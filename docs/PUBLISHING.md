@@ -9,25 +9,25 @@ material was sanitized, and how to verify the publication claims.
 
 - Source tree: the research lab notebook's `opensource/` subtree
   ([cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2) at its `opensource`
-  submodule), **commit `f10ffec`** ("clk: CRG gate parents + read-only PLL/mux model (019);
-  submission series 19 patches"), 2026-11-18.
+  submodule), **commit `6bcea12`** ("lsw: read-only D1b baseline probe (021)"; kernel-patch
+  series 001–021, 2026-11-18).
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
   2026-11-17) exists here.
 - Curated copies may differ from the source tree only by: (a) added publication/provenance
   pages (`README.md`, `NOTICE.md`, `docs/PUBLISHING.md`, this index, licenses, `.gitignore`),
-  (b) absolute host paths sanitized to `~`, (c) tool SPDX headers changed to MIT per the
-  license split in [`NOTICE.md`](../NOTICE.md), (d) one documentation copy under `docs/`
-  whose relative links were adjusted.
+  (b) absolute host paths sanitized to `~` and the project SSH-key filename genericised,
+  (c) tool SPDX headers changed to MIT per the license split in [`NOTICE.md`](../NOTICE.md),
+  (d) one documentation copy under `docs/` whose relative links were adjusted.
 
 ## What is included (and why)
 
 | Content | Why it is published |
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
-| `docs/` (13 engineering documents) | the design, RE specifications, GPL request provenance and the consolidated reversal report |
-| `target-skeleton/` | the schematic OpenWrt target, board DTS, 19 kernel patches, image recipe, base-files and tools — the actual deliverable |
+| `docs/` (15 engineering documents) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance and the consolidated reversal report |
+| `target-skeleton/` | the schematic OpenWrt target, board DTS, 21 kernel patches (001–021), image recipe, base-files and tools — the actual deliverable |
 | `upstream/series-6.18/` | the review-form submission series (cover letter, commit messages, MAINTAINERS proposal, validation logs) |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
@@ -82,7 +82,7 @@ gh api repos/ShibbityShwab/cudy-wr3000v2-openwrt --jq '{private, default_branch,
 | --- | --- |
 | Documentation (`README.md`, `NOTICE.md`, `docs/`, `target-skeleton/README.md`, `target-skeleton/docs/`) | **MIT** (`LICENSE-MIT`) |
 | Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | **MIT** (`LICENSE-MIT`; SPDX `MIT` header in each file) |
-| Kernel code: patches 001–019, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
+| Kernel code: patches 001–021, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
 
 The GPL-2.0-only choice is deliberate provenance: the drivers were derived by documenting the
 interface of the vendor's GPL-declared binaries (see [NOTICE.md](../NOTICE.md)). The MIT/GPL
@@ -102,7 +102,8 @@ tree.
   factory-MAC location `bdinfo+0xde00`), never the values. `MISC-SOC-BLOCKS.md` states the
   redaction rule it follows.
 - **Secrets/keys/tokens** were checked and none are present; the source tree keeps live values
-  in a gitignored directory.
+  in a gitignored directory. The one procedure document that names the project's bench SSH key
+  file refers to it as "the project SSH key" in this curated copy; no key material is published.
 - **No vendor binaries or dumps** were copied in any form (verified by extension scan, by
   `file(1)` type scan — every file is text — and by the repository size).
 - The kernel patches and validation logs are the author's host output; they contain no device
@@ -123,8 +124,9 @@ Link conventions used by the copied documents:
 - `parent:` and bare names such as `STATUS.md`, `BENCH-FACTS.md`, `EVIDENCE-INDEX.md`,
   `mem-entries.md` refer to the lab notebook
   ([cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2)).
-- `opensource/docs/...` and files not curated here (for example `VENDOR-SKB-BRIDGE-PORT.md`,
-  `PUBLISH-READINESS.md`, phase reports) also resolve in the lab notebook's source subtree.
+- `opensource/docs/...` and files not curated here (for example `FIRST-INSTALL.md`,
+  `VENDOR-SKB-BRIDGE-PORT.md`, `PUBLISH-READINESS.md`, `HAZARDS.md`, `FLASH-PLAN.md`, phase
+  reports) also resolve in the lab notebook's source subtree.
 - `~/openwrt-lab*` paths were the author's host build clones (sanitized); `build/`, `dumps/`,
   `firmware/`, `rootfs-*/*` are private local evidence, not part of this repository.
 

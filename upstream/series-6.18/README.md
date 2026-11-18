@@ -5,6 +5,12 @@
 > (the vendor-`.o` purge and license work there); this curated repository was created fresh
 > and contains no vendor binaries. The series is still **not submitted upstream** and has
 > **no hardware validation**. Absolute host paths were sanitized to `~`.
+>
+> **Scope note (target series 001–021).** This review form covers patches **001–019** only.
+> The target tree additionally carries the two fail-closed data-path drafts `020` (PIE ring
+> engine + GEMAC front end) and `021` (read-only LSW baseline probe); they are deliberately
+> excluded from the submission form because they are not merge candidates. Patches `001`-`021`
+> are what the recorded 2026-11-18 host compile applies.
 
 This directory is the **upstream-submission form** of the kernel driver
 series that currently lives as plain patches in

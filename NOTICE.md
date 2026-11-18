@@ -9,8 +9,9 @@ not a flashing guide, and contains no hardware-validated result.
 - Our own documentation: OpenWrt target/device-tree/image design, reverse-engineering
   specifications, the roadmap, the consolidated reversal report and the validation logs.
 - Our own tooling: FIP image-slicing/trailer tools, image builders and mocked host tests.
-- Our own kernel code (as patches): the 19-patch Linux 6.18 series, the draft board DTS and
-  the schematic OpenWrt target/base-files files.
+- Our own kernel code (as patches): the 21-patch Linux 6.18 series (19 patches in upstream
+  review form plus the two fail-closed data-path drafts), the draft board DTS and the
+  schematic OpenWrt target/base-files files.
 
 ## What is deliberately **not** in this repository
 
@@ -52,7 +53,7 @@ and this repository does not claim they are.
 | --- | --- | --- |
 | Documentation (`README.md`, `docs/`, `NOTICE.md`, `target-skeleton/README.md`, `target-skeleton/docs/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` |
 | Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` (SPDX header in each file) |
-| Kernel code: patches 001–019, draft DTS/DTBO, OpenWrt target, image recipe and `base-files/` | GPL-2.0-only — [LICENSE-GPL-2.0](LICENSE-GPL-2.0) | `GPL-2.0-only` (SPDX header in each file) |
+| Kernel code: patches 001–021, draft DTS/DTBO, OpenWrt target, image recipe and `base-files/` | GPL-2.0-only — [LICENSE-GPL-2.0](LICENSE-GPL-2.0) | `GPL-2.0-only` (SPDX header in each file) |
 
 Notes:
 
