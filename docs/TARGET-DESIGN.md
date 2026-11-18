@@ -1,13 +1,17 @@
 # Target design: an upstream OpenWrt port for the Cudy WR3000 v2.0 (HiSilicon luofu / Hi5671Y)
 
 **Status: 2026-11-18. Design proposal - not a submission, not a receipt, not progress.**
-No OpenWrt submission exists today. The target files, board DTS, the kernel patch series
+No OpenWrt submission exists today. A read-only stock-boot inventory (2026-11-18) closed three
+**[U]** rows used below - the live `queue`/`flow` DDR base, the PLL rate/control-word readback and
+the SMP pen-word readback - see [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md); no write,
+build or boot of our code was involved. The target files, board DTS, the kernel patch series
 `patches-6.18/001-017` and a first-pass image/install path are drafts under
 [`../target-skeleton/`](../target-skeleton/README.md): they are host-compile/binding-validated
 (the series builds a full 6.18 kernel and a real target image, SKELETON-SMOKE.md), never booted or
-flashed and not reviewed upstream. Several drivers are explicitly refusing drafts (GEMAC partial,
-PIE 015, LSW 016) and the image carries a NOT FLASHABLE marker until the attended validations
-close. No target PR exists; that remains the recorded fact.
+flashed and not reviewed upstream. Several drivers are explicitly refusing drafts or only arm
+behind an attended opt-in (GEMAC now a draft front end over the arm-gated PIE ring engine,
+LSW 016 still refusing) and the image carries a NOT FLASHABLE marker until the attended
+validations close. No target PR exists; that remains the recorded fact.
 
 This document is the concrete design that the roadmap phases point at. It exists so a reviewer
 can see the target layout, the boot/image requirements (including the vendor loader's FIP
@@ -488,8 +492,16 @@ The device page must not be written, and the target must not claim installabilit
 these is executed end to end on a recovered unit.
 
 **Status (2026-11-18)**: the *upgrade* half of the A/B path is now implemented
-host-side (§5.4) but the *first-install/factory* question above is still open;
-nothing has been flashed.
+host-side (§5.4) and the *first-install* path is now **designed and implemented
+host-side** as option 2: [FIRST-INSTALL.md](FIRST-INSTALL.md) is the design and the
+parent (private) repository carries a fail-closed, read-only-by-default installer tool
+plus a mocked test harness. It writes only the inactive pair (kernel by mtd label,
+rootfs by ubiformat), verifies both regions with full-region sha256 read-backs, and
+performs the handover by writing the written pair's measured record value into the
+SYSCTRL cell; it never writes the env blocks, the active pair, rootfs_data or the vendor
+data partitions. It has **never run on hardware**: the first attended execution, the
+loader env re-stamp, the first boot of the written pair and the recovery cost of a
+successful-but-unwanted boot are all still [U] (FIRST-INSTALL.md sections 8-11).
 
 ### 5.6 Boot arguments
 
@@ -539,18 +551,18 @@ New/derived bindings (propose one YAML per driver; all [I]):
 | block | current compatible in lab DTS | proposed upstream binding / action |
 | --- | --- | --- |
 | board root | `hisilicon,luofu-r116`, `hisilicon,luofu` | keep; add the loader-match properties (`vendor_id`, `board_id`, `board_name`) in the trailer base DTB/overlays only if the match rule requires it (§5.2) |
-| CRG clocks+reset | `hsan,crg` + 16 `hsan,clk-gate` + 2 mux + 2 PLL children | **written** as patch `004`: one `hisilicon,luofu-crg` syscon + simple-mfd node with YAML `clock/hisilicon,luofu-crg.yaml` and header `dt-bindings/clock/hisilicon,luofu-crg.h`; the 16 gates are a driver-side table indexed by the header's IDs (no fake child nodes), and `#reset-cells=<2>` remains the lab `(offset, bit)` form documented and range-checked in the binding/YAML. **extended by patch `019`** (2026-11-18): the four missing fixed clocks plus the real gate parents are in the target DTS and described by the node's `clocks`/`clock-names`; the two PLLs (0x198/0x1e0, status word 0x90) and the two muxes (0x138) are read-only clock outputs of the same provider (new header IDs 16-19, no renumbering) and the binding documents the parent model. PLL `.set_rate` and mux `.set_parent` are deliberately absent/refused (the CPU mux selects the CPU clock source and can hang the core); gate clocks are `CLK_IGNORE_UNUSED` so `clk_disable_unused()` cannot gate a bootloader-enabled clock, and the probe stays register-free. Still TODO: named reset-ID table, one attended PLL rate readback, any write path |
+| CRG clocks+reset | `hsan,crg` + 16 `hsan,clk-gate` + 2 mux + 2 PLL children | **written** as patch `004`: one `hisilicon,luofu-crg` syscon + simple-mfd node with YAML `clock/hisilicon,luofu-crg.yaml` and header `dt-bindings/clock/hisilicon,luofu-crg.h`; the 16 gates are a driver-side table indexed by the header's IDs (no fake child nodes), and `#reset-cells=<2>` remains the lab `(offset, bit)` form documented and range-checked in the binding/YAML. **extended by patch `019`** (2026-11-18): the four missing fixed clocks plus the real gate parents are in the target DTS and described by the node's `clocks`/`clock-names`; the two PLLs (0x198/0x1e0, status word 0x90) and the two muxes (0x138) are read-only clock outputs of the same provider (new header IDs 16-19, no renumbering) and the binding documents the parent model. PLL `.set_rate` and mux `.set_parent` are deliberately absent/refused (the CPU mux selects the CPU clock source and can hang the core); gate clocks are `CLK_IGNORE_UNUSED` so `clk_disable_unused()` cannot gate a bootloader-enabled clock, and the probe stays register-free. Still TODO: named reset-ID table, any PLL/mux write path. **The attended PLL rate readback was taken on the stock boot on 2026-11-18** (read-only): both lock bits set in `0x90`, live `cpu-clk` 1.2 GHz, and the PLL1 control words reproduce exactly that rate - the decoded equation is validated by PLL1; the PLL2 post-divider mapping remains [U] ([MISC-SOC-BLOCKS.md](MISC-SOC-BLOCKS.md) 5.6, [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md) section 4) |
 | watchdog | `hisilicon,luofu-wdt` | **written** as patch `005`: child of the CRG syscon node (no `reg`, no overlapping MMIO), YAML `watchdog/hisilicon,luofu-wdt.yaml`; the vendor magic values/offsets are hwver-2 driver data, no vendor DT properties, no IRQ and no restart handler (both documented TODOs; the restart policy now lives in the patch-`010` `hisilicon,luofu-reboot` driver, which uses the watchdog only as a fallback) |
 | peripheral pinctrl | `hsan,luofu-peri-pinctrl` (the measured driver string) | **written** as patch `011`: `hisilicon,luofu-pinctrl` with the 37 pins / 24 groups / 24 functions tables re-verified from the vendor module, mainline pinmux/pinconf drivers, YAML `pinctrl/hisilicon,luofu-pinctrl.yaml` (no separate dt-bindings header needed); probe writes no register and consumer pin states ([U]) are not attached yet. Host compile only; never booted. |
 | FMC / SPI-NAND | `hisilicon,luofu-fmc` with `bus_id`/`spi_cs`/`enable-quad-mode` vendor props and 17 `fixed-partitions` children | **written** as patch `006`: the controller is a SPI-MEM controller (`drivers/spi/spi-luofu-fmc.c`) and the mainline SPI-NAND stack behind it (`drivers/mtd/nand/spi`, ESMT `F50L1G41LC`) owns chip detection, on-die ECC, OOB layout, bad-block handling and `fixed-partitions`; YAML `Documentation/devicetree/bindings/mtd/hisilicon,luofu-fmc.yaml` (flat `mtd/` - 6.18 has no `mtd/nand/` binding directory). The vendor props are gone: `spi_cs` -> the child's `reg`, `enable-quad-mode` -> `spi-{tx,rx}-bus-width = <4>`, `bus_id` -> nothing; the DTS node becomes a SPI bus with one `spi-nand` child, and its `sfc_rst` reset consumes the CRG 2-cell form (`<&crg 0x2c 0x0>`) and its clock the `LUOFU_CLK_SFC` ID. Still TODO: `u-boot,env` for `enva`/`envb` ([U] format compatibility), read-only flags, the unverified ECC/DMA/partition semantics, and the ESMT F50L1G41LC chip entry is a v6.19 addition that this 6.18 target gets from OpenWrt's generic backport `434-...F50L1G41LC.patch`. Host compile only; never booted. |
-| GEMAC | `hisilicon,luofu-gmac` | **written** as patch `009`: YAML `net/hisilicon,luofu-gmac.yaml`; `phy-mode`, `phy-handle`, one clock and the two CRG reset lines are described; the driver is **PARTIAL** (binding/resource validation only; probe refuses because the TX/RX ring DMA model is not decoded), so the DTS nodes stay `disabled`; `gmac0` is not used by the vendor (mapping: 14380000->phy2, 14400000->phy3, 14480000->phy4 (wired), 14500000->phy5) |
+| GEMAC | `hisilicon,luofu-gmac` | **written** as patch `009`, extended by `020`: YAML `net/hisilicon,luofu-gmac.yaml`; `phy-mode`, `phy-handle`, one clock and the two CRG reset lines are described; patch `009` wrote only the binding/resource half (probe refused, no data path); patch `020` adds a draft **phylink/netdev front end** that registers a netdev only after the PIE ring engine has armed its data path and forwards transmit to it, writing only the measured 1 Gbps link-up/link-down MAC words. The DTS nodes stay `disabled` (the PIE node is arm-gated and the switch egress map is missing); `gmac0` is not used by the vendor (mapping: 14380000->phy2, 14400000->phy3, 14480000->phy4 (wired), 14500000->phy5) |
 | MDIO | `hisilicon,luofu-mdio` | **written** as patch `007`: YAML `net/hisilicon,luofu-mdio.yaml`; the four PHY children are standard `ethernet-phy-ieee802.3-c22`; the seven CRG resets are described and released by the driver before the bus scan |
 | PHY | no node driver; standard PHY child nodes | **written** as patch `008`: a PHYLIB driver for the Hisilicon "Genius" PHY (ID `0x20669a00`, mask `0xffffff00`), bound via PHY ID, not DT compatible, so no YAML is added; the vendor firmware patch load is a TODO |
-| internal switch | `hisilicon,luofu-dp`/`-pfe`/`-lsw-woe`, `hisilicon,luofu-pie` | **D1a written** as patch `016` (2026-11-18): the `hisilicon,luofu-switch` binding (`net/hisilicon,luofu-switch.yaml`) combines the 15 recovered MMIO windows of the vendor `lsw_dp`/`lsw_pfe` nodes (the vendor `queue`/`flow` DDR regions are not modelled - memory the engine consumes, live base [U]); the two CRG clocks, four CRG resets and a switchdev port model (`ethernet-ports` children naming the GEMAC netdev each port uses) are described. The driver is a **probe skeleton**: it validates resources and port model, then refuses to program the switch (`-EOPNOTSUPP`) until the register/queue/port-id model is measured; the DTS node stays `disabled`. Framework decision per [LSW-SPEC.md](LSW-SPEC.md) 9.3: **switchdev over per-port netdevs, not DSA** (no CPU-port tag exists in the recovered model). D1b-D1d (write set, host queue binding, bridge) are still TODO; the vendor switchdev handlers are stubs and its rootif write is a userspace compatibility layer, not a hardware API. |
+| internal switch | `hisilicon,luofu-dp`/`-pfe`/`-lsw-woe`, `hisilicon,luofu-pie` | **D1a + read-only D1b probe written**: patch `016` added the `hisilicon,luofu-switch` binding (`net/hisilicon,luofu-switch.yaml`); patch `021` (2026-11-18) extends it to the measured baseline. The node describes **17 windows**: the 15 recovered MMIO windows of the vendor `lsw_dp`/`lsw_pfe` nodes plus the two DDR regions the engine consumes (**measured live base after the U-Boot overlay: `queue = 0x80000000/4 MiB`, `flow = 0x80400000/1 MiB`**, [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md) section 3.1) - the driver validates the DDR base/size and never ioremaps them; it also checks the `hisilicon,port-bitmap` value (`<0xf01 0x1ff0>`, semantics still unknown), the CRG syscon powered state (gate word `0x20` bits 0/1, four reset lines), and a switchdev port model (`ethernet-ports` children naming the owning GEMAC device). The driver is a **read-only baseline probe**: only after the block passes the powered-state gate does it read the 30-word W1 register baseline and both qid maps, re-derive the qid allocation and compare all 384 measured table words; it never writes a register, registers no netdev/switchdev notifier, and always refuses to program the switch (`-EOPNOTSUPP`). The DTS node stays `disabled`. The derived D1b W2 write set is tabulated in [LSW-SPEC.md](LSW-SPEC.md) 7.7; the writes themselves (W3-W6) are unimplemented and still need attended experiments. Framework decision per [LSW-SPEC.md](LSW-SPEC.md) 9.3: **switchdev over per-port netdevs, not DSA** (no CPU-port tag exists in the recovered model). The vendor switchdev handlers are stubs and its rootif write is a userspace compatibility layer, not a hardware API. |
 | PCIe host | `hisilicon,luofu-pcie` (two domains), vendor `iatu_rc`/`iatu_ep`/`acp-gate` props | **written** as patch `013`: `drivers/pci/controller/dwc/pcie-luofu.c` (+ YAML `pci/hisilicon,luofu-pcie.yaml`) programs the two RCs from DT `ranges`/iATU data with clocks, resets, RC mode and link handling; driver init data carries the iATU tables, and the hard rules are encoded (never read the `misc` window, aligned dwords only). The Wi-Fi endpoint is [X] and its nodes are not enabled. Host compile only; never booted. Reset release now uses the fixed polarity from patch `014`. |
 | thermal | `hisilicon,luofu-tvsensor` + `thermal-zones` | **written** as patch `012`: `drivers/thermal/luofu_tvsensor.c` (read-only, vendor v4 conversion, 6.18 of-thermal API) + YAML `thermal/hisilicon,luofu-tvsensor.yaml`; the DTS zone `cls0-thermal` uses the vendor trips (115/125 C, 3 C hysteresis, 1 s polling) with no cooling map; threshold/IRQ/enable/trim registers are [U] and not written. Host compile only; never booted. |
 | sysctrl/sysenv | vendor blocks `hsan,sysctrl`, `hsan,sysenv`, `hsan,rstinfo` are **not** in the lab DTS | **partly written** as patch `010`: a `hisilicon,luofu-sysctrl` syscon node for page `0x10100000` (boot selector at `0xc08`) plus the `hisilicon,luofu-reboot` node that consumes it; YAMLs `soc/hisilicon/hisilicon,luofu-sysctrl.yaml` and `power/reset/hisilicon,luofu-reboot.yaml`. Still TODO: the nvmem/sysupgrade read path and the selector protocol itself (§3.4) |
-| SMP | `enable-method = "hisilicon,hsan_smp"` | **written** as patch `018` (2026-11-18): the vendor-private method is decoded from the two stock vendor kernels - a SYSCTRL pen write (`SYSCTRL+0xc00`), a CRG resume-bit read-modify-write (`CRG+0x38`, bits from the vendor `core-info` property) and the ARM wakeup IPI; there is no SMC/PSCI in the release path. The port is `arch/arm/mach-hisilicon/platsmp.c` with `CPU_METHOD_OF_DECLARE(luofu_smp, "hisilicon,luofu-smp", ...)` and a fail-safe missing-node path; the DTS selects the documented method. Register offsets/bit numbers are driver data (no new binding). Host compile only; the release has **never run on hardware**. Evidence, risks and the staged UP-first -> attended plan: [SMP-RE.md](SMP-RE.md). |
+| SMP | `enable-method = "hisilicon,hsan_smp"` | **written** as patch `018` (2026-11-18): the vendor-private method is decoded from the two stock vendor kernels - a SYSCTRL pen write (`SYSCTRL+0xc00`), a CRG resume-bit read-modify-write (`CRG+0x38`, bits from the vendor `core-info` property) and the ARM wakeup IPI; there is no SMC/PSCI in the release path. The port is `arch/arm/mach-hisilicon/platsmp.c` with `CPU_METHOD_OF_DECLARE(luofu_smp, "hisilicon,luofu-smp", ...)` and a fail-safe missing-node path; the DTS selects the documented method. Register offsets/bit numbers are driver data (no new binding). Host compile only; the release has **never run on our hardware**. **Read-only baseline 2026-11-18:** the live SYSCTRL pen word reads `0x80609680`, exactly the decoded `__pa_symbol(secondary_startup)` value, and the live stock `/proc/cmdline` carries `maxcpus=2 nr_cpus=2 additional_cpus=1` - the decode is confirmed on the vendor boot; only a boot of our kernel can confirm our side ([SMP-RE.md](SMP-RE.md) 3.4/3.5, [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md) section 5). Evidence, risks and the staged UP-first -> attended plan: [SMP-RE.md](SMP-RE.md). |
 | CPU OPP/regulators | absent (TODO in lab DTS) | optional for a first submission: fixed-rate CPU is acceptable if documented; otherwise OPP table + `pwm-regulator` + efuse/nvmem cells; YAMLs as needed |
 | efuse/RNG/LED PWM/PMU PWM/clk-corrector/net-cdev/woe_dev/woe_wifi | absent from the lab DTS; `hsan,*` in the pinned tree | **decisions made** in [MISC-SOC-BLOCKS.md](MISC-SOC-BLOCKS.md) (2026-11-18): MAC comes from bdinfo `0xde00` (no efuse MAC cell); eFuse write path is NOT to be ported (one-way fences/key material); RNG is a software jitterentropy wrapper (drop, use mainline+urngd); LED PWM is dead on this board (out of scope); PMU PWM is the `vdd_logic` pwm-regulator (optional, attended power-rail work); CRG parents/PLLs/muxes are decoded for a future CRG extension. No bindings invented for unused blocks. |
 
@@ -588,8 +600,8 @@ snapshot READMEs. [V] `tools/lab-src/FILES`; `tools/check-lab-src.sh`.
 | pinctrl | `lab/luofu-pinctrl/luofu-pinctrl.c` (published snapshot; 640 lines body) | [V] 37 pins / 24 groups / 24 functions transcribed; `set_mux` implemented from the vendor algorithm; pinconf bits decoded from the vendor module's config ops | [I] **draft in-tree driver written** (2026-11-18, patch `011`): `drivers/pinctrl/hisilicon/pinctrl-luofu.c` + YAML, mainline framework, six generic pinconf params decoded from the module; probe writes nothing, no consumer states yet (vendor DTS attaches none), reset absent in the vendor node. Still open: drive-strength mA mapping, probe/default pin state, MDIO two-state question, bench confirmation. **Host compile only; never booted.** |
 | MDIO | `tools/lab-src/drivers/net/ethernet/luofu/luofu-mdio.c` (508 lines) | [V] MMIO transfer layout recovered from `hi_kmdio.ko`; live vendor topology measured (PHY 2..5 on `mdio0`); the lab MDIO/GEMAC carry a link, but with the vendor `hi_kphy` bound (M2 not met) | [I] **draft in-tree driver written** (2026-11-18, patch `007`): `drivers/net/mdio/mdio-luofu.c` on the 6.18 MDIO bus API (`devm_mdiobus_alloc_size` + `of_mdiobus_register`), gate clock + the seven CRG resets, YAML `net/hisilicon,luofu-mdio.yaml`; the register model/polled handshake is the one the previous out-of-tree 5.10 driver exercised on the lab board (a real C22 read of PHY ID `0x20669a09`), but **this port has only been host-compiled** - never booted, no bench run. Upstream review is open (the reset-array ordering assumption is documented). |
 | Genius PHY | `tools/lab-src/drivers/net/ethernet/luofu/luofu-phy.c` (44 lines) | [V] PHY ID/mask recovered; genphy ops only; link/autoneg expected to work without the vendor patch | [I] **draft in-tree driver written** (2026-11-18, patch `008`): `drivers/net/phy/luofu-phy.c`, PHYLIB driver matched by PHY ID (`0x20669a00`/mask `0xffffff00`) with the generic clause 22 ops; no binding is added because the PHY is ID-matched and the nodes stay standard C22. The per-PHY firmware patch (`lsw/hi_ephy_%xv%x.bin`) load path is still a TODO, and the driver has only been host-compiled - never booted. |
-| GEMAC | `tools/lab-src/drivers/net/ethernet/luofu/luofu-gmac.c` (717 lines) | [V] phylink driver frame; netdev; the vendor MAC is a phylink driver, so the shape is right; an earlier bring-up got a link via the lab MAC (`ETHERNET-BRINGUP-FRAMING.md`), and the final hybrid stack ran on vendor modules; no lab-MAC data path is proven | [I] **partial in-tree port written** (2026-11-18, patch `009`): `drivers/net/ethernet/hisilicon/luofu-gmac.c` claims the binding (`net/hisilicon,luofu-gmac.yaml`) and validates reg/clocks/resets/phy-mode/phy-handle, then **refuses to probe**: the TX/RX ring DMA model is not implemented and has never been decoded (the lab header's "rings are staged" was a comment without code, and the vendor's transmit helper is exported by another vendor module). No netdev is registered and the DTS nodes are `disabled`. Still needed: the ring/DMA model, NAPI TX/RX, DMA mapping, the MAC port-mode programming, then enable the nodes; the data path is the PIE engine and is specified in [PIE-DATAPATH.md](PIE-DATAPATH.md) (2026-11-18). M2 ("no vendor network modules") remains **NOT MET**. |
-| internal LSW switch | **none** - only reverse-engineered vendor modules (`hi_lsw_pub/dp/pfe`, `hi_swa`) | [X] no driver source in either tree; the register blocks/port bitmap are in the DTS; the RE specification is [LSW-SPEC.md](LSW-SPEC.md) (module layering, synthetic module-id register map, port/queue/qid model, table formats, vendor switchdev stubs and rootif correction) | [I] the largest new SoC-side driver: **switchdev over per-port netdevs** (not DSA - no tag/CPU-port evidence), table/VLAN/learning/port config; driver/binding still unwritten, D1/D2 plan and bench campaign in LSW-SPEC.md. The PIE packet-engine draft is patch `015` (resources + ring scaffolding, refuses to bring up the data path); it must be integrated with this switch's egress qid/port map before Ethernet can work. |
+| GEMAC | `tools/lab-src/drivers/net/ethernet/luofu/luofu-gmac.c` (717 lines) | [V] phylink driver frame; netdev; the vendor MAC is a phylink driver, so the shape is right; an earlier bring-up got a link via the lab MAC (`ETHERNET-BRINGUP-FRAMING.md`) and its `mac_link_up` programmed the measured 1 Gbps PORT_MODE value; the final hybrid stack ran on vendor modules; no lab-MAC data path is proven | [I] **draft in-tree port written as patches `009` + `020`** (2026-11-18): `drivers/net/ethernet/hisilicon/luofu-gmac.c` owns the net_device and a 6.18 phylink front end and forwards its transmit path to the PIE ring engine. It registers a netdev only after the PIE backend has armed its data path, and the only MAC register writes are the measured link-up/link-down words (PORT_MODE `0x010c0008`, MODE_CHANGE_EN bracket, MAC enable) - `mac_config()` stays a no-op because the lab driver showed that touching the block from phylink's config path can hang the AHB bus. The DTS nodes stay `disabled`. Still needed: RX delivery (PIE completion decode is [U]), the internal-switch egress map before any traffic claim, and attended bring-up. M2 ("no vendor network modules") remains **NOT MET**. |
+| internal LSW switch | **none** - only reverse-engineered vendor modules (`hi_lsw_pub/dp/pfe`, `hi_swa`) | [X] no driver source in either tree; the register blocks/port bitmap are in the DTS; the RE specification is [LSW-SPEC.md](LSW-SPEC.md) (module layering, synthetic module-id register map, port/queue/qid model, table formats, vendor switchdev stubs and rootif correction) | [I] the largest new SoC-side driver: **switchdev over per-port netdevs** (not DSA - no tag/CPU-port evidence), table/VLAN/learning/port config; a draft binding and a **read-only baseline probe** exist (patches `016`/`021`, host-compiled, never run: resources, powered state and the measured register/qid-map baseline are validated and programming is refused); the data path, the write set and the switchdev offload remain unwritten, D1/D2 plan and bench campaign in LSW-SPEC.md. The PIE packet-engine draft is patches `015` + `020` (draft ring engine: coherent descriptor rings for the measured two active channels, recovered channel/IRQ init, NAPI RX path and TX producer, arm-gated behind `luofu_pie.arm=1`; RX completion decode still [U]); it must be integrated with this switch's egress qid/port map before Ethernet can work. |
 | PCIe host | `lab/luofu-pcie/luofu-pcie.c` (1,664 lines) | [V] read-only inventory frame; DWC link state; a compile-gated bring-up exists but **was never validated**; the driver does not call `pci_host_probe()`; the misc window is write-only/forbidden to read; sub-word/unaligned accesses fault (panic class) | [I] **draft in-tree host driver written** (2026-11-18, patch `013`): `drivers/pci/controller/dwc/pcie-luofu.c` + YAML, DT `ranges`/iATU data, clocks/resets (fixed polarity via `014`), RC mode, link handling, `pci_host_probe`; the endpoint power GPIOs and real enumeration remain unverified, and the Wi-Fi endpoint driver is [X]. **Host compile only; never booted.** |
 | thermal | `lab/luofu-thermal/luofu-thermal.c` | [V] temperature conversion decoded and numerically verified; threshold writes staged | [I] **draft in-tree driver written** (2026-11-18, patch `012`): `drivers/thermal/luofu_tvsensor.c` (read-only, vendor v4 formula) + YAML, DTS zone `cls0-thermal` with the vendor trips and polling delay; threshold/IRQ/enable/trim registers remain [U] and are not written; no cooling map (net cooling depends on the LSW block). **Host compile only; never booted.** |
 | Wi-Fi | `lab/luofu-wifi/`, `lab/wifidrv0`, `lab/wifidrv1` | [V] a cfg80211 wiphy+netdev was registered in an earlier phase; the takeover reaches the firmware dialogue; **no data path**; see §8.3 | [X] blocked; not part of the first submission |
@@ -630,9 +642,21 @@ the largest SoC-side work item. **Framework decision (2026-11-18, [LSW-SPEC.md](
 wired port already has its own GEMAC netdev, and the vendor's own (stub) integration is
 switchdev. The first slice is **D1a**, patch `016`: a `hisilicon,luofu-switch` binding and probe
 skeleton that validates the register windows, clocks, resets and port model and then refuses to
-program the switch; the DTS node stays `disabled`, so a normal boot never reaches it. The
+program the switch; the DTS node stays `disabled`, so a normal boot never reaches it. Patch
+`021` turns that skeleton into a **read-only D1b baseline probe**: the binding now also carries
+the two engine DDR windows (measured live `queue = 0x80000000/4 MiB`, `flow = 0x80400000/1 MiB`)
+and the `hisilicon,port-bitmap` value; the driver gates its register reads on the measured
+powered state (both CRG gate bits set read-only through the CRG syscon, all four reset lines
+released, active-low polarity from patch `014`), then validates the 30-word W1 register
+baseline and re-derives both qid maps, comparing all 384 measured table words (table A ports
+4-12 qids 1-72, table B ports 40-43 qids 73-104). It still never writes a register and always
+fails closed. The
 forwarding milestone (D1b-D1d: reviewed write set, PIE host-queue binding, Linux bridge) still
-needs the attended register inventory and is the largest remaining SoC data-path item. [I]
+needs attended write experiments and is the largest remaining SoC data-path item; the derived W2
+write set is tabulated in [LSW-SPEC.md](LSW-SPEC.md) 7.7. [I] The **read-only** half is measured
+(2026-11-18): live windows plus the queue/flow DDR base, the per-port qid tables A/B and the W1
+register baseline, all in [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md) section 3. No switch
+register was written.
 
 ### 8.2 PCIe host
 
@@ -678,7 +702,9 @@ Do not present the bench wifidrv/takeover line as an upstream driver. [V] `PORT-
 - The trailer is currently copied from a vendor-derived local artifact and **cannot be regenerated
   from published material yet**; §5.2 is the plan to close that. [V] `PUBLISH-READINESS.md`
   checklist item "Reproducible artifact"; ledger 2026-11-17 00:20.
-- Install path (§5.5) is open; no device page can be written before it is executed.
+- Install path (§5.5): a host-side design and fail-closed tool now exist
+  ([FIRST-INSTALL.md](FIRST-INSTALL.md)), but the path is **unexecuted**; no device page
+  can be written before one attended end-to-end install on a recovered unit.
 
 ### 8.5 Environment/selector and SMP
 
@@ -693,7 +719,11 @@ has never run on our kernel - [SMP-RE.md](SMP-RE.md) has the evidence, the risks
 (UP-first mergeable -> attended bring-up) and the [U] list. UP is acceptable for a first
 submission: the driver is fail-safe without the DTS enable-method, so an UP-first form is
 the staged fallback and no SMP claim is made before the attended acceptance in that
-document is met.
+document is met. **Read-only baseline 2026-11-18:** the live SYSCTRL cell `0xc00` reads
+`0x80609680` (exactly the decoded `__pa_symbol(secondary_startup)`), `0xc08` reads
+`0x00000010` (pair A; upper 24 bits zero), and the live cmdline carries
+`maxcpus=2 nr_cpus=2 additional_cpus=1`; the decoded values are confirmed on the vendor boot, while
+the release itself still has not run on our kernel ([SMP-RE.md](SMP-RE.md) 3.4/3.5).
 
 ### 8.6 GPL source dependency
 
@@ -760,10 +790,11 @@ device fact, not a percentage.
 **Explicitly not met today** (2026-11-18): every row above except the identity warning. There
 is no target PR, no DTS submission, no image recipe, no install path and no WiFi answer; the
 target/DTS drafts and the driver drafts under `../target-skeleton/` (CRG, watchdog, FMC/SPI-NAND,
-MDIO bus, Genius PHY, partial GEMAC, provisional restart, pinctrl, thermal, PCIe host) are
-host-only skeleton work (compile/binding-validated, never booted, not reviewed upstream); the
-GEMAC data path does not exist (its PIE specification is [PIE-DATAPATH.md](PIE-DATAPATH.md)), and
-the internal switch driver is still unwritten (its specification and D1/D2 plan are in
+MDIO bus, Genius PHY, GEMAC front end, PIE ring engine, provisional restart, pinctrl, thermal,
+PCIe host) are host-only skeleton work (compile/binding-validated, never booted, not reviewed
+upstream); the PIE ring engine keeps the transmit half behind an attended arm gate, RX delivery is
+still [U] and the internal switch data path is still unimplemented (the draft is a read-only
+baseline probe, patches `016`/`021`; its specification and D1/D2 plan are in
 [LSW-SPEC.md](LSW-SPEC.md)).
 
 ---
@@ -829,11 +860,20 @@ Ledger entry dates used above are the parent `mem-entries.md` headings; the newe
    region, and why the bench artifact was cut to 40,732 B. (§3.2, §5.2)
 2. **Boot arguments** - how `root=`/`ubi.*` reaches the kernel; whether the loader overrides
    `/chosen/bootargs` from its environment. (§5.6)
-3. **Install path** - characterization of the stock TFTP recovery write path vs the documented
-   vendor-root install. (§5.5)
+3. **Install path** - DESIGNED AND IMPLEMENTED HOST-SIDE 2026-11-18: the documented
+   vendor-root install (option 2) is encoded in the parent tool
+   tools/first-install-stock.sh, with design, preconditions, expected UART/loader
+   output, rollback/recovery cost and the [U] list in
+   [FIRST-INSTALL.md](FIRST-INSTALL.md). The tool is read-only by default, refuses
+   without the attended/recovery flags, writes only the inactive pair and never the env,
+   and its mocked tests pass 144/144. Still [U]: one attended end-to-end execution
+   (write -> handover -> first boot), the loader env re-stamp, the recovery cost after a
+   successful boot, and the stock TFTP recovery write path (§5.5).
 4. **Selector protocol** - exact env-block/bootreg write sequence and value for both pairs; a
    read path usable from Linux. Patch `010` only writes back the value it has just read
-   (a write-same), so the protocol itself is still open. (§3.4)
+   (a write-same), so the protocol itself is still open. The 2026-11-18 read-only read of `0xc08`
+   = `0x00000010` shows the upper 24 bits are zero on this boot, consistent with the low-byte
+   read-modify-write model; the write protocol is still [U]. (§3.4)
 5. **MAC address / efuse - RESOLVED (2026-11-18).** The factory MAC is in the encrypted `bdinfo`
    partition (mtd6): plaintext 6-byte copy at `0xde00` (vendor userspace reads it with
    `mtd_get_mac_binary bdinfo 0xde00` / `bdinfo mac`; WAN = base+1). The efuse has no MAC cell, `fac`
@@ -856,7 +896,9 @@ Ledger entry dates used above are the parent `mem-entries.md` headings; the newe
    both stock vendor kernels and ported as patch `018` (`hisilicon,luofu-smp`,
    [SMP-RE.md](SMP-RE.md)). Is UP acceptable for a first submission? **Yes** - an UP-first
    form with the method absent is mergeable and is the staged fallback (§8.5); the SMP
-   claim itself waits for the attended acceptance in SMP-RE.md. (§7.1)
+   claim itself waits for the attended acceptance in SMP-RE.md. The 2026-11-18 read-only stock
+   boot measured the vendor pen word at `0x80609680` (matching the decode) and the 2-CPU cmdline;
+   our kernel's release is still unrun. (§7.1)
 9. **Wi-Fi scope statement** - the exact wording for the device page/target PR that does not
    claim an open radio. (§8.3)
 10. **Publication sequence** - the history purge must happen before the target/driver series can be
