@@ -1,0 +1,2535 @@
+# Target-skeleton smoke test (2026-11-18)
+
+**Status: structure accepted by OpenWrt main; the kernel patch series (including the
+2026-11-18 early-boot `TEXT_OFFSET` fix, patch `003`) applies; the config re-derives
+with the tree's own OpenWrt GCC 14.4 toolchain; and `make target/linux/compile` now
+completes RC=0, producing `arch/arm/boot/zImage` with the correct `0x80608000`
+load/entry address. A first FIP kernel slice was then assembled from our own DTB +
+overlay + uImage and structurally validated (fourth session below). The **real drivers**
+added so far - CRG clock/reset controller (`004`), watchdog (`005`), and the
+network trio MDIO bus (`007`), Genius PHY (`008`) and a **partial** GEMAC
+(`009`), with device-tree bindings - compile into the same kernel (fifth and sixth
+sessions below); they have **never run on hardware**, and the GEMAC has no data path
+(its DTS nodes stay disabled). Nothing has been booted: no rootfs, no sysupgrade
+container, no install path, no boot, and the rest of the driver series does not
+exist.**
+
+This page records the host-side validation of [`target-skeleton/`](../target-skeleton/README.md)
+against a real OpenWrt tree (six sessions on 2026-11-18: the target-layout smoke test
+below, the kernel patch/config session, the `TEXT_OFFSET` + full-kernel-compile
+session, the first own-artifact FIP kernel slice, the first driver series, and the
+network trio appended at the end). It is not a target build result and must not be cited as one: the build
+products it records are the kernel compile product, a structurally validated kernel
+slice and the two driver objects linked into that kernel - no rootfs, no sysupgrade
+container, no install image and no boot.
+
+## Environment
+
+- OpenWrt `main`, shallow clone, commit `27663a0` (2026-11-18).
+- Host: Linux x86_64, 16 cores, 820 GB free. No feeds were updated; no toolchain was built.
+- Kernel sources downloaded by `make target/linux/prepare`: `linux-6.18.60.tar.xz` (148 MB).
+
+## What was run
+
+1. `git clone --depth 1 --single-branch --branch main https://github.com/openwrt/openwrt.git`
+2. Copied the skeleton target directory to `target/linux/hisilicon/`, applying the layout
+   adaptations listed below.
+3. Seeded `.config` with:
+
+   ```
+   CONFIG_TARGET_hisilicon=y
+   CONFIG_TARGET_hisilicon_luofu=y
+   ```
+
+4. `make defconfig` → **PASS** ("configuration written to .config", no target/image errors).
+   It generated, among others:
+
+   ```
+   CONFIG_TARGET_hisilicon=y
+   CONFIG_TARGET_hisilicon_luofu=y
+   CONFIG_TARGET_hisilicon_luofu_DEVICE_cudy_wr3000-v2=y
+   CONFIG_TARGET_BOARD="hisilicon"
+   CONFIG_TARGET_SUBTARGET="luofu"
+   CONFIG_TARGET_PROFILE="DEVICE_cudy_wr3000-v2"
+   ```
+
+   (The package "has a dependency on ... which does not exist" warnings are feed-related and
+   expected on a clone without `./scripts/feeds update`; no target/image warning was emitted.)
+
+5. `make target/linux/prepare` → **RC=0**. The 6.18.60 kernel source was fetched, unpacked into
+   `build_dir/target-arm_cortex-a9_musl_eabi/linux-hisilicon_luofu/linux-6.18.60/`, and the
+   target prepare step completed without error.
+
+## Layout adaptations applied during the smoke (now reflected in the skeleton)
+
+Main's image idiom differs from the first skeleton draft, so the published skeleton was
+restructured to match the tree that accepted it:
+
+| change | why |
+| --- | --- |
+| board-level `image/Makefile` (includes `image.mk`, `include $(SUBTARGET).mk`, `BuildImage`) | main includes the subtarget image file from the board image Makefile |
+| subtarget image definitions moved to `image/luofu.mk` | same idiom as `target/linux/mediatek/image/*.mk` |
+| `DEVICE_DTS_DIR := ../dts` + `dts/luofu-r116.dts` in the target | main's supported external-DTS mechanism |
+| `base-files/etc/board.d/02_network` at board level | board-level base-files is the main idiom |
+| `KERNEL_PATCHVER:=6.18` and a `luofu/config-6.18` placeholder | the tree's kernel version at the time of the test |
+| profile stub renamed `.mk.unused` | main derives TARGET/DEVICE symbols from the image device stanza, not `profiles/` |
+
+## What this proves
+
+- The target directory **shape** is accepted by OpenWrt main's target/image metadata generation.
+- The device stanza parses and produces the expected `CONFIG_TARGET_hisilicon_luofu_DEVICE_*`
+  symbol; target/board/subtarget/profile selection works.
+- `target/linux/prepare` completes for the target, so the tree can fetch/unpack the kernel with
+  this target present.
+
+## What this does **not** prove
+
+- **No kernel compiled.** The kernel platform patch does not exist
+  (`arch/arm/mach-hisilicon`, `ARCH_HISI`/`ARCH_LUOFU`, DTS Makefile entry, `TEXT_OFFSET`), so a
+  kernel build would fail at the platform stage.
+- `luofu/config-6.18` is a placeholder derived from the lab 5.10.201 tree, **not** a re-derived
+  6.18 config; `make defconfig`/prepare do not validate it.
+- **No image built.** The custom image steps (`luofu-uimage`, `fip-slice`, `fip-manifest`,
+  `luofu-rootfs-ubi`, the sysupgrade wrapper) are schematics and are not referenced by the
+  `IMAGE/` chain yet; no factory/install stanza exists.
+- **No `dtbs_check`** on the draft DTS, and no boot on hardware.
+- Trailer generation was **decoded and implemented separately on 2026-11-18**
+  (`target-skeleton/docs/TRAILER-FORMAT.md`; `make-trailer` reproduces both vendor containers
+  byte-for-byte), but this smoke test did not exercise the trailer path, and a novel generated
+  trailer still needs one attended boot.
+- No feeds, packages, or toolchain were built.
+
+## Next blockers to expect when a real build is attempted
+
+1. Kernel platform patch + machine descriptor + DTS Makefile entries (TARGET-DESIGN.md 4.1, 7.1).
+2. Re-derived kernel config against 6.18 (TARGET-DESIGN.md 4.2).
+3. Wiring the custom image chain to `fip-slice.py` and the UBI step; the trailer must come from a
+   legitimate input, not fabrication (TARGET-DESIGN.md 5.2, 5.3).
+4. `platform.sh`/sysupgrade metadata and the A/B selector/install path (TARGET-DESIGN.md 5.4, 5.5).
+5. Switch driver (DSA vs switchdev) before `board.d` can assign any interface (TARGET-DESIGN.md 8.1).
+
+(Items 1-2 above were addressed at draft level in the later 2026-11-18 session below;
+items 3-5 remain.)
+
+---
+
+## 2026-11-18 (later session): kernel patch series + config re-derivation + compile stage
+
+**Status: the series applies cleanly in the real tree; the config re-derives with the
+tree's own OpenWrt GCC 14.4.0 toolchain (idempotent); the new machine code compiles with
+that toolchain; the full kernel build is blocked by ONE platform-patch defect (the
+non-immediate `TEXT_OFFSET`). No image, no boot. Publication NOT READY.**
+
+> **Update (third session, same day, below):** the compile blocker described in this
+> section (the non-immediate `TEXT_OFFSET`) is fixed by patch `003`; the full kernel
+> compile now reaches RC=0 and produces `zImage` with load/entry `0x80608000`. Every
+> other statement in this section (config derivation, patch application, no image, no
+> boot) still stands. See the third-session section at the end.
+
+Second host-side session against the same clone: `openwrt main` `27663a0`,
+`linux-6.18.60`, no feeds updated, no device. The first pass derived the config with a
+cross-compiler override before the tree's toolchain existed; the canonical top-level
+`make kernel_oldconfig` was then run to completion (toolchain built from source) and
+the compile stage was repeated with the real compiler. Logs and artifacts are local-only
+under `build/linux-kbuild/waves/upstream-6.18-patches-20261118/` (gitignored; sha256
+list inside). None of this is a build result for the target: the target's image recipe,
+drivers and userspace do not exist.
+
+### What was added to the skeleton
+
+| artifact | sha256 |
+| --- | --- |
+| `target/linux/hisilicon/patches-6.18/001-arm-mach-hisilicon-luofu.patch` | `996bf896e6191d24e6b1e8e4456112e7ce985963e1d40cf37cb5ff8f10688d1d` |
+| `target/linux/hisilicon/patches-6.18/002-arm-kconfig-textofs.patch` | `278bb1a01427b31dc79d02b534e4cc4fae9e418698dad16afeea26a40af95796` |
+| `target/linux/hisilicon/luofu/config-6.18` (re-derived with the tree's GCC 14.4 toolchain, annotated) | `2fdf4aea7a8074137d3e949684f17fc24155c9a7d10765cae8fd3b5d74057731` |
+
+- `001`: new `arch/arm/mach-hisilicon/{Kconfig,Makefile,luofu.c}`. `ARCH_LUOFU`
+  depends on the existing upstream `ARCH_HISI` (it is not redefined); the machine
+  descriptor sets only `dt_compat` (`cudy,wr3000-v2`, `hisilicon,luofu-r116`,
+  `hisilicon,luofu`) and the L2 AUX replay (`0x430001`, mask `~0`, with a TODO to
+  verify the vendor mask `0xffb0fffe` and decode the latency fields on hardware).
+  `map_io`/`init_early`/`init_time`/`init_machine` are intentionally not set (DT
+  platform defaults; `drivers/of/platform.c` populates the DT platform devices);
+  `.smp` and `.restart` are documented TODOs (UP-only first submission; no reboot
+  driver). No bench breadcrumbs / vendor symbol stubs / vendor `dt_compat` from the
+  lab `mach-luofu/luofu.c`.
+- `002`: `source "arch/arm/mach-hisilicon/Kconfig"` in `arch/arm/Kconfig`,
+  `machine-$(CONFIG_ARCH_LUOFU) += hisilicon` and
+  `textofs-$(CONFIG_ARCH_LUOFU) := 0x00608000` in `arch/arm/Makefile`.
+- `003-arm-dts-makefile.patch` was **not** created on purpose: the board DTS is
+  delivered by the target's `dts/` + `DEVICE_DTS_DIR := ../dts` mechanism; adding a
+  second copy under `arch/arm/boot/dts` would be the hand-maintained duplicate the
+  design forbids (TARGET-DESIGN.md section 6.1).
+- `luofu/config-6.18`: the 5.10 copy was replaced by the re-derived 6.18 delta
+  (derivation and provenance below). `config-5.10` stays as the 5.10 reference.
+
+### Environment shims needed (host-only, outside the repository, reversible)
+
+The clone has no OpenWrt toolchain and no feeds; the earlier `make defconfig` run had
+not built host tools. Three local shims were required. They are **not** part of the
+deliverable, but without them the tree's own stages cannot start:
+
+1. `staging_dir/host/bin/{m4,flex,bison}` symlinked to the system tools. Without them
+   the kernel kconfig build dies with
+   `flex: fatal internal error, exec of .../staging_dir/host/bin/m4 failed`.
+2. `staging_dir/host/bin/bison` replaced with a wrapper that runs the system
+   `/usr/bin/bison` with `BISON_PKGDATADIR=/usr/share/bison`; the plain symlink fails
+   with `bison: .../share/bison/m4sugar/m4sugar.m4: cannot open: No such file or
+   directory` because bison resolves its data dir from its own path.
+3. cross-compiler override on the make command line,
+   `KERNEL_CROSS=<repo>/build/linux-kbuild/toolchain/bin/arm-none-linux-gnueabihf-`,
+   `KERNEL_CC=...-gcc` (Arm GNU Toolchain 11.3). Without it:
+   `scripts/Kconfig.include:40: C compiler 'arm-openwrt-linux-muslgnueabi-gcc' not
+   found`. The tree's own toolchain is gcc-14.4.0 (visible in the `KCFLAGS` of every
+   OpenWrt log line) and was not built in the first pass; the canonical top-level
+   `make kernel_oldconfig` starts by building the host tools and the toolchain, and the
+   first bounded attempt was cut off at the host-tools stage (RC=124, evidence log
+   `13-kernel_oldconfig-toplevel.log`). That attempt was later completed: see the
+   canonical re-derivation in Stage 2 and the canonical compile rerun in Stage 3.
+
+### Stage 1 - patch application: PASS
+
+Copied the repository `target/linux/hisilicon/` to the clone, added the target DTS as
+`target/linux/hisilicon/dts/luofu-r116.dts` (the existing smoke-test layout), and ran:
+
+```
+$ cd ~/openwrt-lab
+$ make target/linux/prepare
+...
+time: target/linux/prereq#0.04#0.03#0.07
+RC=0
+```
+
+Result: `RC=0`; the tree was re-extracted and patched
+(`build_dir/target-arm_cortex-a9_musl_eabi/linux-hisilicon_luofu/linux-6.18.60`), no
+`.rej`/`.orig` files, and the patched tree contains:
+
+```
+arch/arm/mach-hisilicon/Kconfig   (ARCH_LUOFU)
+arch/arm/mach-hisilicon/Makefile  (obj-y += luofu.o)
+arch/arm/mach-hisilicon/luofu.c   (DT_MACHINE_START LUOFU)
+arch/arm/Kconfig:396              source "arch/arm/mach-hisilicon/Kconfig"
+arch/arm/Makefile:175             textofs-$(CONFIG_ARCH_LUOFU) := 0x00608000
+arch/arm/Makefile:200             machine-$(CONFIG_ARCH_LUOFU) += hisilicon
+```
+
+Both patches also pass `patch -p1 --dry-run` against the pristine 6.18.60 source
+(`checking file ...`, exit 0). Caveat: the first prepare invocation that added the
+patch directory printed only the outer make lines; the resulting tree was verified
+file-by-file instead (the `.prepared` stamp name changed from `5a37066a...` to
+`a3192102...`, i.e. the kernel file-digest dependency forced the re-extract).
+
+### Stage 2 - kernel config derivation: PASS, after fixing the placeholder
+
+Command (the tree's own path, non-interactive preset on stdin):
+
+```
+$ cd openwrt-lab
+$ yes '' | make -C target/linux TOPDIR=$PWD oldconfig V=s \
+      KERNEL_CROSS=<repo>/build/linux-kbuild/toolchain/bin/arm-none-linux-gnueabihf- \
+      KERNEL_CC=<...>-gcc
+...
+~/openwrt-lab/scripts/kconfig.pl - '>' \
+    target/linux/generic/config-6.18 \
+    build_dir/.../linux-6.18.60/.config target/linux/generic/config-filter \
+    > target/linux/hisilicon/luofu/config-6.18
+RC=0
+```
+
+That is the OpenWrt path exactly: `scripts/kconfig.pl + generic target` merge, kernel
+`make oldconfig`, then `scripts/kconfig.pl - '>'` diff against the generic config
+(with `generic/config-filter`) written back to the subtarget config.
+
+**Placeholder bug found first (why the old `config-6.18` was wrong):** with the
+5.10-derived reference as input, oldconfig *succeeds* but silently loses the platform:
+`# CONFIG_ARCH_MULTI_V7 is not set` (the reference only carried lab values, not the
+ARM platform selection), so `ARCH_MULTI_CPU_AUTO` falls back to ARMv5 and the delta
+contains `CONFIG_CPU_ARM926T=y`, big-endian, no `ARCH_HISI`/`ARCH_LUOFU`. Evidence:
+`05-baseline-derived-config-6.18` in the evidence directory. This is the proof the
+previous placeholder did **not** validate a 6.18 build.
+
+**Fix + re-derivation:** the user-selectable symbols the local lab 5.10.201 `.config`
+has were restored before the derivation (`ARCH_MULTIPLATFORM=y`, `ARCH_MULTI_V7=y`,
+`ARM_THUMB=y`, `VFP=y`, `VFPv3=y`; `CPU_LITTLE_ENDIAN` resolved from the choice).
+Re-running the same command gave `RC=0` with:
+
+```
+CONFIG_ARCH_HISI=y
+CONFIG_ARCH_LUOFU=y
+CONFIG_ARCH_MULTI_V7=y
+CONFIG_CPU_V7=y
+CONFIG_CPU_LITTLE_ENDIAN=y
+CONFIG_SMP=y
+CONFIG_NR_CPUS=2
+CONFIG_VFP=y
+CONFIG_VFPv3=y
+```
+
+A second run with the derived file as input reproduced **byte-identical** output and a
+byte-identical kernel `.config` (`CONFIG_DERIVATION_IDEMPOTENT`,
+`KCONFIG_IDEMPOTENT`). The final committed file is the machine-derived delta plus
+comments; `scripts/kconfig.pl` merges it to exactly the same map as the un-annotated
+delta with no warnings (`ANNOTATED_CONFIG_MERGES_IDENTICALLY`).
+
+**Provenance of the delta** (marked inline in the file; the first-pass version had 282
+symbols, the committed canonical one has 281 - see above):
+
+- 6 user-selectable symbols restored before derivation (**[P]**); 46 symbols whose value
+  is carried from the lab 5.10.201 reference (**[L]**); the rest are what 6.18
+  oldconfig/select-default resolution produced (not a design choice).
+- 22 symbols in the 5.10 reference are **not** in the delta because they equal the
+  generic config (`CONFIG_MTD`, `CONFIG_NET`, `CONFIG_SERIAL_8250`,
+  `CONFIG_JFFS2_FS`, `CONFIG_SQUASHFS`, ... - the delta format omits generic values).
+- 13 reference symbols were **dropped** by 6.18: 9 do not exist in the upstream tree at
+  all (`CONFIG_LUOFU_WATCHDOG`, `CONFIG_LUOFU_GMAC`, `CONFIG_LUOFU_MDIO`,
+  `CONFIG_LUOFU_PHY`, `CONFIG_MTD_NAND_LUOFU`, `CONFIG_MDIO_DEVICE`,
+  `CONFIG_MDIO_DEVRES`, `CONFIG_MTD_SPI_NAND`, `CONFIG_PCI_MSI_IRQ_DOMAIN` - the
+  drivers still have to be written), and 4 exist but are hidden/select-only in 6.18
+  (`CONFIG_I2C_DESIGNWARE_PLATFORM`, `CONFIG_MTD_NAND_CORE`, `CONFIG_PCIE_DW`,
+  `CONFIG_PCIE_DW_HOST`), so they are only enabled by a driver that selects them.
+- `CONFIG_PHYLINK` 5.10 y -> 6.18 m: it is a promptless tristate selected by its users
+  (here `NET_DSA=m`); y was never user-settable.
+- 12 `[D-default]` symbols (other Hisilicon SoCs' clock/reset/thermal drivers) are on
+  only because `ARCH_HISI=y` has `default ARCH_HISI` in their Kconfig entries. They
+  should be pruned or the defaults tightened before submission.
+
+**Canonical re-derivation (same session, after the toolchain build):** the
+top-level, tree-native command was then run to completion -
+
+```
+$ cd ~/openwrt-lab
+$ yes '' | timeout 1800 make kernel_oldconfig -j16
+...
+RC=0
+```
+
+It first built the OpenWrt host tools and the tree's own toolchain from source
+(`arm-openwrt-linux-muslgnueabi-gcc (OpenWrt GCC 14.4.0 toolchain-c0e63334e4) 14.4.0`,
+~13.5 minutes wall clock), then ran the same `target/linux oldconfig` path with that
+toolchain and wrote `luofu/config-6.18`. That canonical delta has **281 symbols** and
+contains the same platform selection (the 282-symbol first-pass delta differs only by
+`CONFIG_GCC_ASM_GOTO_OUTPUT_BROKEN`, a compiler-feature symbol that GCC 14.4 does not
+set). A second canonical run reproduced `luofu/config-6.18` **byte-identically**
+(`CANONICAL_DERIVATION_IDEMPOTENT`), and the committed annotated file merges through
+`scripts/kconfig.pl` to exactly the same config as the un-annotated delta
+(`ANNOTATED_CONFIG_MERGES_IDENTICALLY`, no warnings). **The committed
+`config-6.18` is this canonical delta.** Evidence: logs `14-`, `15-`, `16-`, `17-`
+in the evidence directory.
+
+**Not proven by this stage:** the config boots nothing, and the compile stage below
+still fails on one platform-patch defect.
+
+### Stage 3 - compile stage: FAIL, on one platform-patch blocker
+
+**First attempt (before the OpenWrt toolchain existed; bench GCC 11.3 override):**
+
+```
+$ cd openwrt-lab
+$ make target/linux/compile V=s \
+      KERNEL_CROSS=<repo>/build/linux-kbuild/toolchain/bin/arm-none-linux-gnueabihf- \
+      KERNEL_CC=<...>-gcc -j16
+...
+RC=2
+```
+
+The OpenWrt configure step inside compile completed (headers_install, .config from
+`kconfig.pl`, vermagic) and the kernel build started. Two independent failures were
+seen in this first attempt:
+
+**Blocker 1 - the platform patch's `TEXT_OFFSET` value is not an ARM immediate
+(patch-specific, must be fixed before the series can build a kernel):**
+
+```
+AS      arch/arm/kernel/head.o
+arch/arm/kernel/head.S:123: Error: invalid constant (608000) after fixup
+arch/arm/kernel/head.S:188: Error: invalid constant (608000) after fixup
+make[8]: *** [scripts/Makefile.build:430: arch/arm/kernel/head.o] Error 1
+```
+
+`0x00608000` needs bits 15 and 21/22 set, which cannot be encoded in the rotated 8-bit
+immediate of `sub r8, r8, #TEXT_OFFSET` (head.S:123) or of the `pgtbl` macro's
+`add \rd, \phys, #TEXT_OFFSET` (head.S:68, expanded at :188). The decompressor has the
+same problem at `arch/arm/boot/compressed/head.S:312` (`add r4, r0, #TEXT_OFFSET`) and
+`:410` (`sub r0, r4, #TEXT_OFFSET`). The value is fixed by the load-address
+derivation (the stock loader stages the slot at `0x83200000` and the kernel must land
+at `0x80608000`; TARGET-DESIGN.md sections 3.2/5.2), so it cannot simply be changed to
+an encodable value. The lab tree patched these files as bench edits (TARGET-DESIGN.md
+section 7.2 lists them as edits that must be reworked). At the time of this session the
+clean core patch had not been written; it was written later the same day as patch `003`
+(third session below), using `mov_l` (portable constant materialization) at all four
+sites. Without it the failure blocks the whole kernel build, not just the luofu machine.
+
+**Blocker 2 - GNU GCC 11.3 vs `retain` + `CONFIG_WERROR` (environment, not the
+patch):**
+
+```
+net/bpf/test_run.c:511:1: error: 'retain' attribute ignored [-Werror=attributes]
+net/core/filter.c:12084:1: error: 'retain' attribute ignored [-Werror=attributes]
+kernel/bpf/helpers.c:2207:1: error: 'retain' attribute ignored [-Werror=attributes]
+mm/slab_common.c:1310:1: error: 'retain' attribute ignored [-Werror=attributes]
+kernel/cgroup/rstat.c:130:1: error: 'retain' attribute ignored [-Werror=attributes]
+... 94 occurrences
+RC=2
+```
+
+GCC 11.3 answers `__has_attribute(__retain__)` with true but ignores the attribute at
+codegen. 6.18 defines `__retain` when `CONFIG_LD_DEAD_CODE_DATA_ELIMINATION` or
+`CONFIG_LTO_CLANG` is set; the OpenWrt generic config sets
+`CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y` and `CONFIG_WERROR=y`, so the warning becomes
+an error. This was an environment mismatch, not a repository problem.
+
+**Canonical rerun with the tree's own OpenWrt GCC 14.4.0 toolchain:**
+
+```
+$ cd openwrt-lab
+$ make target/linux/compile V=s -j16
+...
+  AS      arch/arm/kernel/head.o
+arch/arm/kernel/head.S:123: Error: invalid constant (608000) after fixup
+arch/arm/kernel/head.S:188: Error: invalid constant (608000) after fixup
+make[8]: *** [scripts/Makefile.build:430: arch/arm/kernel/head.o] Error 1
+...
+RC=2
+```
+
+Result: **0** `retain` errors (blocker 2 is gone with the supported compiler, exactly
+as expected); the **only** remaining compile failure is blocker 1. The machine object
+`arch/arm/mach-hisilicon/luofu.o` was **compiled with GCC 14.4**
+(`6028 bytes`, `__mach_desc_LUOFU` + `"HiSilicon Hi5671Y (luofu)"` + the three
+`dt_compat` strings, no warning/error attributed to the new files), so kbuild accepts
+the machine descriptor under the canonical config; `head.S` stops the image.
+Evidence: `18-compile-stage-canonical-toolchain.log`.
+
+**Evidence-only build (local workarounds, NOT delivered):** to separate blocker 1 from
+the rest of the patch/config, the build was rerun with (a) `CONFIG_WERROR` turned off
+**in the build tree's kernel `.config` only`** (needed only for the bench GCC 11.3
+pass) and (b) a make-command-line override `TEXT_OFFSET=0x00008000` (encodable, wrong
+load address) instead of the platform value:
+
+```
+$ make -C build_dir/.../linux-6.18.60 ARCH=arm CROSS_COMPILE=<...>- \
+      TEXT_OFFSET=0x00008000 -j16 zImage
+...
+  OBJCOPY arch/arm/boot/zImage
+  Kernel: arch/arm/boot/zImage is ready
+RC=0
+```
+
+Result: `arch/arm/boot/zImage`, 3,205,816 bytes, sha256
+`9e79d5914573beaf7878bdb1c25ece36dfa8afbf1388264956b9c7810d50461d`. **This is not a
+deliverable image and proves no boot**: it has the wrong TEXT_OFFSET (the real one must
+be `0x00608000`), no FIP trailer, no rootfs, it was built with the bench GCC 11.3
+rather than OpenWrt's toolchain, and nothing was written to the router. It only shows
+that the patch/config do not break the rest of the kernel build.
+
+### What this proves, and what it does not
+
+Proven (host-only, no device): the patch series applies cleanly in the OpenWrt 6.18
+kernel tree; the Kconfig integration selects `ARCH_LUOFU`; the config derivation
+through the tree's own top-level `make kernel_oldconfig` with the tree's own OpenWrt
+GCC 14.4.0 toolchain is reproducible and idempotent; the cleaned machine descriptor
+compiles with that toolchain; and the kernel compiles up to `arch/arm/kernel/head.o`
+with only the `TEXT_OFFSET` defect stopping it (an evidence-only zImage was also built
+with local workarounds, not a deliverable).
+
+Not proven: a kernel image with the correct text offset/load address, no image, no FIP
+trailer in a slice, no rootfs, no `dtbs_check`/binding review, no
+`platform.sh`/sysupgrade, no A/B selector protocol, no SMP (UP-only), no restart
+driver, no boot, no device interaction, no driver series. Publication is still NOT
+READY.
+
+### Remaining blockers
+
+1. `TEXT_OFFSET=0x00608000` non-immediate core patch (4 assembly sites; see Stage 3) -
+   the only compile blocker for the kernel with this platform textofs. **FIXED in the
+   third session below** by `patches-6.18/003-arm-textofs-nonimmediate.patch` (mov_l);
+   upstream review of that patch is still pending.
+2. Driver + dt-binding series (watchdog, CRG, thermal, pinctrl, FMC, MDIO/PHY/GEMAC,
+   switch, PCIe) - nothing exists; hidden 6.18 symbols must be selected by the new
+   drivers.
+3. Prune/tighten the 12 `[D-default]` other-SoC Hisilicon drivers (or decide to keep
+   them).
+4. Image recipe/trailer/sysupgrade/install path and the A/B selector (TARGET-DESIGN.md
+   5.2-5.5), `dtbs_check`, and then one attended boot - none attempted here.
+
+---
+
+## 2026-11-18 (third session): early-boot `TEXT_OFFSET` fix + full kernel compile
+
+**Status: the kernel compiles end-to-end. With the new core patch `003`, the canonical
+OpenWrt stages (`make target/linux/prepare`, `make target/linux/compile -j16`) reach
+RC=0 using the tree's own OpenWrt GCC 14.4.0 toolchain, `arch/arm/boot/zImage` is
+produced (3,205,200 B), and the built early boot code carries the real
+`TEXT_OFFSET = 0x00608000` / load address `0x80608000` with no make-command-line
+override. **No image, no FIP trailer, no rootfs, no boot, no driver series. Publication
+NOT READY.** Host-only, same clone (`openwrt main` `27663a0`, `linux-6.18.60`);
+evidence logs are local-only under
+`build/linux-kbuild/waves/upstream-6.18-textoffset-20261118/` and this repository
+contains none of them.
+
+### The defect (recap from Stage 3 / blocker 1)
+
+`#TEXT_OFFSET` is used as an ARM immediate in four places:
+`arch/arm/kernel/head.S:123` (`sub r8, r8, #TEXT_OFFSET`, PHYS_OFFSET recovery),
+`arch/arm/kernel/head.S:68` (the `pgtbl` macro's `add \rd, \phys, #TEXT_OFFSET`,
+expanded at `:188`) and `arch/arm/boot/compressed/head.S:312` / `:410` (the
+decompressor's final-kernel-address computation and the ATAG-to-DTB fallback). ARM
+immediates are an 8-bit value rotated by an even number of bits; `0x00608000` (bits 22,
+21 and 15 set) is not encodable, so the assembler reports
+`invalid constant (608000) after fixup`. The value itself is required by the image
+design: the stock loader stages the slot at `0x83200000`, and
+`(0x83200000 & 0xf8000000) + 0x00608000 = 0x80608000`, the bench-proven kernel
+load/entry address (TARGET-DESIGN.md 3.2; skeleton README 3.4).
+
+### Chosen approach (option (a)): make the offset work in the boot code
+
+New patch `target/linux/hisilicon/patches-6.18/003-arm-textofs-nonimmediate.patch`,
+sha256 `407352b8aced76da6c6f1fcef53c77bca0221473515c144126cbe3358e707f5c`. It replaces
+each immediate with the kernel's own portable constant-move macro `mov_l`
+(`arch/arm/include/asm/assembler.h`): `movw`+`movt` on ARMv7 (no literal pool, no
+relocation), `ldr dst, =imm` on older CPUs. `mov_l` is already used in
+`arch/arm/kernel/head.S` itself (`secondary_startup`), so no new abstraction is
+introduced. The alternative (option (b)) - changing `textofs` to an encodable value
+such as `0x00800000` (load `0x80800000`) - was rejected on evidence: it would
+invalidate the only bench-derived kernel-slot address identity and require a new
+attended boot to re-establish the address story, while option (a) keeps the proven
+`0x80608000` contract and changes nothing loader-facing. Patch `002` and
+`image/luofu.mk` are therefore unchanged.
+
+### Exact commands and pass/fail
+
+Baseline (before the fix) reproduced in the same clone:
+
+```
+$ cd ~/openwrt-lab
+$ make target/linux/compile V=s -j16
+  AS      arch/arm/kernel/head.o
+arch/arm/kernel/head.S:123: Error: invalid constant (608000) after fixup
+arch/arm/kernel/head.S:188: Error: invalid constant (608000) after fixup
+...
+RC=2
+```
+
+After copying the three patches and the config into the clone target directory, the
+kernel build tree was removed (clean build, no stale workaround objects) and:
+
+```
+$ make target/linux/prepare
+RC=0                                    # no .rej/.orig; patch 003 applied
+$ make target/linux/compile V=s -j16
+...
+  AS      arch/arm/kernel/head.o
+  AS      arch/arm/boot/compressed/head.o
+  LD      arch/arm/boot/compressed/vmlinux
+  OBJCOPY arch/arm/boot/zImage
+  Kernel: arch/arm/boot/zImage is ready
+time: target/linux/compile#1179.62#72.37#104.27
+RC=0
+```
+
+- toolchain used: `arm-openwrt-linux-muslgnueabi-gcc (OpenWrt GCC 14.4.0
+  toolchain-c0e63334e4) 14.4.0` (the tree's own).
+- `CONFIG_WERROR=y` in the kernel `.config` - no WERROR workaround.
+- both `.head.o.cmd` carry `-DTEXT_OFFSET=0x00608000` from patch `002`; no
+  `TEXT_OFFSET=` or `KERNEL_CROSS=` make override was used.
+- `arch/arm/boot/zImage`: **3,205,200 bytes**, sha256
+  `45ad00d502ed7b2386f83db794e9015267f4f9d66de8d0deaab8aca24cf18d10`.
+- an incremental relink of the same tree reproduced the same zImage byte-for-byte.
+
+### Address story verified from the built artifacts
+
+- `System.map`: `_text = stext = 0xc0608000`, `swapper_pg_dir = 0xc0604000`,
+  `_stext = 0xc0700000`; `CONFIG_PAGE_OFFSET=0xC0000000`.
+- the four patched sites in the linked code are `movw/movt` pairs:
+  - `vmlinux 0xc0608050`: `movw r5,#0x8000; movt r5,#0x60; sub r8,r8,r5`, preceded
+    by the PC-relative `adr_l r8,_text`, so at run time r8 is the physical `_text`
+    and the subtraction yields PHYS_OFFSET;
+  - `vmlinux 0xc060808c` (`__create_page_tables`): `movw r4,#0x8000;
+    movt r4,#0x60; add r4,r4,r8; sub r4,r4,#0x4000`, so the initial page tables land
+    0x4000 below the final kernel address;
+  - decompressor `0xd4`: `movw r4,#0x8000; movt r4,#0x60; add r4,r0,r4` with
+    `r0 = pc & 0xf8000000` - precisely the `(pc & 0xf8000000) + TEXT_OFFSET`
+    computation;
+  - decompressor `0x18c`: `movw r0,#0x8000; movt r0,#0x60; sub r0,r4,r0`.
+- the built zImage's own `.table` (file offset 0x69ec) carries `0x00608000` as its
+  TEXT_OFFSET field.
+- derivation check: `0x83200000 & 0xf8000000 = 0x80000000`; `+ 0x00608000` =
+  **0x80608000** = physical `_text` (`0xc0608000 - 0xc0000000 + 0x80000000`).
+- therefore the image recipe's values are unchanged:
+  `mkimage -A arm -O linux -T kernel -C none -a 0x80608000 -e 0x80608000`, with
+  `ih_load == ih_ep == (loader_stage & 0xf8000000) + TEXT_OFFSET == 0x80608000`.
+- portability check: re-assembling the same patched sources with
+  `-D__LINUX_ARM_ARCH__=6` (the `ldr` literal branch of `mov_l`) also assembles and
+  pools the new `0x00608000` literal in the existing literal pools. The target config
+  (`CONFIG_CPU_V7`) takes the `movw/movt` branch.
+
+### What this proves and what it does not
+
+Proven (host-only): the patch series plus the canonical config build the whole 6.18
+kernel with OpenWrt's own GCC 14.4.0 toolchain and with the real, non-encodable
+`TEXT_OFFSET`; the produced boot code materializes `0x00608000` correctly and the
+load/entry derivation is `0x80608000`; there is no locally applied build workaround.
+
+Still not proven (and not attempted): no target image, no FIP trailer, no rootfs, no
+sysupgrade container, no `platform.sh`, no `dtbs_check`, no SMP, no restart driver,
+no boot, no device interaction, no driver series. The zImage is an intermediate
+`target/linux/compile` product, not a deliverable image, and it has never been loaded
+on hardware. Publication remains NOT READY; patch `003` has not been reviewed upstream.
+
+### Remaining blockers (updated)
+
+1. Driver + dt-binding series (watchdog, CRG, thermal, pinctrl, FMC, MDIO/PHY/GEMAC,
+   switch, PCIe) - nothing exists.
+2. Image recipe wiring: FIP trailer generation into the slice, UBI rootfs, sysupgrade
+   wrapper/manifest, `platform.sh` + A/B selector (TARGET-DESIGN.md 5.2-5.5).
+3. `dtbs_check`/binding review of the draft DTS, and prune/tighten the 12
+   `[D-default]` other-SoC Hisilicon drivers.
+4. Upstream review/submission of patches `001`-`003`, then one attended boot of a
+   full image.
+
+Evidence: local-only `build/linux-kbuild/waves/upstream-6.18-textoffset-20261118/`
+(`00-README.md` indexes the baseline/fix logs, disassembly, hashes and the derivation);
+it is gitignored and none of it is in this repository.
+
+---
+
+## 2026-11-18 (fourth session): first own-artifact FIP kernel slice (host-only)
+
+**Status: for the first time a complete FIP kernel slice exists as a host artifact, built
+from our own sources: the 6.18.60 zImage wrapped in the legacy uImage, followed by a trailer
+generated from our draft board DTB and a minimal loader-match overlay. It satisfies every
+structural check the decoded stock `bootfip` performs and it is byte-reproducible. It has
+NEVER been booted; one attended boot on a recovered unit is still required before the image
+recipe may rely on a novel trailer. No rootfs, no sysupgrade container, no install path, no
+appended DTB, no driver series. Publication NOT READY.**
+
+No router, UART, TFTP, flash or bench tool was used. No vendor dump, trailer, DTB, DTBO,
+U-Boot image or vendor byte is an input; every input is either a repository DTS source
+(`target-skeleton/dts/luofu-r116.dts`, `.../luofu-r116-overlay.dts`), the kernel build
+product (`arch/arm/boot/zImage`) or a host tool from the OpenWrt build tree. The repeated
+strings and numbers below (`hsan`, `luofu`, `board_id 3`, `0xd7b7ab1e`, the load
+address) are decoded structural facts documented in
+[`../target-skeleton/docs/TRAILER-FORMAT.md`](../target-skeleton/docs/TRAILER-FORMAT.md)
+and TARGET-DESIGN.md 3.2/5.2, not copied vendor payload.
+
+### What was built
+
+Produced in one scripted run (the script is `target-skeleton/tools/build-kernel-slice.sh`,
+section "Exact commands" below). Hashes are the run-1 values; a second clean run in a
+different directory reproduced every byte (section "Reproducibility").
+
+| artifact | size | sha256 | role |
+| --- | --- | --- | --- |
+| `luofu-r116.dtb` | 8,984 B | `2f97313a03a73ad64d40314f6fb1484a2d6db967aaa7cb5a50c96a531c883bb7` | our draft base DTB; first member of the trailer |
+| `luofu-r116-overlay.dtbo` | 230 B | `8e4ab83b575dc14d9f3131dc01d1cbdccc63b38f8f8c4fa774da0d1f200b23b6` | minimal loader-match overlay (`vendor_id=hsan`, compatible `hsan-luofu`, `board_id=3`, one no-op fragment targeting `/`) |
+| `uImage` | 3,205,264 B | `77406f1de3e11379942aaaf8d056d9c0aa70c0ac857f179266b8c5a32ec0124e` | legacy uImage: 0x40 header + 3,205,200 B zImage; `-A arm -O linux -T kernel -C none -a 0x80608000 -e 0x80608000 -n "Linux-6.18.60"` |
+| `fip-trailer.bin` | 9,278 B | `aaf45c10a138bfb83c72b5234d6365781e6dcd56143cbadc491190de5c328c2f` | base DTB 8,984 B + 64 B descriptor (32-byte header + one 32-byte entry) + 230 B overlay; container total 294 B |
+| `luofu-kernel-slice.bin` | 3,214,542 B | `3311a3e560c0b3c3af8b68c206a0e3b2e943ed0f754185afc1e82993b120d143` | uImage + trailer; gate `0xd7b7ab1e` at slice `0x310ba8`; 5,436,210 B under the 8,650,752 B slot budget |
+| `fip-manifest.txt` | 901 B | `b244088c13eb8fed606d8955d7892d05632b0993025b471d2f67388314980fb7` | `fip-slice.py manifest` output (schema not frozen) |
+
+The generated trailer is **not** the fixed 40,732-byte bench-lane artifact: 8,984 + 64 + 230 =
+9,278 B. The loader does not require the fixed length (TRAILER-FORMAT.md sections 7 and 9);
+40,732 is a fire-preflight convention, so this slice cannot go through the current bench fire
+lane unchanged (open question 4 below).
+
+### DTS compilation: no source change was required
+
+The draft base DTS compiled unchanged - no TODO placeholder had to be commented out or
+removed, no binding was invented. Exactly one dtc warning is emitted, the already-documented
+`unique_unit_address` collision between `/clock-reset-controller@14880000` and
+`/watchdog@14880000` (the vendor watchdog shares the CRG page; README section 6):
+
+```
+cpp -nostdinc -I<kernel>/include -I<kernel>/arch/arm/boot/dts -undef -D__DTS__ \
+    -x assembler-with-cpp -o luofu-r116.dts.preprocessed dts/luofu-r116.dts
+<kernel>/scripts/dtc/dtc -I dts -O dtb -o luofu-r116.dtb luofu-r116.dts.preprocessed
+opensource/target-skeleton/dts/luofu-r116.dts:248.39-260.4: Warning (unique_unit_address):
+    /clock-reset-controller@14880000: duplicate unit-address (also used in node /watchdog@14880000)
+```
+
+Tools: the build tree's own `scripts/dtc/dtc` (DTC 1.7.2-g52f07dcc) and the host
+`cpp` (GCC 16.2.1); `cpp`'s include paths are the clone's kernel tree. The script asserts
+the FDT header (magic, totalsize == file size), the root compatible
+(`["hisilicon,luofu-r116", "hisilicon,luofu"]`) and the root model. The same assertions pass
+under the independent system dtc 1.8.1/`fdtget` (evidence 03).
+
+### The overlay is a loader-match stub for our own base DTB
+
+`dts/luofu-r116-overlay.dts` is **not** a vendor DTBO and embeds no vendor bytes. It exists
+only because the decoded applier refuses to hand over to the kernel unless the first matching
+overlay applies successfully. The decoded rule (TRAILER-FORMAT.md section 6) is mirrored
+exactly:
+
+- root `vendor_id = "hsan"` - the applier does `strcmp` against the stock environment's
+  `vendorid` (stock: `hsan`);
+- root `compatible = "hsan-luofu"` - the match helper does
+  `strstr(compatible, family_token)` against its 11-row family table; this board's row is
+  `luofu`/`hsan`, and `hsan-luofu` is the decoded vendor family string for that row;
+- root `board_id = <3>` - matched against the environment `boardid` if set, otherwise
+  against the 4-bit board strap. **Evidence for 3:** the vendor trailer carries a
+  board_id=0 reference overlay and a board_id=3 R116 overlay, and the stock loader selected
+  the board_id=3 overlay on this unit (the live DT carries the R116 model; TRAILER-FORMAT.md
+  section 6). The physical strap-bit reading is an inference [I] from that selection; the
+  attended boot doubles as its confirmation, because if the strap were not 3 the applier would
+  find no match and `bootfip` would refuse to boot the slot;
+- one `fragment@0` with `target-path = "/"` and an intentionally empty `__overlay__`.
+  Our base DTB is already the complete board tree for our kernel; the empty fragment adds
+  nothing and therefore needs no growth of the base DTB, which is the least demanding case for
+  the applier's libfdt buffers. Host libfdt applies it and the applied tree is byte-identical
+  to the base (evidence 03).
+
+The overlay DTS is a draft for the same in-tree location as the base DTS
+(`target/linux/hisilicon/dts/`); it becomes a real overlay only when an overlay has a real
+board delta (and binding) to carry.
+
+### Exact commands
+
+Delivered script, run from a clean output directory (it refuses a non-empty directory without
+`--force`, refuses missing inputs and any vendor-derived input path, and defaults to the lab
+clone unless `--openwrt-dir`/`OPENWRT_DIR` is given):
+
+```
+cd ~/cudy-wr3000v2
+opensource/target-skeleton/tools/build-kernel-slice.sh \
+    --out build/linux-kbuild/waves/upstream-6.18-slice-20261118/run1
+```
+
+Internally (per-step logs in the output's `logs/`):
+
+```
+cpp ... luofu-r116.dts                       -> luofu-r116.dts.preprocessed
+<kernel>/scripts/dtc/dtc                     -> luofu-r116.dtb   (8,984 B)
+<kernel>/scripts/dtc/dtc                     -> luofu-r116-overlay.dtbo (230 B)
+<openwrt>/staging_dir/host/bin/mkimage -A arm -O linux -T kernel -C none \
+    -a 0x80608000 -e 0x80608000 -n "Linux-6.18.60" -d zImage uImage
+fip-slice.py make-trailer --base-dtb luofu-r116.dtb \
+    --overlay luofu-r116-overlay.dtbo --expect-board-id 3 \
+    --expect-vendor-id hsan --match-family luofu --overlay-apply require \
+    --output fip-trailer.bin
+fip-slice.py assemble --uimage uImage --trailer fip-trailer.bin \
+    --loader-stage 0x83200000 --text-offset 0x00608000 \
+    --max-size 8650752 --output luofu-kernel-slice.bin
+fip-slice.py check luofu-kernel-slice.bin --max-size 8650752
+fip-slice.py manifest --slice luofu-kernel-slice.bin --output fip-manifest.txt
+```
+
+`fip-slice.py check` output on the result:
+
+```
+FIP slice check: PASS (measurable constraints only)
+  slice size:      3214542 B (kernel slot limit 8650752 B)
+  uImage:          magic ok, name='Linux-6.18.60', ih_size=3205200 (0x30e850)
+  uImage load/ep:  0x80608000 / 0x80608000
+  trailer:         9278 B
+  base DTB:        totalsize 8984 B
+  descriptor:      64 B (32-byte header + 1 x 32-byte entries), container total 294 B
+    overlay 0      size 230 B, offset 64 B (trailer+0x2358)
+  gate:            magic 0xd7b7ab1e at 0x310ba8
+```
+
+Gate arithmetic, re-read independently of the tool's own validation:
+`0x40 + ih_size 0x30e850 + base-DTB totalsize 0x2318 = 0x310ba8`, and the 32-bit
+big-endian word there is byte-identically `d7 b7 ab 1e`. The descriptor totals
+`32 + 32*count + sum(overlay sizes) = 32 + 32 + 230 = 294` B equal its header word +4.
+A second, independent Python re-read (no `fip-slice` code) and the system dtc 1.8.1
+`fdtoverlay`/`fdtget` checks agree (evidence 02/03).
+
+### Reproducibility
+
+The two clean runs (different output directories) are byte-identical for every artifact:
+same SHA256SUMS, same slice `3311a3e5...`. This works because `mkimage` honours
+`SOURCE_DATE_EPOCH`, which the script pins to 0 by default (the decoded loader never reads
+`ih_time`; override with `--source-date-epoch` to embed a real build time). Full listing:
+evidence `01-reproducibility.txt`.
+
+### What this proves and what it does not
+
+Proven (host-only, structural): a trailer generated from our own base DTB + overlay satisfies
+every check the decoded stock applier performs (gate word at the computed offset, required
+descriptor constants, entry count/stride/totals, overlay FDT header/size, libfdt overlay
+apply); the uImage carries the correct ARM/Linux/kernel/none identity, the derived
+`ih_load == ih_ep == 0x80608000`, and the full slice fits the kernel slot by 5,436,210 B;
+the result is byte-reproducible from the same inputs and tools.
+
+Not proven: that the stock loader accepts a novel slice or that any of this boots. That needs
+one attended boot on a recovered unit (TARGET-DESIGN.md 5.2 and 9; TRAILER-FORMAT.md section
+8). Also absent: rootfs, UBI, sysupgrade container and manifest wiring into one image,
+`platform.sh`, the A/B selector path, appended DTB, install path, driver series,
+`dtbs_check`. Publication remains NOT READY.
+
+### Open questions
+
+1. **Does a no-op overlay suffice?** Structurally yes for the decoded applier: the entry
+   validates, the match properties pass, host libfdt applies an empty fragment, and no base-DTB
+   growth is needed. But the stock U-Boot 2022.07's own libfdt version and the applier's work
+   buffers are not fully decoded, and no novel trailer has ever been booted on the stock
+   loader. One attended boot is the only closure. If our base DTB ever depends on
+   overlay-provided properties, the stub must become a real overlay.
+2. **board_id 3** is inferred from the overlay the vendor loader applied and the live R116
+   model, not from a physical strap read (TRAILER-FORMAT.md section 6 [I]); the attended boot
+   confirms it (a wrong value means no match and no boot).
+3. **Boot arguments / rootfs**: this slice carries no rootfs and no `root=`/`UBI`
+   arguments; where the stock loader's bootargs come from is still [U] (TARGET-DESIGN.md 5.6).
+   The uImage also has no appended DTB; the decoded loader hands over the trailer's base DTB,
+   so the appended copy is hygiene for later recipes (TARGET-DESIGN.md 5.2), not required for
+   this structural step.
+4. **Delivery lane**: the slice is 3,214,542 B with a 9,278 B generated trailer, whereas the
+   existing bench lane copies the fixed 40,732-byte trailer and
+   `tools/fire-preflight.sh` fails closed unless the last 40,732 bytes match that artifact.
+   This slice is therefore not flashable through the current tools; adopting a generated
+   trailer needs the attended boot first, then the preflight/image-recipe update.
+5. **Image recipe wiring**: `target/linux/hisilicon/image/luofu.mk` still treats the trailer
+   as a fixed input and does not call `make-trailer`; this host script is not yet integrated
+   into the OpenWrt build.
+
+### Evidence
+
+Local-only, gitignored:
+`build/linux-kbuild/waves/upstream-6.18-slice-20261118/` - `00-README.md` indexes the two
+run directories (full script stdout, per-step logs, dtb/dtbo/uImage/trailer/slice/manifest,
+SHA256SUMS/SIZES), the reproducibility comparison, xxd byte structure, independent-tool
+checks, exact commands and git state. None of it is committed; the published tree contains
+only the sources and the script.
+
+---
+
+## 2026-11-18 (fifth session): first real drivers - CRG clock/reset + watchdog
+
+**Status: the first two upstream-style drivers for this board are written, with device-tree
+bindings in the shape upstream review expects, and they compile as built-ins into the same
+`linux-6.18.60` kernel the `TEXT_OFFSET` series builds (`make target/linux/compile -j16`
+RC=0, 1190 s, no warning from the new files). The delivered patches apply cleanly to pristine
+6.18.60 and in the OpenWrt clone; `dt_binding_check` passes for both YAMLs; the draft board DTS
+compiles to a DTB with the patched kernel's own dtc with ZERO warnings (the old deliberate
+`unique_unit_address` collision is gone); the hand-added kernel-config delta is
+symbol-identical to a canonical `make kernel_oldconfig` re-derivation with the new Kconfig;
+and an independent cross-check confirms the DTS clock IDs, the driver gate table and the
+dt-bindings header agree. Nothing has been booted or run on hardware: no bench, no device, no
+boot claims; publication NOT READY.**
+
+Host-only, same clone (`openwrt main` `27663a0`, `linux-6.18.60`, the tree's own OpenWrt
+GCC 14.4.0 toolchain). No router, UART, TFTP, flash or bench tool was used.
+
+### What was added
+
+| artifact | sha256 |
+| --- | --- |
+| `target/linux/hisilicon/patches-6.18/004-arm-clk-reset-luofu-crg.patch` | `bb92a7cbd8f54addff628fb6ea409c8cf70b096c301669676bd21a03d4c050b0` |
+| `target/linux/hisilicon/patches-6.18/005-arm-watchdog-luofu-wdt.patch` | `b8a780f5e65ed092247e1a693252c0033a9e7cf376a02c988890fd518963e2be` |
+| `target/linux/hisilicon/luofu/config-6.18` (two `[N]` driver symbols plus the syscon/regmap selects; now symbol-identical to a canonical re-derivation) | `03ac74d1a167b8e05716d9409b19251a5bd2056a08545380d8d58ea28a9bb5aa` |
+| `dts/luofu-r116.dts` (one CRG syscon node + watchdog child, no gate children, clock IDs from the header) | `2b395a292221174213a2e0e6532f1a78d5f3ffcf03dcdc9e18a92b3c67ed5b57` |
+
+`004` adds:
+- `drivers/clk/hisilicon/crg-luofu.c`: the 16 CRG gate clocks and the reset controller from
+  one node.
+- `include/dt-bindings/clock/hisilicon,luofu-crg.h`: the clock-ID ABI (IDs 0..15 keep the
+  existing ordering contract; `LUOFU_CLK_NR` = 16).
+- `Documentation/devicetree/bindings/clock/hisilicon,luofu-crg.yaml`.
+- `drivers/clk/hisilicon/{Kconfig,Makefile}`: `CONFIG_LUOFU_CRG=y`.
+
+`005` adds:
+- `drivers/watchdog/luofu-wdt.c`: the watchdog on the 6.18 watchdog API, hwver-2 register
+  data.
+- `Documentation/devicetree/bindings/watchdog/hisilicon,luofu-wdt.yaml`.
+- `drivers/watchdog/{Kconfig,Makefile}`: `CONFIG_LUOFU_WDT=y`.
+
+### Design decisions (and why)
+
+1. **One shared 0x14880000 page -> one `syscon` + `simple-mfd` node, one regmap, two
+   drivers.** The CRG gate bits (0x14/0x20), reset bits (0x2c/0x30/0x34) and watchdog registers
+   (0x50/0x64/0x70/0x100) are interleaved in one 4 KiB page, so no driver may claim it
+   exclusively. The node is `compatible = "hisilicon,luofu-crg", "syscon", "simple-mfd"`; the
+   CRG driver and the watchdog child both obtain the page with
+   `syscon_node_to_regmap()` and the syscon core maps it once. Neither driver contains a
+   `request_mem_region()` or `ioremap()` call, so there is no overlapping resource and no
+   second mapping. The lab lane had exactly the failure this removes: the CRG claimed the page
+   and the watchdog probe returned `-EBUSY` until it was worked around with a bare
+   `devm_ioremap()` (ledger 2026-11-13 16:00/16:29). `simple-mfd` populates the watchdog
+   child; `syscon` is the documented regmap contract, so the watchdog still works if
+   `CONFIG_LUOFU_CRG` is disabled. Rejected alternative: two nodes with overlapping `reg`
+   and one of them using bare `devm_ioremap()` (not upstream acceptable).
+2. **Compatibles:** `hisilicon,luofu-crg` (controller) and `hisilicon,luofu-wdt` (child),
+   each with a YAML binding. The watchdog node carries no vendor-only properties: the hwver,
+   register offsets and magic values are hwver-2 driver data attached to the compatible's
+   match entry.
+3. **Clock gates: a driver-side table indexed by the documented clock IDs, not 16 child
+   nodes.** The gates share two registers, and per-gate child nodes would have no `reg` (they
+   are not devices) and would require an invented binding for the bit position. The DT ABI is
+   the one-cell index from the header; the driver's designated-initializer table is indexed by
+   the same IDs and the probe rejects a missing entry. This is the table+ID shape used by
+   modern SoC clock drivers (sunxi-ng, meson, renesas CPG); child-node-per-gate is the
+   deprecated TI shape and would describe no hardware. The clock IDs, ordering and the
+   gate/(offset,bit) geometry are unchanged from the lab driver, so every existing consumer
+   specifier keeps its meaning.
+4. **Reset cells: two cells, `(CRG page register offset, bit)`.** This preserves the lab
+   driver's specifier (documented in the YAML and the DTS). The xlate rejects any offset
+   outside `0x2c/0x30/0x34`, so a reset specifier can never write the watchdog, soft-reset,
+   mux or PLL words. The driver also sets `rcdev.of_reset_n_cells = 2`: the lab driver did not,
+   which is why `devm_reset_control_array_get()` returned `-EINVAL` for every two-cell
+   consumer (ledger 2026-11-13 21:41) - that bug is now fixed and explained. A named reset-ID
+   table remains a submission TODO (it changes every consumer's cells and needs an agreed
+   inventory).
+5. **Watchdog:** 6.18 watchdog API (`devm_watchdog_register_device`, `.start/.stop/.ping/
+   .set_timeout`, DT `timeout-sec`, min 1 s / max 512 s from driver data). The vendor write
+   pairs/order are preserved exactly: enable val1 then val0 to 0x64, stop val0 then val1 to
+   0x64, ping reset-val0 then reset-val1 to 0x70, and the hwver-2 timeout field `(secs - 1)`
+   at bits [18:10] of 0x50 (clear mask `0xfff803ff`). Probe performs **no register access at
+   all**, so loading the driver cannot arm the timer.
+6. **Interrupt SPI 2 and restart are deliberately absent, not fake.** The block has a
+   status/interrupt register at 0x100 (SPI 2 in the vendor tree), but its semantics are
+   unverified, so the driver is polled and the node claims no `interrupts` property. There is
+   no restart handler: the vendor reset path writes sysctrl/boot-selector registers that are not
+   understood, and a wrong reset sequence would strand the board - a documented TODO. The
+   watchdog therefore cannot reboot the chip by itself; that belongs to a future reset driver.
+
+### Verification (exact commands and results)
+
+All logs and artifacts are local-only (gitignored) under
+`build/linux-kbuild/waves/upstream-6.18-drivers-20261118/`; a `00-README.md` there indexes
+them with the git state. The repository contains only the sources and these docs.
+
+**1. Patches apply to pristine `linux-6.18.60`** (unpacked from the clone's
+`dl/linux-6.18.60.tar.xz`):
+
+```
+$ cd .../upstream-6.18-drivers-20261118/a          # pristine tree
+$ patch -p1 --dry-run -i 004-arm-clk-reset-luofu-crg.patch
+checking file drivers/clk/hisilicon/Kconfig
+checking file drivers/clk/hisilicon/Makefile
+checking file drivers/clk/hisilicon/crg-luofu.c
+checking file include/dt-bindings/clock/hisilicon,luofu-crg.h
+checking file Documentation/devicetree/bindings/clock/hisilicon,luofu-crg.yaml
+RC=0
+$ patch -p1 --dry-run -i 005-arm-watchdog-luofu-wdt.patch
+checking file drivers/watchdog/Kconfig
+checking file drivers/watchdog/Makefile
+checking file drivers/watchdog/luofu-wdt.c
+checking file Documentation/devicetree/bindings/watchdog/hisilicon,luofu-wdt.yaml
+RC=0
+```
+
+**2. OpenWrt prepare** (patches/config/DTS copied into the clone's target):
+
+```
+$ cd ~/openwrt-lab && make target/linux/prepare
+RC=0
+```
+
+No `.rej`/`.orig` files; the patched tree contains
+`drivers/clk/hisilicon/crg-luofu.c`, `drivers/watchdog/luofu-wdt.c`,
+`include/dt-bindings/clock/hisilicon,luofu-crg.h` and the Kconfig/Makefile hooks.
+
+**3. Full kernel compile** with the tree's own OpenWrt GCC 14.4.0 (`CONFIG_WERROR=y`, no
+make-command-line override):
+
+```
+$ make target/linux/compile V=s -j16
+  CC      drivers/clk/hisilicon/crg-luofu.o
+  CC      drivers/watchdog/luofu-wdt.o
+...
+  Kernel: arch/arm/boot/zImage is ready
+time: target/linux/compile#1190.22#74.07#104.94
+RC=0
+```
+
+- `arch/arm/boot/zImage`: **3,222,416 B**, sha256
+  `50cd07a1025e19e747e281ac3fb89e96e2b82f42594ddbeada2528a150dc528b`.
+- kernel `.config`: `CONFIG_LUOFU_CRG=y`, `CONFIG_LUOFU_WDT=y`, `CONFIG_MFD_SYSCON=y`,
+  `CONFIG_REGMAP=y`, `CONFIG_RESET_CONTROLLER=y`, `CONFIG_WATCHDOG_CORE=y`.
+- both drivers are built-in and linked: `System.map` has `luofu_crg_probe` (`c0b25d08`) and
+  `luofu_wdt_probe` (`c0ba5ce4`).
+- **0 warnings from the new files.** The build emits 38 pre-existing
+  `WARNING: modpost: missing MODULE_DESCRIPTION()` lines for unrelated generic modules
+  (netfilter, phylink, ppp, ...); none mentions luofu/crg/wdt.
+- the load-address contract is unchanged: both `.head.o.cmd` files carry
+  `-DTEXT_OFFSET=0x00608000` and `System.map` has `_text = stext = 0xc0608000`
+  (load/entry 0x80608000 via the loader staging base).
+
+**4. Board DTS -> DTB with the patched kernel's own dtc:**
+
+```
+$ cpp -nostdinc -I <kernel>/include -I <kernel>/arch/arm/boot/dts -undef \
+      -D__DTS__ -x assembler-with-cpp -o luofu-r116.dts.preprocessed dts/luofu-r116.dts
+$ <kernel>/scripts/dtc/dtc -I dts -O dtb -o luofu-r116.dtb luofu-r116.dts.preprocessed
+DTC 1.7.2-g52f07dcc, RC=0, stderr EMPTY (zero warnings)
+```
+
+- DTB: **8,944 B**, sha256
+  `86396521d9db8f4abccfdb155e83b0ac99dc677f283a2a82015f391d96126df8`.
+- node checks (system `fdtget`): `/system-controller@14880000` has compatible
+  `["hisilicon,luofu-crg", "syscon", "simple-mfd"]`, `#clock-cells = <1>`,
+  `#reset-cells = <2>`, and its only child is `watchdog`. The watchdog child has exactly
+  `compatible = "hisilicon,luofu-wdt"`, `timeout-sec = <30>`, `status = "okay"` - no
+  `reg`, no `interrupts`, no vendor-only properties.
+- the same DTS also compiles through the delivered host slice script
+  (`tools/build-kernel-slice.sh --out .../slice-check`): PASS, DTB 8,944 B (same sha256),
+  trailer 9,238 B, FIP slice 3,231,718 B sha256
+  `0c28771dadfffeb25e5329800ebcdeb0a36f06fadb930896a1271d7a40706fe1` with gate at
+  `0x314ec0` and uImage load/ep `0x80608000`. Structural only: that slice has never been
+  booted and is still not flashable through the bench lane (fixed 40,732-byte trailer).
+
+**5. Clock-ID contract cross-check** (independent Python re-read of the DTB and the patch
+text, not the tools' own asserts):
+
+- all 16 dt-bindings IDs have a gate-table entry with the expected name and the designated
+  initializer index equals the ID (`driver_table_matches_header_order: True`);
+- all 15 existing clock consumers use the expected index (`mismatches: []`): fmc/sfc=0,
+  gpio0=1, gpio1=2, i2c0=3, pcie0=4, pcie1=5, gmac0=6, lsw_dp=8, lsw_pfe=9, mdio=10,
+  gmac1=11, gmac2=12, gmac3=13, gmac4=14, pie=15; led_pwm=7 has no consumer yet;
+- no `clk-gate` child nodes remain under the controller node.
+
+**6. Device-tree binding validation:**
+
+```
+$ PATH=<dtschema-venv>/bin:$PATH make ARCH=arm dt_binding_check \
+      DT_SCHEMA_FILES=".../clock/hisilicon,luofu-crg.yaml:.../watchdog/hisilicon,luofu-wdt.yaml"
+  SCHEMA  Documentation/devicetree/bindings/processed-schema.json
+  CHKDT   ./Documentation/devicetree/bindings
+  DTEX    Documentation/devicetree/bindings/clock/hisilicon,luofu-crg.example.dts
+  DTC [C] Documentation/devicetree/bindings/clock/hisilicon,luofu-crg.example.dtb
+  DTEX    Documentation/devicetree/bindings/watchdog/hisilicon,luofu-wdt.example.dts
+  DTC [C] Documentation/devicetree/bindings/watchdog/hisilicon,luofu-wdt.example.dtb
+RC=0
+$ dt-doc-validate -u Documentation/devicetree/bindings <both yamls>   -> RC=0
+$ dt-validate -s processed-schema.json ...crg.example.dtb             -> RC=0
+$ dt-validate -s processed-schema.json ...wdt.example.dtb             -> RC=0
+```
+
+dtschema **2026.9** was installed in a throwaway venv for this check (`pip install dtschema`;
+the tree requires >= 2023.9). `yamllint` is not installed, so the tree's YAML-lint step is
+skipped with its own warning - that is the only step not exercised. The real board DTB's CRG
+subtree was also validated against the same processed schema: RC=0, no errors for the
+controller or the watchdog child (only the synthetic wrapper root lacked
+`compatible`/`model`). A **full**-draft-DTS `dtbs_check` is NOT clean and is not claimed:
+every other node still has a TODO binding (TARGET-DESIGN.md 6.2).
+
+**7. Kernel-config provenance:** with the new Kconfig in the tree, the canonical top-level
+
+```
+$ yes '' | make kernel_oldconfig
+RC=0
+```
+
+target emitted 286 config-symbol lines, **identical** to the annotated
+`luofu/config-6.18` after stripping comments (`CONFIG_SYMBOLS_IDENTICAL`; only the emitted
+line order differs), and the kernel `.config` was byte-identical before and after the re-run
+(`KCONFIG_UNCHANGED`). The two hand-added `[N]` driver symbols and the syscon/regmap selects
+they pull in are therefore exactly what the tree derives; the committed file stays annotated.
+
+**8. Static sanity of the submitted code:**
+
+- no `request_mem_region()`/`ioremap()`/`platform_get_resource()` call in either driver;
+  both obtain the page only via `syscon_node_to_regmap()`;
+- neither probe body contains any `regmap_read`/`regmap_write`/`regmap_update_bits`
+  (probe cannot arm the timer or touch a gate);
+- `scripts/checkpatch.pl --no-tree -f`: **0 errors, 0 warnings** for both drivers and the
+  dt-bindings header (346 / 247 / 33 lines);
+- the delivered driver code contains no lab/bench breadcrumbs or private-repository references
+  (0 matches for `TARGET-DESIGN`, `opensource`, `target-skeleton`, `bench`, `lab`).
+
+### What this proves and what it does not
+
+Proven (host-only): the two drivers are real code with bindings that pass `dt_binding_check`;
+they apply to pristine 6.18.60 and build into the board kernel with zero warnings; the DTS uses
+them with zero dtc warnings and the clock-ID/geometry contract is internally consistent; the
+shared-page design removes the overlapping MMIO claim without any special-case mapping (there
+is no mapping in the drivers at all); and the target kernel config is canonically derived.
+
+Not proven / not claimed - any hardware behaviour:
+
+- the 0x20-group gate offsets are reconstructed from the vendor encoding (PROVISIONAL);
+- reset polarity (the driver preserves the lab behaviour; the vendor description says the
+  opposite; no in-tree consumer uses the resets yet) and the per-gate clock parents/PLLs/muxes;
+- watchdog enable/stop magic-value ordering at run time, whether the bootloader leaves the
+  watchdog running (no `WDOG_HW_RUNNING` detection), and the 0x100 status/interrupt
+  semantics;
+- no restart handler exists at all (documented TODO - the vendor reset path is not understood);
+- no boot, no bench, no device, no image: the FIP slice above is structural only and never
+  flashable through the bench lane. **Publication remains NOT READY.**
+
+### Remaining TODOs for the driver series
+
+1. Attended-bench confirmation of the gate register/bit map, reset polarity, and watchdog
+   clear/enable ordering and boot-time state; then decide `CLK_IGNORE_UNUSED`/rate modelling
+   for boot-enabled gates and a `WDOG_HW_RUNNING` read.
+2. Upstream review items: named reset-ID table, per-gate parent clock model (PLLs/muxes at
+   0x198/0x1e0/0x138, read-only until measured), maintainer identity in the two YAMLs
+   (currently the repository's git identity as a placeholder), and whether the CRG should be
+   split across `drivers/clk/hisilicon` + `drivers/reset` (it is one MFD block, so this draft
+   registers both providers from the clock driver).
+3. The rest of the driver/binding series (thermal, pinctrl, FMC, MDIO/PHY/GEMAC, switch,
+   PCIe), the image recipe/trailer wiring, rootfs/sysupgrade, and one attended boot of a
+   generated trailer - unchanged from the earlier sessions.
+
+Evidence: local-only
+`build/linux-kbuild/waves/upstream-6.18-drivers-20261118/` (gitignored); its `00-README.md`
+indexes the pristine/patched trees, the dry-run/prepare/compile logs, the dtc and
+`dt_binding_check` logs, the cross-check script/output, the config re-derivation logs and the
+slice re-export. None of it is committed.
+
+## 2026-11-18 (sixth session): network trio - MDIO bus, Genius PHY, partial GEMAC
+
+**Status: the network trio is written and compiles as built-ins into the same
+`linux-6.18.60` kernel (`make target/linux/compile -j16` RC=0, 1284.97 s,
+**zero warnings** with `CONFIG_WERROR=y`). The MDIO bus controller (`007`) and the
+Genius PHY (`008`) are complete ports of the lab drivers; the GEMAC (`009`) is a
+**partial** port - binding + platform resource validation only, deliberately **no data
+path** (no TX/RX rings, no DMA, no netdev), with its DTS nodes disabled. Both new YAML
+bindings pass `dt_binding_check`; the board DTS compiles with the patched kernel's own
+dtc to a 9,459 B DTB with **zero warnings**; `checkpatch.pl` reports 0 errors /
+0 warnings / 0 checks on all three files. **Nothing has been booted or run on hardware:
+no bench, no device, no boot claims; publication NOT READY.**
+
+Host-only, same clone (`openwrt main` `27663a0`, `linux-6.18.60`, the tree's own OpenWrt
+GCC 14.4.0 toolchain). No router, UART, TFTP, flash or bench tool was used.
+
+### What was added
+
+| artifact | sha256 |
+| --- | --- |
+| `target/linux/hisilicon/patches-6.18/007-net-mdio-luofu.patch` | `dcbb2821b99f2f5b265596999b0d88fc8605561c4b2453d8857ca54d0d512ccb` |
+| `target/linux/hisilicon/patches-6.18/008-net-phy-luofu.patch` | `676e332e5072608b7193a57213605d5af5cda26e11586d7a9c26fe6b14365912` |
+| `target/linux/hisilicon/patches-6.18/009-net-gmac-luofu.patch` | `96022d6a61c7ef878397dbe2a28b56c00fbf68b6b3ea1bbc3df7ae5e0a2aecee` |
+| `target/linux/hisilicon/luofu/config-6.18` (three `[N]` network symbols; `CONFIG_LUOFU_GMAC/MDIO/PHY=y`) | `6910879e7ef9ebfdb6e4eb3de82522bb26a05c3d86368af6794d7774ba276118` |
+| `dts/luofu-r116.dts` (MDIO resets, GEMAC resets/bindings, GEMAC nodes disabled) | `989da320e753d9f7cd4f0d51563d55b3c784d713d3ef0d73bc71c85a1ef2fda6` |
+
+`007` adds:
+- `drivers/net/mdio/mdio-luofu.c`: the MDIO bus controller on the 6.18 MDIO bus API
+  (`devm_mdiobus_alloc_size` + `of_mdiobus_register`), gate clock via
+  `devm_clk_get_enabled()`, the seven CRG reset lines as a reset array, and the polled
+  MMIO frame handshake.
+- `drivers/net/mdio/{Kconfig,Makefile}`: `CONFIG_LUOFU_MDIO` (inside the existing
+  `if PHYLIB` block, `depends on HAS_IOMEM && OF_MDIO`; it selects nothing new because
+  the devm MDIO helpers are unconditional in 6.18).
+- `Documentation/devicetree/bindings/net/hisilicon,luofu-mdio.yaml`.
+
+`008` adds:
+- `drivers/net/phy/luofu-phy.c`: a PHYLIB driver matched by PHY ID (`0x20669a00` /
+  mask `0xffffff00`) with the generic clause 22 operations.
+- `drivers/net/phy/{Kconfig,Makefile}`: `CONFIG_LUOFU_PHY`.
+- **No YAML on purpose**: PHY drivers are matched by PHY ID, not by a devicetree
+  compatible, and the PHY children stay standard `ethernet-phy-ieee802.3-c22` nodes.
+  Adding a binding here would be wrong; the MDIO binding validates the bus and its
+  children.
+
+`009` adds:
+- `drivers/net/ethernet/hisilicon/luofu-gmac.c`: the **resource/binding half** of the
+  GEMAC port - it validates reg/clocks/resets/`phy-mode`/`phy-handle` and then refuses
+  to probe (see below).
+- `drivers/net/ethernet/hisilicon/{Kconfig,Makefile}`: `CONFIG_LUOFU_GMAC`.
+- `Documentation/devicetree/bindings/net/hisilicon,luofu-gmac.yaml`.
+
+### Design decisions (and why)
+
+1. **MDIO goes in `drivers/net/mdio/`, not next to the MAC.** The controller is a
+   standalone five-MAC-shared bus, and 6.18 keeps standalone MDIO controllers there
+   (`mdio-xgene`, `mdio-hisi-femac`, ...). The driver uses only the standard bus API:
+   no vendor glue, no vendor compatible string (`hsan,mdio` is not bound), and none of
+   the vendor's optional DT properties (`pre-addr`/`pre-val`/`vendor-addr`/`pinctrl-sel`)
+   are modelled - the board's DT does not carry them.
+2. **The transfer sequence is the measured one, not the first decoded guess.** The lab
+   source documents two register layouts: an early `0x00/0x60/0x6c/0x70/0x74` group
+   recovered from the vendor's DFX path, and the `0x20/0x2c/0x30/0x38` group that the
+   working lab driver actually used. The working group is the one with hardware
+   evidence: the out-of-tree 5.10 driver read real clause 22 PHY IDs on the SoC (the
+   Genius PHY ID came back as `0x20669a09`, ledger 2026-11-14 23:15). The port keeps
+   that sequence: wait `0x2c[18:16]` clear, write the frame in the high half of `0x30`,
+   poll `0x20` bit 0/1 for done, acknowledge by writing the observed value back, wait
+   for busy to clear, read `0x38[15:0]`. A write puts the payload in the low half of the
+   frame word. Caveat stated plainly: **that hardware evidence belongs to the previous
+   out-of-tree driver; this 6.18 port has only been host-compiled.**
+3. **The poll is bounded, not a spin.** The lab loop used jiffies + `cpu_relax`; the port
+   uses `readl_poll_timeout_atomic()` with a 10 us interval and the same 100 ms bound,
+   which is legal in both process and atomic context (the MDIO core serialises with
+   `bus->mdio_lock`).
+4. **PHY driver: ID-matched, generic C22 ops, no binding.** `PHY_GBIT_FEATURES` no longer
+   exists in 6.18; the core reads the abilities with `genphy_read_abilities()`, and the
+   driver only names itself, `config_aneg`/`read_status` and the suspend/resume helpers.
+   This is the complete port of the 44-line lab driver plus the 6.18 API shape. The
+   vendor per-PHY firmware patch (`lsw/hi_ephy_%xv%x.bin`) is a documented TODO: it is
+   not loaded, and that is the first suspect if link training differs from the vendor
+   stack.
+5. **GEMAC is delivered as an honest partial, not a stub.** The previous out-of-tree
+   driver registered a netdev whose `ndo_start_xmit` dropped every frame; the TX/RX ring
+   and DMA programming model has never been decoded (the lab header's "rings are staged"
+   was a comment without code, and the vendor's transmit helper `hi_net_dev_xmit` lives
+   in another vendor module), and a wrong access to this block before it is ready has
+   hung the board's AHB bus. Registering a net_device that cannot carry a packet would
+   present a working-looking interface to userspace. Instead the driver claims the
+   binding, validates the resources, and returns `-EOPNOTSUPP` from probe without
+   registering anything; the DTS GEMAC nodes are `status = "disabled"` so a normal boot
+   never reaches it. What is known is kept for the next step: the five instances are
+   ports 8..12 of the internal switch, instance 0 is RGMII and unused by the vendor,
+   instances 1..4 are GMII into the switch, and the wired jack is instance 3
+   (0x14480000, port 11); a few words (PORT_MODE 0x0040, MODE_CHANGE_EN 0x01b4) were
+   observed read-only on the vendor's running kernel. None of that is written here.
+6. **DTS/config follow the existing provenance discipline.** The MDIO node gains its
+   seven CRG resets with clean reset names (`mdio`, `gephyall`, `gephy0`..`gephy4`)
+   instead of the vendor's `*_reset` strings; the GEMAC nodes gain the two CRG reset
+   lines and are switched from `okay` (no driver) to `disabled` (partial driver).
+   `config-6.18` gains the three `[N]` symbols =y. They reuse symbols already in the
+   delta (`CONFIG_OF_MDIO`, `CONFIG_MDIO_BUS`, `CONFIG_PHYLIB`); `CONFIG_PHYLINK`
+   stays `m` because the partial GEMAC links no phylink code - a future full GMAC port
+   will need `PHYLINK=y` and its MAC ops.
+
+### Verification (exact commands and results)
+
+All logs and artifacts are local-only (gitignored) under
+`build/linux-kbuild/waves/upstream-6.18-net-20261118/`. The repository contains only the
+sources and these docs.
+
+**1. Patches apply to pristine `linux-6.18.60`** (unpacked from the clone's
+`dl/linux-6.18.60.tar.xz`):
+
+```
+$ cd .../netport-pristine/linux-6.18.60
+$ patch -p1 --dry-run < 007-net-mdio-luofu.patch
+checking file drivers/net/mdio/Kconfig
+checking file drivers/net/mdio/Makefile
+checking file drivers/net/mdio/mdio-luofu.c
+checking file Documentation/devicetree/bindings/net/hisilicon,luofu-mdio.yaml
+RC=0
+$ patch -p1 --dry-run < 008-net-phy-luofu.patch
+checking file drivers/net/phy/Kconfig
+Hunk #1 succeeded at 253 (offset -75 lines).
+checking file drivers/net/phy/Makefile
+Hunk #1 succeeded at 63 (offset -12 lines).
+checking file drivers/net/phy/luofu-phy.c
+RC=0
+$ patch -p1 --dry-run < 009-net-gmac-luofu.patch
+...
+RC=0
+```
+
+The `-75`/`-12` offsets in `008` exist because the patch was generated against the
+OpenWrt clone's `drivers/net/phy/*` files, which the OpenWrt generic patch set has
+already extended (extra PHY drivers); the hunks still land on the right context in
+pristine 6.18.60 and in the clone. This is cosmetic, not a data-path difference.
+
+**2. OpenWrt prepare** (the three patches and the DTS/config edits were copied into the
+clone's target):
+
+```
+$ cd ~/openwrt-lab && make target/linux/prepare V=s
+Applying .../patches-6.18/007-net-mdio-luofu.patch using plaintext:
+Applying .../patches-6.18/008-net-phy-luofu.patch using plaintext:
+Applying .../patches-6.18/009-net-gmac-luofu.patch using plaintext:
+RC=0
+```
+
+No `.rej`/`.orig` files; the tree contains `drivers/net/mdio/mdio-luofu.c`,
+`drivers/net/phy/luofu-phy.c`, `drivers/net/ethernet/hisilicon/luofu-gmac.c` and both
+YAMLs.
+
+**3. Full kernel compile** with the tree's own OpenWrt GCC 14.4.0 (`CONFIG_WERROR=y`, no
+make-command-line override):
+
+```
+$ make target/linux/compile V=s -j16
+  CC      drivers/net/mdio/mdio-luofu.o
+  CC      drivers/net/phy/luofu-phy.o
+  CC      drivers/net/ethernet/hisilicon/luofu-gmac.o
+...
+  Kernel: arch/arm/boot/zImage is ready
+time: target/linux/compile#1284.97#...
+RC=0
+```
+
+- `arch/arm/boot/zImage`: **3,223,728 B**, sha256 `2749c294fe95b6fe3ece2ecc26357dbb44d0aa5e5fc765699e8865f0a6e5b6f5`.
+- kernel `.config`: `CONFIG_LUOFU_MDIO=y`, `CONFIG_LUOFU_PHY=y`, `CONFIG_LUOFU_GMAC=y`
+  (plus the already-enabled `CONFIG_LUOFU_CRG/WDT=y`).
+- all three objects are built-in and linked: `System.map` has `luofu_mdio_probe`,
+  `luofu_gmac_probe` and `luofu_genius_phy_drivers`.
+- **0 warnings in the whole compile log** (`grep -c 'warning:'` = 0), and none of the
+  new files appears in any warning (`grep` limited to the new names = none).
+- the load-address contract is unchanged: both `.head.o.cmd` files carry
+  `-DTEXT_OFFSET=0x00608000` and `System.map` has `_text = stext = 0xc0608000` /
+  `swapper_pg_dir = 0xc0604000`, i.e. load/entry `0x80608000` via the loader staging base
+  - the `TEXT_OFFSET` mechanism is untouched by this session.
+
+**4. Board DTS -> DTB with the patched kernel's own dtc:**
+
+```
+$ cpp -nostdinc -I <kernel>/include -I <kernel>/arch/arm/boot/dts -undef \
+      -D__DTS__ -x assembler-with-cpp -o luofu-r116.dts.preprocessed dts/luofu-r116.dts
+$ <kernel>/scripts/dtc/dtc -I dts -O dtb -o luofu-r116.dtb luofu-r116.dts.preprocessed
+DTC RC=0, stderr EMPTY (zero warnings)
+```
+
+- DTB: **9,459 B**, sha256 `f6781920eedc8421ffbe5d72aa6adecc9f64509ee2316f62263aabd5f4f9c887` (the fifth session's DTB was 8,944 B; the
+  growth is the MDIO/GEMAC reset arrays and binding comments).
+- `fdtget` node checks: `/mdio@14000000` compatible `"hisilicon,luofu-mdio"`, seven
+  `resets` entries (`0x30` word, bits `0x6`, `0x1a..0x1f`) and reset-names
+  `"mdio gephyall gephy0 gephy1 gephy2 gephy3 gephy4"`; `/ethernet@14480000` compatible
+  `"hisilicon,luofu-gmac"`, `status = "disabled"`, two `resets` entries (bits
+  `0x13`/`0x14`).
+- 17 reset specifiers exist in the DTS; all are `(0x30, bit <= 31)`, which the CRG reset
+  provider's xlate accepts (it only allows the `0x2c/0x30/0x34` words and bit 0..31) -
+  checked independently with a Python re-read of the DTS, `invalid: []`.
+
+**5. Device-tree binding validation:**
+
+```
+$ PATH=<dtschema-venv>/bin:$PATH make ARCH=arm dt_binding_check \
+      DT_SCHEMA_FILES=".../net/hisilicon,luofu-mdio.yaml:.../net/hisilicon,luofu-gmac.yaml"
+  DTEX    Documentation/devicetree/bindings/net/hisilicon,luofu-mdio.example.dts
+  DTC [C] .../hisilicon,luofu-mdio.example.dtb
+  DTEX    Documentation/devicetree/bindings/net/hisilicon,luofu-gmac.example.dts
+  DTC [C] .../hisilicon,luofu-gmac.example.dtb
+RC=0
+```
+
+dtschema **2026.9** in a throwaway venv (`/tmp/dtsv`); `yamllint` is not installed, so the
+tree's YAML-lint step is skipped with its own warning - that is the only validation step
+not exercised (same limitation as the fifth session). A **full**-draft-DTS `dtbs_check` is
+NOT clean and is not claimed: every other node still has a TODO binding.
+
+**6. Static sanity of the submitted code:**
+
+- `scripts/checkpatch.pl --no-tree -f`: **0 errors, 0 warnings, 0 checks** -
+  `mdio-luofu.c` 211 lines, `luofu-phy.c` 52 lines, `luofu-gmac.c` 137 lines.
+- no `request_mem_region()`/`ioremap()` in any of the three drivers (MMIO only through
+  `devm_platform_ioremap_resource()`/the MDIO bus API);
+- no lab/bench breadcrumbs or private-repository references: `grep -i 'lab|bench'` on the
+  three drivers and both YAMLs = **no matches**; no diagnostic-cell writes, no
+  `0xc0de*`/`0x10100*` addresses, no vendor `hsan,*` strings;
+- the GMAC driver registers no `net_device` and has no `ndo_start_xmit`; probe returns
+  `-EOPNOTSUPP` before any register access.
+- 281 lines of the committed config delta were compared against the compiled kernel's
+  `.config`: all `LUOFU`/network symbols match. The only two differences are a
+  **pre-existing, unrelated** `CONFIG_DEVTMPFS`/`CONFIG_DEVTMPFS_MOUNT` pair (the delta
+  says `=y` while the OpenWrt generic config and the built `.config` say not-set); this
+  session neither introduced nor fixed that and it does not touch the network symbols.
+
+### What this proves and what it does not
+
+Proven (host-only): the three drivers are real code with two bindings that pass
+`dt_binding_check`; they apply to pristine 6.18.60, apply in the OpenWrt clone, and build
+into the board kernel with **zero warnings under `CONFIG_WERROR=y`**; the board DTS uses
+the new nodes with zero dtc warnings; the GEMAC driver cannot create a fake interface (it
+refuses to probe and registers no netdev); and no vendor/lab instrumentation or private
+artifact is embedded.
+
+Not proven / not claimed - any hardware behaviour:
+
+- the 6.18 MDIO driver's transfer timing/rate and the reset-polarity assumption (the
+  register sequence has hardware evidence only through the earlier out-of-tree 5.10
+  driver; the CRG reset polarity itself is still unverified);
+- PHY autonegotiation/link/suspend behaviour on this silicon, and whether the vendor
+  per-PHY firmware patch is required for correct link training;
+- the GEMAC data path: it does not exist in this port. No rings, no DMA, no NAPI, no
+  netdev; the DTS nodes are disabled;
+- no boot, no bench, no device, no image. **Publication remains NOT READY.**
+
+### Remaining TODOs for the network port
+
+1. Bench: boot the 6.18 kernel (needs the image/install path that does not exist yet),
+   confirm the MDIO bus comes out of reset, read the PHY IDs (expect `0x20669a09`-class
+   values on addresses 2..5), and check autonegotiation/link on the wired port.
+2. Decode and implement the GEMAC TX/RX ring + DMA model from a citable source
+   (vendor GPL source or further RE), add NAPI and DMA mapping, program the MAC port
+   mode from the phylink link-up callback, then enable the GEMAC DTS nodes and attach
+   through `phylink` - that is when `CONFIG_PHYLINK=y` and the MAC ops enter the
+   picture.
+3. Decode the vendor per-PHY firmware patch (`hi_ephy_%xv%x.bin`) if hardware tests show
+   the generic C22 path is insufficient.
+4. Upstream review items: maintainer identity in the YAMLs (currently the repository's
+   git identity as a placeholder), whether the seven-reset array belongs on the MDIO bus
+   node, the MDIO controller file location, and whether a GEMAC binding should land
+   before its data path exists (the draft keeps the binding because the DT nodes are
+   already in the board tree and the partial driver documents the contract).
+
+Evidence: local-only `build/linux-kbuild/waves/upstream-6.18-net-20261118/` (gitignored).
+None of it is committed.
+
+
+## 2026-11-18 (sixth session, FMC/NAND port): FMC SPI-NAND controller
+
+**Status: the board's flash controller is ported as a SPI-MEM controller with a YAML
+binding, and the draft board DTS is converted to a SPI bus + `spi-nand` child. The
+delivered patch applies to pristine `linux-6.18.60` and in the clone, the full kernel
+compiles as a built-in with zero warnings from the new files (`make target/linux/prepare`
+and `make target/linux/compile` RC=0), the board DTS compiles with the kernel's own dtc
+with zero warnings, `dt_binding_check` passes for the new YAML, and the hand-added config
+delta is symbol-identical to a canonical `make kernel_oldconfig` re-derivation. Nothing has
+been booted or run on hardware: the FMC ECC engine semantics, the OOB bytes the DMA engine
+returns, the die's quad-enable state after the SPI-NAND core's reset and the partition
+semantics are unverified. Publication NOT READY.**
+
+Host-only, in an isolated reflink copy of the same clone (`openwrt main` `27663a0`,
+`linux-6.18.60`, the tree's own OpenWrt GCC 14.4.0 toolchain) so a parallel driver port
+could keep using the original clone. No router, UART, TFTP, flash or bench tool was used.
+
+### What was added
+
+| artifact | sha256 |
+| --- | --- |
+| `target/linux/hisilicon/patches-6.18/006-arm-mtd-nand-luofu-fmc.patch` | 1f8809e98be649fb915c33d0ceaadb0c7e98509068347e72557839d3c7f5865e |
+| `target/linux/hisilicon/luofu/config-6.18` (three `[N]` groups: the driver symbol, the SPI-NAND stack, the SPI core; symbol-identical to a canonical re-derivation) | 2b5493d2797d12b5b77eb13027daee7e07b331d63b590ba66c305231fd67c58a |
+| `dts/luofu-r116.dts` (the FMC node becomes a SPI bus with a `spi-nand` child; `resets` added) | d1cca5f9b730f5b01dcd2cab010680013ac6b46b02713f8650dd8f2ccfc4ed0d |
+
+`006` adds:
+
+- `drivers/spi/spi-luofu-fmc.c`: a SPI-MEM controller for the FMC at `0x10a20000` (command
+  engine for command/address/short-data phases; the measured DMA engine for page + OOB
+  transfers). The mainline SPI-NAND stack is the NAND layer.
+- `Documentation/devicetree/bindings/mtd/hisilicon,luofu-fmc.yaml`.
+- `drivers/spi/{Kconfig,Makefile}`: `CONFIG_LUOFU_FMC`.
+
+### Design decisions (and why)
+
+1. **Not the raw-NAND framework: a SPI-MEM controller plus the mainline SPI-NAND stack.**
+   The die is an SPI-NAND part (ESMT F50L1G41LC: page load `0x13`, read cache `0x6b`,
+   program load `0x32`, program execute `0x10`, block erase `0xd8`, READ ID `0x9f`). The
+   raw-NAND core drives `NAND_CMD_*` sequences and a `0x90` READ ID, which this die does not
+   speak, and the controller is in SPI mode (FMC_CFG bit 2 = 0; the lab driver refuses
+   raw-NAND mode for exactly this reason). Reusing `drivers/mtd/nand/spi` provides chip
+   detection, the on-die ECC engine, the ESMT OOB layout, bad-block handling and partition
+   parsing from mainline instead of re-implementing them, which is what the repo's port spec
+   recommends (parent `phase50/nand-fmc-port-spec.md` section (f)).
+2. **The controller driver is a SPI-MEM controller** (`spi_controller` + `mem_ops`), the
+   upstream shape already used for dedicated SPI-NAND controller hardware
+   (`drivers/spi/spi-qpic-snand.c`, `spi-amlogic-spifc-a4.c`). Page data uses the
+   controller DMA engine with the two measured interface packs; the command engine handles
+   commands, addresses, dummy cycles and the short feature/ID data phases through the
+   memory-mapped window.
+3. **No dirmap implementation is needed**: an SPI controller without `->dirmap_create` gets
+   the spi-mem core's exec_op fallback, and every page-cache operation the SPI-NAND core
+   issues is one of the shapes the driver accepts (checked in `supports_op`).
+4. **Measured register values are driver data, not DT properties.** The vendor DT props
+   are gone: `spi_cs` becomes the child's `reg` (chip select 1), `enable-quad-mode` becomes
+   `spi-{tx,rx}-bus-width = <4>` (the SPI-NAND core then selects the quad op variants), and
+   `bus_id` disappears. The page/OOB geometry (2048/64) is driver data matching the die the
+   controller is wired to; every op is validated against it.
+5. **Clock and reset are consumed from the CRG binding (patch `004`)**: `clocks = <&crg
+   LUOFU_CLK_SFC>` and `resets = <&crg 0x2c 0x0>` (`sfc_rst`). The driver deasserts the
+   reset rather than pulsing it: the bootloader has already released the block, and the
+   block's timing configuration is bootloader data - pulsing is a measurement, not a guess.
+6. **Deliberately absent**: no IRQ (all known implementations poll and no devicetree wires
+   one), no restart, no die reset in the controller probe (the SPI-NAND core does its own),
+   no writes to the fifteen undecoded vendor init words (their meaning is unknown; only the
+   two documented mode bits are set), and no lab breadcrumbs, sysctrl writes, JFFS2/UBI
+   edits or "read ECC off" flag - those were never in the driver slice.
+7. **The ESMT F50L1G41LC chip entry is not in vanilla 6.18.60.** It is a v6.19 upstream
+   addition that this target receives through OpenWrt's generic backport
+   `target/linux/generic/backport-6.18/434-v6.19-mtd-spinand-esmt-add-support-for-F50L1G41LC.patch`.
+   The driver therefore depends on that backport in this tree; an upstream submission needs
+   the chip entry (or a target kernel bump).
+
+### Verification (exact commands and results)
+
+All logs/artifacts are local-only (gitignored) under
+`build/linux-kbuild/waves/upstream-6.18-fmc-20261118/`; nothing there is committed.
+
+**1. Patch applies to pristine `linux-6.18.60`** (unpacked from the clone's
+`dl/linux-6.18.60.tar.xz`):
+
+```
+$ cd .../upstream-6.18-fmc-20261118/a            # pristine tree
+$ patch -p1 --dry-run -i 006-arm-mtd-nand-luofu-fmc.patch
+checking file drivers/spi/Kconfig
+checking file drivers/spi/Makefile
+checking file drivers/spi/spi-luofu-fmc.c
+checking file Documentation/devicetree/bindings/mtd/hisilicon,luofu-fmc.yaml
+RC=0
+```
+
+**2. OpenWrt prepare** (target `001`-`006` + config + DTS copied into the isolated clone
+copy):
+
+```
+$ cd ~/openwrt-lab-fmc && make target/linux/prepare
+RC=0   (the log shows 004/005/006 applied; 0 .rej/.orig files)
+```
+
+**3. Full kernel compile** with the tree's own OpenWrt GCC 14.4.0 and `CONFIG_WERROR=y`:
+
+```
+$ make target/linux/compile V=s -j16
+  CC      drivers/spi/spi-luofu-fmc.o
+...
+  Kernel: arch/arm/boot/zImage is ready
+RC=0   (START 2026-11-18T03:27:22Z, END 03:29:11Z = 109 s wall clock; the copied tree's OpenWrt time.pl counter is an accumulated total (1202.37 s), not this run)
+```
+
+- `arch/arm/boot/zImage`: **3,248,984 B**, sha256 51f340adc9d4e83c6b4c55be93d43453d65947126c9c805309a5d08e99d859ba.
+- kernel `.config`: CONFIG_LUOFU_FMC=y, CONFIG_MTD_SPI_NAND=y, CONFIG_MTD_NAND_CORE=y, CONFIG_MTD_NAND_ECC=y, CONFIG_SPI=y, CONFIG_SPI_MASTER=y, CONFIG_SPI_MEM=y (plus CONFIG_LUOFU_CRG=y / CONFIG_LUOFU_WDT=y from patches 004/005).
+- the driver is built-in and linked: `System.map` has `luofu_fmc_probe`, `luofu_fmc_exec_op`,
+  `luofu_fmc_dma_xfer`, the match table and the `device_initcall`.
+- **0 compiler warnings/errors from the new files**: the only `spi-luofu-fmc` line in the
+  build log is the `CC` line. The remaining warning strings in the log are pre-existing
+  `modpost: missing MODULE_DESCRIPTION()` lines for unrelated generic modules (netfilter,
+  phylink, ppp, ...) plus one kernel kconfig-sync notice printed before the build.
+- the load-address contract is unchanged: both `.head.o.cmd` files carry
+  `-DTEXT_OFFSET=0x00608000` and `System.map` has `_text = stext = 0xc0608000`.
+
+**4. Board DTS -> DTB with the patched kernel's own dtc:**
+
+```
+$ cpp -nostdinc -I <kernel>/include -I <kernel>/arch/arm/boot/dts -undef \
+      -D__DTS__ -x assembler-with-cpp -o luofu-r116.dts.preprocessed dts/luofu-r116.dts
+$ <kernel>/scripts/dtc/dtc -I dts -O dtb -o luofu-r116.dtb luofu-r116.dts.preprocessed
+DTC 1.7.2-g52f07dcc, RC=0, stderr EMPTY (zero warnings)
+```
+
+- DTB: **9,163 B**, sha256 3541b267ca666e90d921d48ccea2d3394d657e68805aa5fff1b1e4009de154df.
+- the `spi@10a20000` node has compatible `hisilicon,luofu-fmc`, `reg-names = "regs",
+  "window"`, `clocks = <&crg 0>` (`LUOFU_CLK_SFC`), `resets = <&crg 0x2c 0>`, and one child
+  `flash@1` (`compatible = "spi-nand"`, `reg = <1>`, quad bus widths) carrying the 17 fixed
+  partitions.
+
+**5. Device-tree binding validation:**
+
+```
+$ PATH=<dtschema-venv>/bin:$PATH make ARCH=arm dt_binding_check \
+      DT_SCHEMA_FILES=mtd/hisilicon,luofu-fmc.yaml
+  SCHEMA  Documentation/devicetree/bindings/processed-schema.json
+  CHKDT   ./Documentation/devicetree/bindings
+  DTEX    Documentation/devicetree/bindings/mtd/hisilicon,luofu-fmc.example.dts
+  DTC [C] .../hisilicon,luofu-fmc.example.dtb
+RC=0
+```
+
+dtschema **2026.9** in a throwaway venv; `yamllint` is not installed, so the tree's
+YAML-lint step is skipped with its own warning. The board DTB's FMC subtree (plus the CRG
+provider it points at) validates against the same processed schema: `dt-validate` RC=0,
+stderr empty.
+
+**6. Kernel-config provenance:** with the new Kconfig in the tree:
+
+```
+$ yes '' | make kernel_oldconfig
+RC=0
+```
+
+target emitted 285 config-symbol lines, **identical** to the annotated
+`luofu/config-6.18` after stripping comments (285/285 symbols identical by set (CONFIG_SYMBOLS_IDENTICAL); only the [N] annotation lines move symbols out of emitted sort order), and the kernel `.config` was
+byte-identical before and after (CONFIG_DERIVATION_IDEMPOTENT (two consecutive canonical runs byte-identical) and ANNOTATED_CONFIG_MERGES_IDENTICALLY (the annotated delta and the canonical delta merge with generic/config-6.18 to the identical kernel config); the derivation make returns rc=0 (the yes feeder exits on SIGPIPE afterwards)).
+
+**7. Static sanity:**
+
+- `scripts/checkpatch.pl --no-tree -f`: **0 errors, 0 warnings** for the driver (636
+  lines) and the YAML (106 lines);
+- the delivered driver/binding text contains no `lab`, `bench`, `opensource`,
+  `target-skeleton`, sysctrl/breadcrumb or `0xC0DE` references (0 matches in the final
+  scan);
+- the driver consumes the CRG clock/reset cells instead of hard-coding them: the gate is
+  `clocks = <&crg LUOFU_CLK_SFC>` and the reset is the documented 2-cell form
+  `<&crg 0x2c 0x0>`.
+
+### What this proves and what it does not
+
+Proven (host-only): the controller driver is real code with a binding that passes
+`dt_binding_check`; it applies to pristine 6.18.60 and builds into the board kernel as a
+built-in with zero warnings; the board DTS uses it with zero dtc warnings and its FMC
+subtree validates against the schema; the config delta is canonically derived; the load
+contract is unchanged.
+
+Not proven / not claimed - any hardware behaviour:
+
+- the FMC ECC engine semantics: whether ECC type 1 is a host ECC engine or an on-die
+  pass-through, and whether the on-die ECC engine's OOB/status expectations are met;
+- the OOB bytes the DMA engine returns at `SADDR_OOB` (the receive side of the lab proof
+  only ever consumed page data, and bad-block/ECC status handling depends on OOB);
+- the page-load command (`0x13`) through the command engine: the measured page read let the
+  DMA engine perform the whole page operation and never issued it;
+- whether a Linux die reset (issued by the SPI-NAND core at probe) clears the die's
+  quad-enable bit; the board's bootloader runs quad and the mainline ESMT entry has no QE
+  quirk;
+- the fifteen undecoded vendor init words are not written; whether the die needs them is
+  unknown;
+- partition read-only semantics and the `u-boot,env` representation;
+- no boot, no bench, no device, no image: **publication remains NOT READY**.
+
+### Remaining TODOs for the driver series
+
+1. Attended bring-up of one generated kernel on the board: confirm the command-engine
+   encodings and address byte order, the DMA completion protocol, the quad-enable state,
+   the OOB path and the ECC status reporting; then decide whether any of the fifteen vendor
+   init words is required.
+2. Upstream: the ESMT F50L1G41LC chip entry must land (v6.19) or the target must move to a
+   kernel that has it; `MAINTAINERS` entries; review the driver-data page/OOB geometry
+   approach; decide whether the reset should be pulsed.
+3. The rest of the driver series (thermal, pinctrl, MDIO/PHY/GEMAC, switch, PCIe) and one
+   attended boot - unchanged.
+
+Evidence: local-only `build/linux-kbuild/waves/upstream-6.18-fmc-20261118/`.
+
+---
+
+## 2026-11-18 (seventh session): machine restart (patch 010)
+
+**Status: the first upstream-style machine-restart path for this SoC is written as a platform
+driver with two YAML bindings, the board DTS gets a SYSCTRL syscon node and the reboot node,
+and the driver/rootfs config gains `CONFIG_LUOFU_REBOOT=y`. The patch applies cleanly to
+pristine `linux-6.18.60` and in the OpenWrt clone, the full kernel compiles as a built-in
+with zero warnings, both bindings pass `dt_binding_check`, the board DTS compiles with the
+patched kernel's own dtc to a DTB with zero warnings and the two new nodes validate against
+their schemas, and `checkpatch` is clean. The CRG software-reset command itself is
+**PROVISIONAL** (the vendor devicetree values and the vendor reboot-register offset are
+used, but the exact write order/width has never been measured), and the selector protocol
+stays [U]. NOTHING HAS BEEN BOOTED OR RUN ON HARDWARE AND THE RESET PATH IS NOT CLAIMED TO
+WORK; publication remains NOT READY.**
+
+Host-only, in an isolated btrfs-reflink copy of the clone
+(`~/openwrt-lab-restart`; `openwrt main` `27663a0`, `linux-6.18.60`,
+the tree's own OpenWrt GCC 14.4.0 toolchain). The shared `openwrt-lab` clone was not
+modified by this lane; no router, UART, TFTP, flash or bench tool was touched.
+
+### What was added
+
+| artifact | sha256 |
+| --- | --- |
+| `target/linux/hisilicon/patches-6.18/010-arm-luofu-restart.patch` | `3fbfaaeed7f3038eeb0c56701e4cc52ccdc082e693a04b990336b188c2d25095` |
+| `target/linux/hisilicon/dts/luofu-r116.dts` (adds the SYSCTRL syscon node and the reboot node) | `42c6ffa30b74f1108d2045ae1814e1b3da709752f1e327aabc26b8871752b9b4` |
+| `target/linux/hisilicon/luofu/config-6.18` (`CONFIG_LUOFU_REBOOT=y`) | `25c27473b3bc52ae2d0a207acb4126080578e8c28d59b2656ff0960c9fc7a9c8` |
+
+`010` adds:
+- `drivers/power/reset/luofu-reboot.c`: the restart handler. Three steps: save the SYSCTRL
+  A/B boot selector with a read-back write-same; write the vendor `softrst_val0`/`val1`
+  pair to the CRG reboot register at page offset `0x00`; if that does not reset the SoC,
+  set the CRG watchdog to a 1 s expiry and arm its vendor enable pair, then wait a bounded
+  time. Probe only obtains the two syscon regmaps and registers the handler - it performs
+  no register access at all.
+- `drivers/power/reset/{Kconfig,Makefile}`: `CONFIG_LUOFU_REBOOT` (bool,
+  `depends on ARCH_LUOFU || COMPILE_TEST`, `select MFD_SYSCON`).
+- `Documentation/devicetree/bindings/power/reset/hisilicon,luofu-reboot.yaml` and
+  `Documentation/devicetree/bindings/soc/hisilicon/hisilicon,luofu-sysctrl.yaml`.
+
+### Design decisions (and why)
+
+1. **A standalone `drivers/power/reset/` platform driver, not a machine `.restart` hook.**
+   This is the upstream shape for SoC restart implementations (the directory already holds
+   `hisi-reboot.c`, `syscon-reboot.c`, `gpio-restart.c`), it keeps the mach file clean,
+   and it matches the target design's "future reset driver" note (TARGET-DESIGN.md 7.1).
+   The driver shares the two syscon pages instead of claiming them: SYSCTRL is a new
+   `hisilicon,luofu-sysctrl` syscon node and CRG is the existing
+   `hisilicon,luofu-crg` syscon node. There is no `ioremap()` and no
+   `request_mem_region()` in the driver, so the lab lane's overlapping-MMIO failure mode
+   cannot recur.
+2. **The boot-selector write is a write-same, never the lab's hard-coded `0x10`.** The
+   measured facts are the cell offset (`0xc08`), the A/B encodings (`0x10`/`0x11`) and
+   that the cell is sticky across a warm reset. The value the stock restart path writes is
+   not measured, so the driver reads the cell, validates the encoding and writes the same
+   value back - it preserves whichever pair booted and cannot move the board to another
+   slot. An unrecognised value (including the observed `0x21` handover) is left untouched
+   with a warning.
+3. **The CRG reset command is PROVISIONAL and is labelled so in the driver, the binding and
+   the DTS.** The values (`0x51162100`/`0xaee9deff`, the second the bitwise complement of
+   the first) and the register offset (`reboot-offset = <0x0>`) are the vendor devicetree's
+   own; the recovered access rules name `0x00` the reboot register and mark it as a store
+   the read-only lab instruments must not perform (i.e. writing it is expected to reset the
+   SoC). What is *not* measured is whether the pair goes to one register or two adjacent
+   words and in which order - the driver writes both to `0x00` (the vendor watchdog pair
+   shape) and nothing is invented. The write is confined to the reboot register: no
+   soft-reset (`0x84`), resume (`0x38`), mux (`0x138`) or PLL (`0x198`/`0x1e0`)
+   word is ever touched, so a wrong command cannot reprogram clocks.
+4. **A failed reset must not strand the board, so the watchdog is the bounded fallback.**
+   PHASE 85 in the parent ledger is the evidence: the old restart path wrote its reset
+   sequence, parked forever, and the SoC watchdog had already been disarmed - only a hand on
+   the power returned the box. The fix was to arm the watchdog before parking. This driver
+   keeps that backstop with the watchdog driver's own vendor hwver-2 values (1 s expiry,
+   enable val1-then-val0) and **never parks**: after arming it waits 1.5 s and returns, so
+   `machine_restart()` still gets to print its "Reboot failed" message.
+5. **Why not extend the watchdog driver or `POWER_RESET_HISI`:** patch `005` deliberately
+   has no restart handler (arming the watchdog from the watchdog driver is the wrong layer,
+   and the reset path was unverified); `POWER_RESET_HISI` binds `"hisilicon,sysctrl"` and
+   writes `0xdeadbeef` at a `reboot-offset` prop this SoC's vendor node does not have, and
+   matching that compatible would give it an MMIO claim next to the syscon; `syscon-reboot`
+   cannot express selector-save + two-stage reset. The watchdog enable constants therefore
+   appear in both `005` and `010` - a known review smell, named in the port summary rather
+   than hidden.
+6. **Probe is read-only, and `checkpatch`/static checks are part of the gate.** The first
+   MMIO access happens in the restart handler only; loading the driver cannot arm the timer,
+   write the selector or reset anything. The delivered drivers/YAMLs contain no lab/bench
+   breadcrumbs and no private-repository references.
+
+### Verification (exact commands and results)
+
+All logs/artifacts are local-only (gitignored) under
+`build/linux-kbuild/waves/upstream-6.18-restart-20261118/`; nothing there is committed.
+
+**1. Patch applies to pristine `linux-6.18.60`** (unpacked from the clone's
+`dl/linux-6.18.60.tar.xz`):
+
+```
+$ cd .../upstream-6.18-restart-20261118/a            # pristine tree
+$ patch -p1 --dry-run -i 010-arm-luofu-restart.patch
+checking file drivers/power/reset/Kconfig
+checking file drivers/power/reset/Makefile
+checking file drivers/power/reset/luofu-reboot.c
+checking file Documentation/devicetree/bindings/power/reset/hisilicon,luofu-reboot.yaml
+checking file Documentation/devicetree/bindings/soc/hisilicon/hisilicon,luofu-sysctrl.yaml
+RC=0
+```
+
+**2. OpenWrt prepare** (the isolated clone copy, target patches `001`-`010` plus the DTS
+and config edits; the prep step re-extracts the kernel and applies every generic backport):
+
+```
+$ cd ~/openwrt-lab-restart && make target/linux/prepare V=s
+Applying .../patches-6.18/010-arm-luofu-restart.patch using plaintext:
+patching file drivers/power/reset/Kconfig
+...
+RC=0   (1,169 "patching file" lines over the generic + target patches; 0 .rej/.orig files)
+```
+
+**3. Full kernel compile** with the tree's own OpenWrt GCC 14.4.0 and `CONFIG_WERROR=y`
+(no make-command-line override):
+
+```
+$ make target/linux/compile V=s -j16
+  CC      drivers/power/reset/luofu-reboot.o
+...
+  Kernel: arch/arm/boot/zImage is ready
+RC=0
+```
+
+- `arch/arm/boot/zImage`: **3,251,336 B**, sha256 `e548bc7b4c54160da2b482fcb2111d5569227c1132ba4c0299ba2e665d26aeb4`.
+- kernel `.config`: `CONFIG_LUOFU_REBOOT=y`, plus the existing `CONFIG_POWER_RESET=y`,
+  `CONFIG_MFD_SYSCON=y`, `CONFIG_REGMAP=y` and the rest of the series symbols.
+- the driver is built-in and linked: System.map has `luofu_reboot_probe` and
+  `luofu_restart_handler` (luofu_reboot_probe (c0ba94a8), luofu_restart_handler (c07082cc)).
+- **0 warning lines** in the whole compile log.
+- the load-address contract is unchanged: `_text = stext = 0xc0608000` in System.map and
+  `-DTEXT_OFFSET=0x00608000` in both early-boot `.cmd` files.
+
+**4. Board DTS -> DTB with the patched kernel's own dtc:**
+
+```
+$ cpp -nostdinc -I <kernel>/include -I <kernel>/arch/arm/boot/dts -undef \
+      -D__DTS__ -x assembler-with-cpp -o luofu-r116.dts.preprocessed dts/luofu-r116.dts
+$ <kernel>/scripts/dtc/dtc -I dts -O dtb -o luofu-r116.dtb luofu-r116.dts.preprocessed
+RC=0, stderr EMPTY (zero warnings)
+```
+
+- DTB: **9,891 B**, sha256 `f23fc9319c3f0d9fc3cad6aa0a6578fde9a5f4f182ba27a5ff00f5cea44383cb`.
+- node checks: `/reboot` has compatible `"hisilicon,luofu-reboot"` and the
+  `hisilicon,sysctrl`/`hisilicon,crg` phandles; `/system-controller@10100000` has
+  compatible `"hisilicon,luofu-sysctrl", "syscon"` and `reg = <0x10100000 0x1000>`.
+
+**5. Device-tree binding validation:**
+
+```
+$ PATH=<dtschema-venv>/bin:$PATH make ARCH=arm dt_binding_check \
+      DT_SCHEMA_FILES="Documentation/devicetree/bindings/power/reset/hisilicon,luofu-reboot.yaml:Documentation/devicetree/bindings/soc/hisilicon/hisilicon,luofu-sysctrl.yaml"
+  DTEX    .../hisilicon,luofu-reboot.example.dts
+  DTC [C] .../hisilicon,luofu-reboot.example.dtb
+  DTEX    .../hisilicon,luofu-sysctrl.example.dts
+  DTC [C] .../hisilicon,luofu-sysctrl.example.dtb
+RC=0
+```
+
+dtschema **2026.9**; `yamllint` is not installed, so the tree's YAML-lint step is skipped
+with its own warning - the only validation step not exercised (same limitation as the
+earlier sessions). The real board DTB was also run through `dt-validate`: RC=0 and **no
+message names the reboot or SYSCTRL node** (the remaining messages are the pre-existing TODO
+nodes: sp804 compatible, UART clock-names, thermal zone naming). A full-draft-DTS
+`dtbs_check` is still not clean and is not claimed.
+
+**6. Static checks:**
+
+```
+$ scripts/checkpatch.pl --no-tree -f drivers/power/reset/luofu-reboot.c
+  total: 0 errors, 0 warnings, 258 lines checked
+$ scripts/checkpatch.pl --no-tree -f Documentation/devicetree/bindings/power/reset/hisilicon,luofu-reboot.yaml
+  total: 0 errors, 0 warnings, 69 lines checked
+$ scripts/checkpatch.pl --no-tree -f Documentation/devicetree/bindings/soc/hisilicon/hisilicon,luofu-sysctrl.yaml
+  total: 0 errors, 0 warnings, 44 lines checked
+```
+
+- no `ioremap()`/`request_mem_region()`/`platform_get_resource()` in the driver; both pages
+  are obtained through `syscon_regmap_lookup_by_phandle()`;
+- the probe body contains no `regmap_read`/`regmap_write` call (no register touch before a
+  reboot is requested);
+- no lab/bench breadcrumb or private-repository reference in the driver or the two YAMLs
+  (`grep -i 'lab|bench'` -> no matches); no `0xc0de*`/vendor `hsan,*` strings.
+
+**7. Config provenance:** canonically re-derived with the new Kconfig in the tree: `yes '' | make kernel_oldconfig` RC=0 emitted 297 config-symbol lines that are **identical** to the annotated `luofu/config-6.18` after stripping comments (`CONFIG_SYMBOLS_IDENTICAL`), including `CONFIG_LUOFU_REBOOT=y`; a second run was byte-identical (`IDEMPOTENT_BYTE_IDENTICAL`) and the clone's target config was restored afterwards. The driver's `select MFD_SYSCON` adds no resolved line because MFD_SYSCON was already in the delta.
+
+### What this proves and what it does not
+
+Proven (host-only): the restart driver and its two bindings are real code that applies to
+pristine 6.18.60, applies in the OpenWrt platform-patch order and builds into the board
+kernel as a built-in with zero warnings under `CONFIG_WERROR=y`; the two YAMLs pass
+`dt_binding_check` and the board DTS nodes validate against them; the board DTS compiles
+with zero dtc warnings; `checkpatch` is clean; probe cannot write a register; and the load
+contract/TEXT_OFFSET is unchanged.
+
+Not proven / not claimed - any hardware behaviour:
+
+- whether writing the vendor complementary pair to CRG offset `0x00` actually resets the
+  SoC; the write order and whether the pair belongs in one register or two adjacent words
+  are unmeasured (PROVISIONAL);
+- whether the 1 s watchdog arming sequence from our own kernel takes: the values are the
+  vendor driver's hwver-2 values and the watchdog has been observed resetting this board
+  through the bootloader's own arming, but this exact sequence from Linux has not been run
+  here;
+- what `0x21` means as a selector value (the driver leaves it untouched);
+- the selector protocol itself: the Linux read path for `sysupgrade` and one attended A/B
+  validation remain open (TARGET-DESIGN.md 3.4);
+- no boot, no bench, no device, no image: **publication remains NOT READY**.
+
+### Remaining TODOs for the restart port
+
+1. One attended bench cycle in the order given in `docs/incoming/restart/SUMMARY.md`: the
+   watchdog fallback alone, then the CRG command variants as separate measured runs, then
+   the selector save + one A/B validation.
+2. Upstream review items: split the two binding YAMLs into their own patches (checkpatch's
+   "DT binding docs and includes should be a separate patch"; this series keeps them with
+   the driver like `004`/`005`), maintainer identity, phandle property naming, whether an
+   `nvmem` cell provider should expose the selector instead of a driver-private write, and
+   sharing the watchdog constants with patch `005`.
+
+Evidence: local-only `build/linux-kbuild/waves/upstream-6.18-restart-20261118/`.
+
+
+## 2026-11-18 (eighth session): peripheral pinctrl (patch 011)
+
+Patch 011-pinctrl-luofu.patch (sha256 700bba855492352afc88dfaeca618c5f3a351bfec1734cdc294f54427fad7442)
+adds drivers/pinctrl/hisilicon/pinctrl-luofu.c (848 lines; mainline pinctrl platform driver with
+pinctrl/pinmux/pinconf ops and pinconf_generic_dt_node_to_map_all), the new
+drivers/pinctrl/hisilicon Kconfig/Makefile wiring (CONFIG_PINCTRL_LUOFU bool), and
+Documentation/devicetree/bindings/pinctrl/hisilicon,luofu-pinctrl.yaml (two register windows:
+mux 0x3c, cfg 0x100; 37 pin names, 24 group names, 24 function names; generic state form).
+
+Design decisions and findings:
+- The vendor tables were re-verified directly from the local hi_kpinctrl.ko fixture (read-only
+  pyelftools/capstone): 37 pins, 24 groups with real pin lists, 24 functions, the per-pin 5-hit
+  mux table, group-level mux RMW fields, and cfg_off = 4*pin for every pin - the port is checked
+  against the binary, not only the older transcription.
+- Pinconf was decoded from the module's config ops: pull-up [0], pull-down [1],
+  drive-strength [4:2] (raw 3-bit), schmitt [5], input-enable [7], output level [10] (5.10
+  PIN_CONFIG_OUTPUT renamed to 6.18 PIN_CONFIG_LEVEL). Unsupported params fail loudly instead of
+  being stubbed. The vendor probe writes no mux/cfg register, so our probe performs no register
+  access and calls no reset.
+- No consumer pin states are attached: the vendor DTS attaches none to MDIO/GEMAC/FMC/UART, and
+  which states the wired path needs is [U]. Adding guessed states could remux the console/NAND.
+
+Verified in the isolated clone ~/openwrt-lab-pinctrl (openwrt main 27663a0,
+linux-6.18.60, OpenWrt GCC 14.4.0, CONFIG_WERROR=y, series 001-010 + 011; thermal 012 excluded):
+pristine dry-run RC=0; make target/linux/prepare RC=0; full make target/linux/compile -j16 RC=0
+(0 warnings, CC drivers/pinctrl/hisilicon/pinctrl-luofu.o 52,336 B); zImage 3,252,544 B sha256
+a4686a41...; _text=stext=0xc0608000 and -DTEXT_OFFSET=0x00608000 unchanged (0x80608000 contract);
+CONFIG_PINCTRL_LUOFU=y linked (System.map luofu_pinctrl_probe); dt_binding_check RC=0 (yamllint
+unavailable, only that lint skipped); board DTS cpp+kernel-dtc RC=0 with zero stderr (DTB 9,887 B
+sha256 eddb76f5...); config canonical re-derivation RC=0 twice, byte-identical and
+symbol-identical (290 symbols); checkpatch 0 errors / 0 warnings / 0 checks; MMIO only through
+devm_platform_ioremap_resource_byname; no lab/bench/vendor breadcrumbs.
+
+Not proven: never probed or applied on hardware; probe-time/default pin state, consumer state
+requirements, drive-strength mA mapping and the MDIO two-state question remain [U]. No boot/image/
+bench claims.
+
+## 2026-11-18 (ninth session): thermal sensor + zone (patch 012)
+
+Patch 012-arm-thermal-luofu-tvsensor.patch (sha256
+3c42f8e6a08ea159b5c3a074890ff64d8c1476f3cbc16bc7c92780b89c7edb5f) adds
+drivers/thermal/luofu_tvsensor.c (read-only sensor registered with
+devm_thermal_of_zone_register(), thermal_zone_device_ops.get_temp), its Kconfig/Makefile entry
+(CONFIG_LUOFU_TVSENSOR), and Documentation/devicetree/bindings/thermal/hisilicon,luofu-tvsensor.yaml.
+The board DTS placeholder becomes a real sensor node (reg widened from the vendor 0x14 to 0x100,
+vendor IRQ SPI 0 not claimed) plus the cls0-thermal zone with the vendor trips (115 C passive /
+125 C critical, 3 C hysteresis, polling-delay = 1000) and no cooling map.
+
+Design decisions:
+- The conversion is the vendor v4 path reproduced operation for operation: read +0x24 & 0xffff,
+  compute ((165*raw - 32835)/100)*1000 - 40000 millidegrees (raw 240 -> 27.0 C), so values match
+  the vendor kernel bit for bit.
+- Registry through the 6.18 of-thermal API (the old thermal_zone_of_device_ops interface is gone).
+- The reg window is widened to the containing 256-byte block; the vendor's page-granular ioremap
+  masked the too-small DT window. Nothing beyond +0x24 is touched.
+- Polled, no interrupt, no writes: threshold/IRQ/enable/trim registers are undecoded and no store
+  to the block was measured. No cooling map (the vendor cooling device is a network rate limiter
+  that depends on the LSW block); sustainable-power is dropped (units [U]).
+
+Verified in the isolated clone ~/openwrt-lab-thermal (series 001-010 + 012):
+pristine dry-run RC=0; prepare RC=0; full compile RC=0 with 0 warnings (zImage 3,250,848 B sha256
+34ed6116...; a supplementary CONFIG_WERROR=y rebuild was also RC=0 and produced the identical
+zImage); dt_binding_check RC=0; board DTS cpp+dtc RC=0, zero warnings (DTB 9,799 B sha256
+2677acd7...); config canonical re-derivation byte-identical (298 symbols); checkpatch 0/0/0.
+Caught in the lane: thermal-zones.yaml requires child names matching *-thermal, so the old
+placeholder zone cls0 became cls0-thermal (a pre-existing dt-validate error is gone).
+
+Not proven: threshold/enable/trim/IRQ register model is [U] and deliberately not implemented;
+the reg width and the trip policy are [I]/vendor policy rather than our measurement; no clock or
+reset is modelled; hardware behaviour is unverified - no boot/image/bench claim.
+
+
+## 2026-11-18 (tenth session): DWC PCIe host controller (patch 013)
+
+Patch 013-arm-pci-luofu-host.patch (sha256
+73c413dda1463842aa4bfda63879147894930c64ef6e6909b7914110c9d01202) adds
+drivers/pci/controller/dwc/pcie-luofu.c (467 lines, DWC host glue: the CRG clock plus the four
+named apb/pcs/phy/ctrl resets through the reset API, the write-only misc RC-mode/iATU-enable/
+LTSSM-enable full-word stores, aligned-dword read_dbi/write_dbi, a config-window pci_ops using
+pci_generic_config_read32/write32, CFG0 iATU viewport programming, mem/IO iATU viewports derived
+from the DT ranges through the framework, link wait/report and pci_host_probe), the Kconfig/
+Makefile CONFIG_PCIE_LUOFU_HOST entry and Documentation/devicetree/bindings/pci/
+hisilicon,luofu-pcie.yaml (built on pci-host-bridge.yaml). The shared DTS edits rewrite both PCIe
+nodes (reg-names dbi/misc/config, corrected ranges, pcie clock, the four resets, num-lanes=1 and
+documented-but-disabled pci59e7,0005 endpoint children); the RC nodes stay disabled because the
+write path is unmeasured and the Wi-Fi endpoint driver is [X].
+
+Design rules encoded: never read the RC misc window 0x10161000 (write-only stores only), only
+4-byte-aligned dword MMIO accesses, no forbidden CA writes; the iATU tables are driver data, not
+vendor DT props.
+
+Validated in the isolated clone ~/openwrt-lab-pcie (series 001-013): pristine
+dry-run RC=0; prepare RC=0; full compile RC=0 in 1m56s with 0 warnings and CONFIG_WERROR=y;
+zImage 3,262,016 B sha256 392d5861...; driver built-in (luofu_pcie_probe in System.map);
+_TEXT/TEXT_OFFSET contract unchanged; dt_binding_check RC=0; board DTS compiles RC=0 with zero
+warnings (DTB 10,133 B sha256 46fac7ad...); dt-validate RC=0 with no PCIe diagnostic; config
+canonical re-derivation byte-identical (306 symbols incl. CONFIG_PCIE_LUOFU_HOST=y); checkpatch
+0/0/0; static scans clean (no misc read, aligned readl only, no vendor-only DT props, no lab/bench
+breadcrumbs).
+
+Not proven: misc wrapper store semantics, iATU-enable/LTSSM bit interaction, CFG0 per-access
+programming, DWC version word 0x8f8, endpoint power GPIOs, radm/linkdown handling, MSI/INTx,
+dma-ranges, ACP, ASPM/L1SS. The Wi-Fi PCIe endpoint remains [X]; no boot/enumeration claim.
+
+## 2026-11-18 (cross-lane fix): CRG reset polarity (patch 014)
+
+The PCIe lane found a real defect in patch 004: the vendor CRG reset class is ACTIVE-LOW
+(hi_kreset: assert = clear the bit, deassert = set it), while patch 004 implemented the opposite.
+The measured evidence is the live census read of 0x14880034 = 0x000ff309 with both PCIe root
+complexes up: the four RC0 reset bits are SET in the released state (UPSTREAM-PORT-PLAN arm B/C;
+REMAINING-DRIVERS block C). As shipped before 014, reset_control_deassert() would have CLEARED
+those bits and driven the RC into reset.
+
+Patch 014-arm-crg-reset-polarity.patch (sha256
+739700c0ee0a85f969acbfde33d462fc0d501c1a1df3bff5ef223cdf53949227) swaps the two operations in
+luofu_crg_reset_set (assert clears, deassert sets), inverts luofu_crg_reset_status (asserted =
+bit clear) and documents the measured polarity in the driver comment and the CRG YAML. Every
+consumer (FMC, MDIO/GEMAC, PCIe, watchdog fallback) uses the standard reset API, so releasing a
+line now sets its bit as the hardware expects; nothing else needs to change.
+
+Validation: patch 014 applies cleanly to the 004-created files (patch -p1 dry-run and real apply
+in a scratch tree); in the combined verification tree (series 001-013 already prepared and
+compiled) the patched crg-luofu.o compiles with the tree's OpenWrt GCC 14.4.0 (driver object
+27,460 B) and the series 001-013 full compile itself was RC=0 with zero warnings (zImage
+3,262,144 B sha256 8654b99a...; all CONFIG_LUOFU_* symbols present; DTS 10,133 B zero warnings;
+0 error/warning lines in the compile log). Drive strength: the polarity fix is host-compiled
+only and has never run on hardware - the reset class is documented, not hardware-proven by this
+series.
+
+
+## 2026-11-18 (eleventh session): PIE packet-engine draft (patch 015)
+
+Patch 015-net-pie-luofu.patch (sha256
+fac5ab382964c4696ba1a305ec4401068edded8372980f0af25bd62ed01446d2) adds
+drivers/net/ethernet/hisilicon/luofu-pie.c, its Kconfig/Makefile entry
+(CONFIG_LUOFU_PIE) and Documentation/devicetree/bindings/net/hisilicon,luofu-pie.yaml. This is the
+first draft of the PIE half of the wired data path specified in PIE-DATAPATH.md; it is a refusing
+draft, not a working network driver.
+
+What the probe does, in order: matches the variant (hisilicon,luofu-pie -> v250 generation; an
+unknown generation fails closed), validates the 64 KiB register window (devm_ioremap only - no
+MMIO access), gets the unnamed CRG gate clock and one CRG reset line, looks up the four interrupts
+by name (ch0-7, ch1-6, ch2-5, ch3-4), requires dma-coherent and a 32-bit DMA mask, allocates the
+coherent ring bookkeeping (4 RX rings x 1024 x 32 B, 4 TX rings x 4096 x 32 B) with
+dma_alloc_attrs(..., 0), logs and frees the rings, then returns -EOPNOTSUPP with
+"data path not started: PIE register/channel inventory is not captured; refusing to arm the
+engine". It does not read/write any register, enable the clock, toggle the reset, request an IRQ
+or register NAPI; the DTS node is disabled. Compiled scaffolding: the recovered v250 ring/doorbell/
+completion/IRQ-mask/enable offsets, 32-byte descriptor accessors (only the recovered RX address+
+owner and TX length+address+owner fields; everything unrecovered stays zero and TODO) and a hard
+IRQ handler encoding the recorded schedule/mask/ack order and channel pairing. No poll callback:
+the RX completion decode is not recovered.
+
+Deliberate decisions: ring geometry is driver data (documented board constants) because the vendor
+rx_ring/tx_ring properties are not an ABI and their pair-word decoding is inferred; the inventory
+settles it by read-back. Clock/reset are acquired but not driven in probe (bring-up is a hardware
+step). No netdev, no WoC, no exported API until the data path exists. Coherent DMA only; the ACP
+attribute question stays open.
+
+Validated in the isolated clone ~/openwrt-lab-pie (series 001-015, clean
+re-extract): pristine dry-run/chained apply RC=0; prepare RC=0 (1,189 patching lines, no .rej);
+full compile RC=0 in 1m50s with 0 warnings under CONFIG_WERROR=y; zImage 3,262,336 B sha256
+5231214b...; luofu_pie_probe/driver/v250/irq_names linked; TEXT_OFFSET contract unchanged;
+CONFIG_LUOFU_PIE=y; dt_binding_check RC=0; board DTS zero warnings pre/post shared.patch (DTB
+10,193 B sha256 4e4a0304...); dt-validate RC=0; config re-derivation byte-identical (307 symbols);
+checkpatch 0/0/0 (driver 597 lines, YAML 96); static checks show no MMIO/DMA/IRQ/netdev/export in
+the probe path and no vendor-only DT properties.
+
+Not proven: any hardware behaviour. Every register offset is from the vendor module, not measured
+on this board; ring-pair decoding, descriptor decode, per-channel init, IRQ semantics and ACP
+coherency remain [U]; the driver has never been instantiated on ARM or mapped the real window; no
+boot/image/install/bench. The attended P3 read-only inventory is the next hardware step (bench is
+currently blocked); until then the node must stay disabled.
+
+Combined whole-series verification (in the scratch tree, patches 001-015 applied from the repo): make target/linux/prepare RC=0 and make target/linux/compile RC=0 with 0 warnings/errors; zImage 3,262,792 B sha256 c82d0ffe...; all CONFIG_LUOFU_* drivers built in (including the polarity-fixed CRG); combined DTS compiles with zero warnings (DTB 10,193 B).
+
+
+## 2026-11-18 (twelfth session): internal LSW switch D1a probe skeleton (patch 016)
+
+Patch 016-net-lsw-luofu.patch (sha256
+c15aba7c52b671211334423b919d5ca209906a53b339ff0ccef5259f22a0b68a) adds
+drivers/net/ethernet/hisilicon/luofu-switch.c, its Kconfig/Makefile entry
+(CONFIG_LUOFU_SWITCH), Documentation/devicetree/bindings/net/hisilicon,luofu-switch.yaml and
+the board DTS node (disabled). This is the D1a gate of the internal-switch plan (LSW-SPEC.md
+sections 10.4/11): a resource/binding/probe skeleton, not a switch driver.
+
+Design decisions: the vendor tree describes the switch as two nodes (lsw_dp: 7 windows,
+lsw_pfe: 10 windows), but it is one switch, so the binding is one hisilicon,luofu-switch node
+with the 15 MMIO windows (five queue-manager + ten classifier/forwarding, 512 KiB each). The
+vendor queue (4 MiB) and flow (1 MiB) regions are DDR memory the engine consumes, not MMIO
+windows, and their live base is unestablished ([U]), so they are deliberately not modelled.
+The two CRG gate clocks and four CRG reset lines are acquired by name but never enabled or
+driven. The framework question is settled as switchdev, not DSA (no CPU-port tag; per-port
+netdevs exist; LSW-SPEC.md 9.3), so the port model is an ethernet-ports child list where each
+port has a reg ordering index (explicitly NOT the recovered hardware port id) and an ethernet
+phandle to the GEMAC node that owns that port's netdev. The probe validates all of it, logs,
+frees the port references and returns -EOPNOTSUPP; a file-wide grep for readl/writel finds none
+(the windows are only ioremapped), no clock is enabled, no reset is toggled, no interrupt is
+requested, no netdev is registered and no switchdev notifier is installed (there is no port
+netdev to attach to; an empty notifier would reproduce the vendor's stub behaviour). The DTS
+node stays disabled, so a normal boot never reaches the refusal.
+
+Validation (isolated clone ~/openwrt-lab-lsw, target tree re-synced to the
+committed 001-015 state plus patch 016 and the delivered DTS/config edits; the stale kernel
+build directory was removed so make target/linux/prepare re-extracted 6.18.60 and re-applied
+the whole series from scratch): pristine 6.18.60 dry-run of 016 RC=0; chained apply of
+001-016 RC=0 (60 patching lines, 0 rej/orig); prepare RC=0 (1,193 patching lines, 0 rej/orig,
+the 016 hunks applied without offsets); full compile RC=0 with 0 warnings under
+CONFIG_WERROR=y; zImage 3263624 B sha256 201ba86863d8ee6c14d865702ee2339cd3e373c30fbb4b94983afcc2d72df83f; luofu_lsw_probe and
+luofu_lsw_driver in System.map; TEXT_OFFSET contract unchanged;
+CONFIG_LUOFU_SWITCH=y; dt_binding_check RC=0; board DTS zero warnings (DTB 10538 B
+sha256 ff34bc7f7e744b61bbc0ca7bd0934317e46d837c87d024592fc08335ed5ce4a0); dt-validate reports no diagnostic for the switch node; config canonical
+re-derivation byte-identical and symbol-identical to the delivered delta; checkpatch 0/0/0 on
+the driver (447 lines) and the YAML (179 lines); shared.patch dry-run/apply/byte-compare OK;
+static checks show no MMIO access in the probe, no netdev/switchdev registration, no exported
+ABI and no lab/bench breadcrumbs or forbidden addresses.
+
+Not proven: any hardware behaviour. The register/queue/port-id model is recovered offline from
+the vendor modules and has never been measured on this board; the port_bitmap decoding, the
+LSW-vs-MAC port-id mapping, the EQM command word, the qid-map high-port classes and the
+classifier/VLAN table formats all remain [U]. The driver has never run on ARM, never mapped the
+real windows at runtime and never registered a port; no boot, no image, no install path and no
+bench run. The next hardware step is the attended, read-only register inventory plus a reviewed
+write set (LSW-SPEC.md 12.3 W1/W2), after which D1b-D1d (queue maps, PIE host binding, bridge
+forwarding) can start. Publication remains NOT READY.
+
+## 2026-11-18 (image-recipe session): the image chain is wired and built
+
+**Status: the target image recipe is implemented and produced a full, validated
+sysupgrade container in an isolated `openwrt main` clone (`make world -j16`
+RC=0). The artifact has NEVER BOOTED and is NOT installable: the A/B selector
+protocol and the install path are [U], `platform_do_upgrade` refuses to write,
+and no factory/install image exists. Nothing here is a boot or flash claim.**
+
+### What changed
+
+- `target/linux/hisilicon/image/luofu.mk` is no longer a sketch. The real
+  chain is `kernel-bin | luofu-check-textofs | append-dtb | uImage none |
+  luofu-fip-slice | luofu-fip-manifest` for the kernel and
+  `luofu-rootfs-ubi | luofu-sysupgrade-container | append-metadata` for the
+  image; `image/luofu.mk` derives the load/entry address from the loader
+  staging base and `TEXT_OFFSET`, regenerates the FIP trailer from our own
+  board DTB + loader-match overlay (`fip-slice.py make-trailer`, libfdt apply
+  required), assembles/validates the slice with the slot budget and
+  load/entry assertions (`fip-slice.py assemble`), writes a manifest, builds
+  the squashfs-in-static-UBI rootfs from the measured geometry (checked-in
+  `image/luofu-ubinize.cfg`) and packages the container. Every stage fails the
+  build closed.
+- `target/linux/hisilicon/image/luofu-ubinize.cfg` (new): one static volume
+  named `squashfs`, vol_id=0, and a placeholder for the rootfs image path.
+- `target/linux/hisilicon/base-files/lib/upgrade/platform.sh` (new): real
+  structural `platform_check_image` (tar/`CONTROL`, uImage load/entry, FIP
+  trailer/gate/descriptor constants, UBI volume shape, manifest-vs-bytes,
+  slot budgets) and a **refusing** `platform_do_upgrade` with the full TODO
+  list that must be closed before any write is allowed.
+- `target/linux/hisilicon/Makefile`: `KERNELNAME:=zImage` added - without it
+  `Kernel/CopyImage` never copies a zImage into $(KDIR) and the image chain
+  has no kernel input.
+- `tools/luofu-image.py` (new; OpenWrt-tree mapping `scripts/luofu-image.py`):
+  `rootfs-ubi`, `sysupgrade` and `check-container`, all fail-closed; it
+  re-parses EC/VID/data CRCs, the layout volume table and the static `squashfs`
+  volume, refuses vendor input paths and unknown ubinize-cfg keys.
+- `tools/fip-slice.py`: the generated manifest comment no longer says that
+  `platform_check_image` is unwritten.
+- The target mapping must place `dts/luofu-r116.dts` as
+  `target/linux/hisilicon/dts/luofu-r116.dts` and `dts/luofu-r116-overlay.dts`
+  as `.../luofu-r116-overlay.dtso` (the `DEVICE_DTS_OVERLAY` rule only
+  compiles `.dtso` sources), and the two tools as `scripts/fip-slice.py` and
+  `scripts/luofu-image.py`.
+
+### How it was run (isolated clone, no shared tree modified)
+
+    cp -a --reflink=auto ~/openwrt-lab-verify ~/openwrt-lab-image
+    # install target/linux/hisilicon/, the two dts files and the two scripts as above
+    make defconfig                       # RC=0
+    make world -j16                      # RC=0
+
+The clone was built from patches `001`-`015` (`linux-6.18.60`), the state
+stated for this task. Patch `016` (task-26, LSW) and its
+`CONFIG_LUOFU_SWITCH=y` `config-6.18` line were completed after this build;
+they are not part of these artifacts (re-run `make world -j16` after
+integration; the hashes will change). A second identical `make world -j16`
+produced a byte-identical image.
+
+One pre-existing clone-copy artefact had to be repaired before the build
+succeeded: the copied `staging_dir` carried absolute paths to the source clone
+(553 files; 131 text files such as `.pc` wrappers and autoconf/libtool
+scripts) which produced duplicate staging include paths and broke the `apk`
+host build on a shadowed `<endian.h>`. Rewriting the text files to the new
+clone path fixed it; this is a reused-clone issue, not a target issue.
+
+### Results
+
+- Image: `bin/targets/hisilicon/luofu/openwrt-hisilicon-luofu-cudy_wr3000-v2-squashfs-sysupgrade.bin`
+  - **6,175,022 B**, sha256 `ea143b03d9d248b3e2b21723ef639e42817e66da847285496ebbc46e12756881`
+  - members `sysupgrade-cudy_wr3000-v2/{CONTROL,INSTALL-STATUS.txt,fip-manifest.txt,kernel,root}`
+    plus standard appended fwtool metadata (`supported_devices` =
+    `cudy,wr3000-v2 hisilicon,luofu-r116 hisilicon,luofu`; revision
+    `r0-27663a0`).
+- Kernel slice: `cudy_wr3000-v2-kernel.bin`, **3,283,008 B**, sha256
+  `23c3286b631a20d1a8fa0d7671d0bea1d7dfbd7f8fdcf7c85a084fba3c5ca636`;
+  uImage `Linux-6.18.60` with the DTB appended (`ih_size` 3,272,457 B),
+  load/entry `0x80608000`; trailer 10,487 B generated from our DTB + overlay;
+  gate `0xd7b7ab1e` at `0x32171a`; 5,367,744 B under the slot budget.
+- Rootfs UBI: `cudy_wr3000-v2-rootfs.ubi`, **2,883,584 B**, sha256
+  `d3c5611cf49395a7a99c8703331b6545a5b543ae9781041e2571e80a9faff2e7`;
+  22 PEBs = 2 layout + 20 data, single static volume `squashfs` (LEB
+  126,976 B), all header/data CRCs verified; 21,430,272 B under the slot
+  budget. Its source `root.squashfs` is 2,481,002 B (sha256 `c079a1d6...`).
+- zImage: 3,262,264 B sha256 `b3227ac3d0ab5265c73d1d25c773767d6c72fc974d85209521620af41664c060`;
+  System.map is deleted by an incremental OpenWrt modules rebuild, so the
+  recipe reads `_text` from `vmlinux` with the target `nm` (0xc0608000; the
+  fallback path was exercised by the rebuild).
+- Base DTB 10,193 B sha256 `4e4a0304...`, loader-match overlay DTBO 230 B
+  sha256 `8e4ab83b...`, manifest 945 B sha256 `bd976870...`.
+
+### Checks actually run
+
+- `tools/luofu-image.py check-container` on the final `.bin`: **PASS**
+  (independent re-read of CONTROL, kernel slice load/entry/trailer/gate/
+  descriptor, UBI volume shape, manifest-vs-bytes, slot budgets).
+- `platform_check_image` from `base-files/lib/upgrade/platform.sh`, run
+  host-side against the real image: **PASS**; corrupted-image, wrong-board and
+  foreign-image variants refused (RC=1 / RC=1 / RC=74);
+  `platform_do_upgrade` returns 1 with the [U] refusal text.
+- Negative tests: fabricated uImage load/entry, slot-budget overflow,
+  non-squashfs rootfs, tampered/unknown-key ubinize cfg, corrupted UBI data
+  CRC, manifest/sha mismatch - all refused.
+- `sh -n`/`bash -n` clean on `platform.sh`; the recipe was parsed and executed
+  by the real OpenWrt make.
+
+### What this proves and what it does not
+
+Proven: the image chain is valid OpenWrt idiom and builds end to end from our
+own DTB/overlay/kernel/rootfs; the derived load/entry and the FIP gate are
+asserted at build time; the rootfs UBI has the measured shape; the container
+is structurally self-consistent under independent re-validation; the build is
+reproducible byte-for-byte.
+
+Not proven: anything about booting. The stock loader accepting a novel
+generated trailer, kernel execution, rootfs mount and overlay, the A/B
+selector protocol, the install path and the boot-argument hand-off are all
+still [U]. The image is a host build product, not a release and not a
+flashable upgrade.
+
+### Next blockers
+
+1. One attended boot of a generated trailer / kernel slice (and then of the
+   rootfs UBI) on a recovered unit.
+2. Measure the A/B selector read/write path (both env copies, `0x10100C08`)
+   and only then implement `platform_do_upgrade`.
+3. Execute one install path end to end (vendor-root documented installer or a
+   characterized TFTP recovery) before adding any factory/install stanza.
+4. Integrate patch `016` with its `config-6.18` symbol and re-run the full
+   build.
+5. Decide the boot-argument hand-off (`/chosen/bootargs` override question),
+   then prove the rootfs mounts.
+
+
+## 2026-11-18 (A/B install session): selector interface + sysupgrade write path
+
+**Status: the A/B selector read/write interface and `platform_do_upgrade` are
+IMPLEMENTED and validated host-side; NOTHING HAS BOOTED OR BEEN FLASHED.** The
+container still says NOT FLASHABLE (it has never booted) and one attended A/B
+validation remains owed.
+
+### What changed
+
+- patch `017` adds `drivers/soc/hisilicon/luofu-selector.c`, its YAML binding,
+  Kconfig/Makefile and an ABI doc: `current_pair` (read-only; 0x10 = a,
+  0x11 = b, 0x21 = manual-b, 0x00 = uninitialised, anything else unknown) and
+  `next_pair` (write-only; accepts only "a" -> 0x10 and "b" -> 0x11, verifies
+  the read-back, -EINVAL otherwise) over the shared SYSCTRL syscon cell at
+  0xc08. Probe performs no register access; the page stays shared with the
+  machine-restart driver (patch `010`), so there is no second mapping.
+- the board DTS gains the enabled `boot-selector` node (sysctrl phandle +
+  `hisilicon,selector-offset = <0x0c08>`), `CONFIG_LUOFU_SELECTOR=y` joins the
+  config delta and `ubi-utils` joins `DEFAULT_PACKAGES` (the write path calls
+  `ubiformat`, which `switch_to_ramfs()` copies only if it is installed).
+- `base-files/lib/upgrade/platform.sh`: `platform_check_image` is unchanged in
+  scope; `platform_do_upgrade` is implemented. The active pair is the
+  `luofu-selector` `current_pair` AND the booted rootfs slot
+  (`/sys/class/ubi/ubi0/mtd_num` + its `/proc/mtd` label), which must agree.
+  The target is the other pair, located by label (`kernelb`+`rootfsb` after an
+  A boot, `kernela`+`rootfsa` after a B boot). Kernel first (`mtd write`,
+  erase+write), then the rootfs (`ubiformat`), each read back (kernel md5
+  equals the member; the rootfs re-reads the UBI#/UBI! headers). Only then
+  `sync` and the selector store, read back. Any failure leaves or restores the
+  selector on the active pair, so the next boot still comes up on the
+  untouched pair; the function never reboots (the framework does), never
+  erases `rootfs_data` (mtd15, a separate shared partition) and never writes
+  the env blocks. `/proc/mtd` is the only partition source; the measured
+  kernel slot (8,650,752 B), the rootfs partition (24,379,392 B) and the image
+  budget (24,313,856 B) are all checked.
+- `tools/test-platform-abinstall.sh` (new): host-side mocked harness that
+  sources the real `platform.sh` and runs `platform_do_upgrade` against fake
+  `/proc/mtd`, fake `ubi0/mtd_num`, fake selector sysfs and
+  `mtd`/`ubiformat`/`sync`/`reboot` shims. 52/52 assertions pass against the synthetic fixture containers; with
+  `--container` the same suite runs the real built sysupgrade.bin
+  (6,185,262 B, sha256 `0303d76a...`) through the real
+  `platform_check_image` and all 58 assertions pass.
+
+### Validation (isolated clone `~/openwrt-lab-abinstall`)
+
+- OpenWrt main commit `27663a0`, `linux-6.18.60`; the target was installed
+  from the repository skeleton with patch `017` and the shared edits, the
+  kernel build dir deleted and re-created by `prepare`.
+- `patch -p1 --dry-run` of `017` against pristine `linux-6.18.60`: RC=0;
+  serial apply `001`-`017`: RC=0, 0 `.rej`/`.orig`.
+- `make target/linux/prepare V=s`: RC=0 (1,198 patching lines, 0 rej/orig).
+- `make target/linux/compile V=s -j16`: RC=0, **0 warnings** under
+  `CONFIG_WERROR=y`; `CONFIG_LUOFU_SELECTOR=y` built-in
+  (`luofu_selector_probe` etc. in `System.map`); zImage 3,262,472 B sha256
+  `a4e4f6c0612317dd1b4ea98f86408de811f6af8635c419b5d9fc7113c1ed5b2e`;
+  `_text = stext = 0xc0608000` and `DTEXT_OFFSET=0x00608000` (TEXT_OFFSET
+  contract unchanged).
+- `make ARCH=arm dt_binding_check
+  DT_SCHEMA_FILES=Documentation/devicetree/bindings/soc/hisilicon/hisilicon,luofu-boot-selector.yaml`:
+  RC=0 (`yamllint` unavailable, that lint step skipped as in earlier lanes).
+- stock DTS compile (cpp + kernel dtc): RC=0, **zero warnings**, DTB 10,664 B
+  sha256 `5726f7cd3798113a0881c86a9e2778860b5171ef2ee29fbb93970a6bb8a6b857`;
+  `dt-validate` RC=0 with no `boot-selector` diagnostic (the pre-existing
+  draft-DTS uart diagnostics remain, unrelated to this node).
+- config canonical re-derivation, two runs: RC=0/RC=0, byte-identical
+  (`4106877fdb6dad7ee9d5d2895ed6eb878da0c6a70ff4067d664be3da380a2a1f`) and
+  symbol-identical to the delivered delta (309/309 symbols).
+- `checkpatch.pl`: 0 errors / 0 warnings on the driver (251 lines), the YAML
+  (59 lines) and the ABI doc (37 lines).
+- `sh -n` on the installed `platform.sh`: RC=0; `bash -n` on the harness: RC=0.
+- `tools/test-platform-abinstall.sh`: 52/52 fixture assertions; 58/58 with
+  `--container` on the real built sysupgrade.bin (6,185,262 B sha256
+  `0303d76a987fd16aeee7833db0d8188d6390129c62e1fc048560a971b922dce2`,
+  the artifact recorded by the image-recipe lane).
+
+### What this proves and what it does not
+
+Proven (host-only): patch `017` applies to pristine `linux-6.18.60` and after
+`001`-`016`; the whole series prepares and compiles with no warnings; the
+selector YAML passes `dt_binding_check`; the board DTS compiles with zero
+warnings; the config re-derivation is idempotent; `checkpatch` is clean; the
+mocked install path selects the right inactive pair, writes in the right
+order, moves the selector last and refuses every bad input tested.
+
+Not proven: any hardware behaviour. The post-boot cell value, the loader's
+env re-stamp, NAND read-back under ECC, bad-block behaviour, the first boot of
+the written pair and rollback are all still [U]. The A/B protocol is closed
+only by one attended validation.
+
+## 2026-11-18 (selector-fix session): corrected selector contract + boot pair recorder
+
+**Status: patch 017 and the target's base-files were corrected against the local
+evidence reconstruction (docs/SELECTOR-0x21.md), the target image gained the
+boot-time running-pair recorder, and everything was re-validated host-side.
+NOTHING HAS BOOTED OR BEEN FLASHED and no hardware behaviour is claimed.**
+
+### What changed
+
+- **Patch 017 corrected** (task-31): the comments, Kconfig help, YAML binding and
+  ABI doc no longer claim a vendor 0x21 provenance. They now state the
+  evidence: the bootloader selects the pair from its env bootflag, the SYSCTRL
+  cell is its opposite-pair/failed-boot record (0x10 = A recorded, 0x11 = B
+  recorded, 0x00 = power-on cleared, 0x21 = the project's bench handover
+  value), and vendor userspace writes only 0x10/0x11. The next_pair
+  store is now the loader-style **low-byte read-modify-write** (upper 24 bits
+  preserved, whole-cell read-back, -EIO if it does not stick); probe still performs
+  no register access and the page stays a shared syscon.
+- **Boot-time running-pair recorder** (new
+  base-files/etc/init.d/luofu_record_pair): START=96, after
+  /etc/init.d/done; derives the booted rootfs pair from
+  /sys/class/ubi/ubi0/mtd_num + its /proc/mtd label (optional
+  /proc/cmdline ubi.mtd= cross-check), waits bounded for the selector
+  interface, logs, and records the running pair only when the cell holds one of the
+  two established pairs and differs (idempotent). It never writes
+  manual/unknown values, never blocks the boot for long and never touches the env
+  blocks. This is the target's equivalent of the vendor boot_done step and is
+  what keeps the two-witness installer check valid.
+- **platform.sh contract comments corrected**: the env is the selector (not an
+  output re-stamped from the cell); the handover is the loader's mismatch path;
+  the two-witness check is documented as valid only because the recorder runs on
+  every boot; a warning (not a refusal - refusals unchanged) is emitted if the
+  running system has no recorder.
+- **Incoming shared edits** (target-skeleton/docs/incoming/selectorfix/shared.patch):
+  TARGET-DESIGN 3.4/5.4, SKELETON-SMOKE (this session), TARGET-SKELETON,
+  target-skeleton/README, the DTS boot-selector comment, and correction notes in
+  FLASH-PLAN, HYBRID-IMAGE-PLAN, DEPLOYMENT-DECISION and the abinstall port-notes.
+- **Review form regenerated**: commit message 0017 rewritten, series/0017 and
+  01-commit-messages.md regenerated (gen-series.py --check clean), validation
+  logs/hashes replaced, cover letter/README/04-validation updated. This session
+  record is itself part of the shared patch.
+
+### Validation (isolated clones; no device)
+
+- **Upstream series** (tools/run-validation.sh on the pristine 6.18.60 tarball):
+  patch(1) 17/17 RC=0 (0 fuzz, the two known 0008 offsets), git am 17/17 RC=0,
+  trees identical, checkpatch default/strict 0 errors / 46 warnings (0017: 3
+  review items, 436 checked lines). Logs/hashes replaced under
+  upstream/series-6.18/validation/.
+- **Kernel clone** (~/openwrt-lab-selectorfix-k, a reflink copy
+  of the A/B-install lane clone, target reinstalled): make target/linux/prepare V=s
+  RC=0 (1,198 patching lines, no .rej/.orig in the kernel tree);
+  make target/linux/compile V=s -j16 RC=0, **0 warnings / 0 errors** under
+  CONFIG_WERROR=y; zImage 3,265,056 B sha256
+  5b417ce976d8bc7fb90f34056e3a3da02f271f1613fb7945ec54d99639839bb1;
+  CONFIG_LUOFU_SELECTOR=y built in; _text=stext=0xc0608000,
+  DTEXT_OFFSET=0x00608000.
+- **Binding/DTS/config**: boot-selector YAML dt_binding_check RC=0; board DTS
+  cpp+kernel dtc RC=0 zero warnings (10,664 B DTB sha256 5726f7cd...,
+  unchanged - only comments change in the DTS source, delivered via the shared
+  patch); dt-validate RC=0, no boot-selector diagnostic; config re-derivation
+  RC=0 twice, byte-identical (4106877f...), 309/309 symbols identical;
+  checkpatch file-mode 0 on driver/YAML/ABI.
+- **Mocked harness** (tools/test-platform-abinstall.sh): 94/94 fixture
+  assertions and 100/100 with the real 6,185,262 B container
+  (e869f105... from the previous lane). Covered: install path (unchanged
+  refusals + the recorder warning), recorder recording/idempotence/fail-safe paths
+  and the corrected record semantics.
+- **Image rebuild** (~/openwrt-lab-selectorfix-img, a reflink
+  copy of the image clone, target reinstalled): make world -j16 RC=0 with
+  **0 warnings / 0 errors**; the rebuilt container is 6,185,262 B sha256
+  362ca4ece4df2b77b0e527ad5d948bbd997201ccb3bf6e2518d5ddaccbb59899; its rootfs
+  carries /etc/init.d/luofu_record_pair (mode 0755, byte-identical to the
+  repository file) and the enabled /etc/rc.d/S96luofu_record_pair symlink, and
+  tools/luofu-image.py check-container PASSes; the harness passes 100/100
+  against this new container.
+- sh -n clean on the installed recorder and platform.sh; bash -n clean on
+  the harness.
+
+### What this proves and what it does not
+
+Proven host-only: the corrected patch applies to pristine 6.18.60 and through
+the series; the series prepares and compiles with no warnings; the binding
+passes dt_binding_check; the board DTS compiles cleanly; the config delta is
+idempotent; checkpatch is clean; the driver's low-byte RMW store builds and is
+file-checkpatch-clean; the recorder is installed and enabled in the built
+rootfs and behaves correctly against mocked sysfs/proc; the install path keeps
+its ordering and refusals and now documents/depends on the recorder.
+
+Not proven: any hardware behaviour. The in-boot cell value versus the running
+pair (including after our recorder), the POR clearing chain, the meaning of the
+cell's upper 24 bits, the env re-stamp, the first boot of a written pair and the
+full A/B install are all still [U]; the recorder has never run on hardware.
+
+---
+
+## 2026-11-18 (SMP-RE session): platsmp port 018, host validation only
+
+The vendor SMP enable-method was decoded and a platsmp port drafted (task-32). The
+release sequence (SYSCTRL pen word at `0xc00`, CRG resume-bit read-modify-write at
+`0x38` with the bit numbers from the vendor `core-info`, then the wakeup IPI; no
+SMC/PSCI) comes from the two stock vendor vmlinux images and the vendor base DTB;
+[SMP-RE.md](SMP-RE.md) is the evidence + design + staged-plan document and
+`patches-6.18/018-arm-mach-hisilicon-smp.patch` is the implementation (new
+`arch/arm/mach-hisilicon/platsmp.c`, `CPU_METHOD_OF_DECLARE` for the documented
+method `hisilicon,luofu-smp`, machine Kconfig/Makefile/descriptor refactor). The DTS
+`enable-method` line and the doc updates are in the incoming integration patch
+(`docs/incoming/smp/`), not edited here.
+
+Validated host-only in an isolated btrfs-reflink copy of the shared clone
+(`openwrt-lab-smp`, `openwrt main` `27663a0`, `linux-6.18.60`, the tree's own
+OpenWrt GCC 14.4.0; the shared clone was not modified):
+
+- patches `001`-`018` apply to a fresh pristine `linux-6.18.60` tree in order,
+  RC=0, no `.rej`/`.orig`; patch `018` dry-run on the `001`-`017` tree RC=0 and
+  byte-identical after apply;
+- `make target/linux/prepare` RC=0 (1,202 patching-file lines), then
+  `make target/linux/compile` **RC=0** (20m06s), zImage 3,264,472 B sha256
+  `ae59d998...`, **zero warnings attributable to any new/changed file** (the 38
+  modpost `missing MODULE_DESCRIPTION` warnings are the exact same pre-existing
+  baseline as the 001-017 and restart lanes);
+- `arch/arm/mach-hisilicon/platsmp.o` is built and its symbols are in System.map
+  (`luofu_smp_boot_secondary`, `luofu_smp_prepare_cpus`, `luofu_smp_ops`,
+  `__cpu_method_of_table_luofu_smp`);
+- `TEXT_OFFSET` unchanged: `textofs-$(CONFIG_ARCH_LUOFU) := 0x00608000` and
+  `_text = stext = 0xc0608000`; SMP symbols already resolved in the config
+  (`CONFIG_SMP=y`, `CONFIG_HAVE_ARM_SCU=y`, `CONFIG_HAVE_ARM_TWD=y`) - the patch
+  needs no config change;
+- `make kernel_oldconfig` three runs RC=0; the resulting kernel `.config` is
+  byte-identical to the 001-017 build and the re-derived target `config-6.18`
+  fragment has the same 300-symbol set and is byte-idempotent;
+- `dt_binding_check` RC=0 for all 13 series YAMLs; the board DTS (with the
+  enable-method hunk) compiles with **zero dtc warnings** (DTB 10,710 B sha256
+  `bc599a4e...`); `dt-validate` has only the same six pre-existing findings as the
+  001-017 lane and none naming the SMP nodes;
+- checkpatch: `platsmp.c` 0/0 and the three edited files 0/0.
+
+Not proven: any hardware behaviour. The release has never run on our kernel; the
+second-core hang/cache/coherency/GIC/TWD risks and the attended acceptance gates are
+in [SMP-RE.md](SMP-RE.md). No device, router, UART, TFTP or flash tool was touched.
+
+## 2026-11-18 (bdinfo MAC provisioning session): factory LAN/WAN MACs from bdinfo
+
+**Status: the target image now provisions its LAN/WAN MAC addresses from the factory
+`bdinfo` partition, and the whole logic is host-validated; NOTHING HAS BOOTED and no MAC
+has been read from a real unit or applied to a netdev.**
+
+### What changed
+
+- `target/linux/hisilicon/base-files/lib/functions/luofu-mac.sh` (new): reads the
+  plaintext 6-byte factory MAC at `bdinfo+0xde00` through `mtd_get_mac_binary` (direct
+  `/dev/mtdN` character-device fallback, found by partition label), validates it,
+  derives LAN = base MAC and WAN = base+1 with the vendor `macaddr_add` arithmetic, and
+  falls back to a clearly logged locally-administered random pair when the partition is
+  missing/corrupt; the bdinfo partition is only ever read.
+- `target/linux/hisilicon/base-files/etc/board.d/02_network`: sources the helper and
+  records both addresses through `ucidef_set_interface_macaddr` (the normal board.d ->
+  board.json -> `/bin/config_generate` -> netifd path). The interface placeholder is
+  deliberately untouched (the switch port map is still missing, TARGET-DESIGN.md 8.1), so
+  until that map exists the addresses are recorded in board.json only. The file also stops
+  sourcing the non-existent `/lib/functions/board.sh`; this release defines
+  `board_config_update`/`board_config_flush` in `/lib/functions/uci-defaults.sh` and
+  the read/MAC helpers in `/lib/functions/system.sh`.
+- `tools/test-mac-provisioning.sh` (new): host-only mocked harness for the helper (fake
+  `/proc/mtd`, fake mtd devices, mocked `mtd_get_mac_binary`/`/dev/urandom`/
+  `ucidef_set_interface_macaddr` seams): 103/103 assertions pass.
+- no kernel patch, config delta or DTS change is part of this lane.
+
+### Rules implemented (evidence: MISC-SOC-BLOCKS.md section 1)
+
+- LAN = the factory base MAC itself; WAN = LAN+1 under the vendor/OpenWrt `macaddr_add`
+  rule (OUI preserved, low 24 bits incremented modulo 2^24, so `...:ff:ff:ff` wraps to
+  `...:00:00:00`). Sources: vendor 2.5.24 `99_fixwan:41` (LAN from
+  `mtd_get_mac_binary bdinfo 0xde00`), vendor 2.4.15 `board.d/02_network:25-29`
+  (canonicalized `bdinfo mac` for LAN, +1 for WAN, `ucidef_set_interface_macaddr`),
+  vendor 2.4.15 `99_fixwan:17-52` (per-port application).
+- validation rejects non-MAC input, all-zero, all-`0xff` (erased), multicast,
+  locally-administered, OUI `00:00:00` and the `...:ff:ff:ff` WAN-wrap case. The last
+  two are conservative project policy [I], not vendor rules; a rejected copy is logged and
+  replaced with a random pair, never "repaired".
+- the U-Boot env `ethaddr` is not read or written (it is a locally-administered loader
+  value, MISC-SOC-BLOCKS 1.2), and no factory bytes are printed or embedded anywhere.
+
+### Validation (isolated clone; shared clone untouched)
+
+    cp -a --reflink=auto ~/openwrt-lab ~/openwrt-lab-mac
+    make defconfig
+    make world -j16
+
+- `make defconfig`: RC=0, `CONFIG_TARGET_PROFILE="DEVICE_cudy_wr3000-v2"`.
+- `make world -j16`: **RC=0** (started 18:34, image written 18:44 = about 10 minutes on 16 cores in the cache-reused clone; an explicit incremental \`make world -j16\` re-run also returned RC=0), built container `openwrt-hisilicon-luofu-cudy_wr3000-v2-squashfs-sysupgrade.bin`,
+  **6,185,262 B**, sha256 `54652e56241e26eba0e95bc7fa663950c6e69ddb834dba77beb5b1afbeea2cac`; `tools/luofu-image.py check-container`
+  PASS on the built bytes.
+- built rootfs: `/lib/functions/luofu-mac.sh` (mode 0644) and `/etc/board.d/02_network`
+  (mode 0755) are present and byte-identical to the repository files; `sh -n` clean on
+  the installed copies and `tools/test-mac-provisioning.sh` passes 103/103 when pointed
+  at them.
+- the target tree for the build came from `opensource` HEAD (`5989404`, series
+  `001`-`018`) plus this lane's two base-files files; the concurrently in-flight patch
+  `019` (CRG clock tree) was excluded on purpose.
+
+### What this proves / does not prove
+
+Proven host-only: the board.d path reads the right six bytes of the right partition,
+validates and derives the vendor LAN/WAN addresses, records them through the standard
+board.json path, logs and falls back on every bad input tested, never writes the factory
+partition, and the image installs the files. Not proven: any hardware behaviour. The
+bdinfo read has never run on a booted target; preinit `/dev/mtdN`/`/dev/mtdblockN`
+availability is argued from `CONFIG_DEVTMPFS_MOUNT=y` + the MTD core (not measured); and
+the addresses cannot reach a netdev until the LSW switch port map exists
+(TARGET-DESIGN.md 8.1). No device, router, UART, TFTP or flash tool was touched.
+
+## 2026-11-18 (CRG clock-tree session): gate parents, fixed clocks, read-only PLLs/muxes (patch 019)
+
+The CRG clock tree was decoded from the vendor module and the patch-`004` driver was
+extended with the clock-parent, PLL and mux model (task-35). The decode and the
+remaining [U] items are in [MISC-SOC-BLOCKS.md](MISC-SOC-BLOCKS.md) section 5; the patch
+header carries the exact register/field notes. **Host-only: no device, router, UART,
+TFTP, flash or bench tool was touched; nothing was booted.**
+
+### What was added
+
+- `drivers/clk/hisilicon/crg-luofu.c`: the 16 gate clocks are parented on their real
+  input clocks (apb/ahb/gemacN/lsw_dp/lsw_pfe, decoded from the vendor devicetree)
+  instead of the previous single `apb_clk` parent; the two PLLs (control words at
+  `0x198`/`0x1e0`, status word `0x90` bits 30/27) and the two muxes (`0x138` bit 3 CPU,
+  bit 1 efuse) are registered as read-only clock outputs of the same provider. The
+  provider resolves its seven input clocks from the node `clocks`/`clock-names` with
+  `of_property_match_string` + `of_clk_get_parent_name`, so no global clock name is
+  guessed. The probe remains register-free; all clocks are `CLK_IGNORE_UNUSED`.
+- `include/dt-bindings/clock/hisilicon,luofu-crg.h`: four new indices appended
+  (`LUOFU_CLK_PLL_CPU` 16, `LUOFU_CLK_PLL_LSW` 17, `LUOFU_CLK_CPU_MUX` 18,
+  `LUOFU_CLK_EFUSE_MUX` 19; `LUOFU_CLK_NR` 20). The existing 16 gate IDs are not
+  renumbered.
+- the YAML binding gains the required `clocks`/`clock-names` input-clock model and its
+  example; the PLL/mux description states they are read-only. No new Kconfig symbol or
+  config line: the driver is still `CONFIG_LUOFU_CRG`.
+- the target DTS (in the incoming integration patch, not edited here) gains the four
+  missing fixed clocks (`gemacN_clk` 125 MHz, `lsw_dp_clk` 166 MHz, `lsw_pfe_clk`
+  333 MHz, `efuse_ring_clk` 20 MHz) and the `clocks`/`clock-names` on the CRG node.
+
+### The decode (why the values are what they are)
+
+The vendor `hi_clk.ko` (GPL, not stripped, 15,556 B, md5
+`3b331b9058e13bc409dd8f0040af3b11`, identical in the 2.4.15 and 2.5.24 rootfs) was
+disassembled host-side. `hi_pll_recalc_rate` decodes a fractional PLL:
+`rate = parent * (int + frac/2^24) / fbdiv`, followed by two divider-select fields
+(`word0[10:8]` and `word0[6:4]`, each `+ div-factor`, skipped when zero; bit 3 of word0
+byte 0 selects the integer-only path). The fields are [V] and the arithmetic order is
+taken from the module; the on-board value is **not** measured - the boot-programmed
+words have never been read back, so the derived rate is [U] until a `clk_summary`/
+control-word readback (attended). The writer (`0x4c4`) busy/re-lock protocol was
+decoded but is **not** implemented: its feedback-word encoding is not verified and a
+wrong store can hang the core. The muxes are read-only (`set_parent` returns
+`-EOPNOTSUPP`): `0x138` bit 3 selects the CPU clock source and must never be writable,
+and the efuse mux is only switched by an efuse programming path that this tree does not
+have.
+
+### Verification (exact commands and results)
+
+Validated in an isolated btrfs-reflink copy of the shared clone (`openwrt-lab-clk`,
+`openwrt main` `27663a0`, `linux-6.18.60`, the OpenWrt GCC 14.4.0 of that tree; the
+shared clone was not modified):
+
+- patches `001`-`019` apply to a fresh pristine `linux-6.18.60` tree in order, RC=0,
+  no `.rej`/`.orig`; patch `019` dry-run on the `001`-`018` tree RC=0, apply RC=0,
+  `git apply --check` RC=0, and the applied files are byte-identical to the series
+  tree;
+- `make target/linux/prepare` RC=0 (patch `019` applied: 3 patching-file lines), then
+  `make target/linux/compile` **RC=0**, **0 warnings** in the whole log and 0 errors;
+  `arch/arm/boot/zImage` 3,264,560 B sha256 `4456b0ec...`,
+  `drivers/clk/hisilicon/crg-luofu.o` 43,900 B;
+- `TEXT_OFFSET` unchanged: `textofs-$(CONFIG_ARCH_LUOFU) := 0x00608000`; both
+  `arch/arm/kernel/.head.o.cmd` and `arch/arm/boot/compressed/.head.o.cmd` carry
+  `-DTEXT_OFFSET=0x00608000`; `System.map` gives `_text = stext = 0xc0608000`;
+  the CRG objects are linked (`luofu_crg_probe`, `luofu_crg_pll_recalc_rate`,
+  `luofu_crg_mux_get_parent` in `System.map`);
+- config: no patch-introduced symbols; `make kernel_oldconfig` five runs RC=0, the
+  re-derived target `config-6.18` is byte-idempotent (`4106877f...`, 300 symbols, the
+  same set as the `001`-`018` lane) and the kernel `.config` is byte-identical to that
+  lane (`1b9b084e...`); `CONFIG_LUOFU_CRG=y` and `CONFIG_COMMON_CLK=y` unchanged;
+- `dt_binding_check` for the extended YAML: RC=0, the example preprocesses and compiles
+  (`DTEX`/`DTC [C]`), no diagnostic mentions the file; the only non-yamllint caveat is
+  the same pre-existing `realtek,rtl8152.yaml` schema note and the "yamllint not
+  installed" skip as the earlier lanes;
+- board DTS (with the four fixed clocks + CRG `clocks`/`clock-names`): cpp RC=0;
+  patched-kernel `dtc` RC=0 with **zero warnings (stderr 0 bytes)**; DTB 11,346 B
+  sha256 `a31ab53f...`; `dt-validate` RC=0 with only the same six pre-existing findings
+  as the 001-018 lane and **none** naming the CRG or a new clock node;
+- checkpatch: `crg-luofu.c` 0/0, the dt-bindings header 0/0 and the YAML 0/0; the bare
+  patch file only reports the expected working-format metadata ("Missing commit
+  description") plus the series-wide "DT binding docs should be a separate patch" note
+  (the whole 001-019 series keeps binding+driver in one patch per block).
+
+Not proven: any hardware behaviour, and specifically the PLL **rate values** (the
+equation is decoded from the module, not measured), the PLL status-bit meaning and the
+mux parent read-back. No device, router, UART, TFTP or flash tool was touched; the
+kernel has never been booted. The attended checks remaining: one boot with a read-only
+probe to print `clk_summary` (CPU/LSW PLL rates, `cpu_mux`/`efuse_mux` parents, gate
+parents) and read the two control words at `0x198`/`0x1e0`; and a read-only census of
+the `0x90` status bits. No write experiment is needed for this read-only stage.
