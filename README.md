@@ -12,10 +12,10 @@ An upstream-style **OpenWrt / Linux bring-up for the Cudy WR3000 v2.0** — a Hi
 image. The goal is a mainline OpenWrt target, device tree and driver set for this board.
 
 This curated repository collects the parts of the research that are **safe and useful to
-publish**: a Linux 6.18 kernel patch series (a 19-patch upstream review form plus two
-fail-closed data-path drafts), an OpenWrt target skeleton and board DTS, an image/install
-recipe, reverse-engineering specifications and measured read-only silicon inventory, and an
-honest status report.
+publish**: a Linux 6.18 kernel patch series (all 21 patches in the upstream review form;
+19 merge-intent patches plus two fail-closed data-path drafts marked do-not-merge), an OpenWrt
+target skeleton and board DTS, an image/install recipe, reverse-engineering specifications
+and measured read-only silicon inventory, and an honest status report.
 It is a curated snapshot of the lab notebook
 [**cudy-wr3000v2**](https://github.com/ShibbityShwab/cudy-wr3000v2) with fresh git history; the
 security findings from the same research live in the separate
@@ -34,7 +34,7 @@ reverse-engineered code.
 | Area | Host-validated (evidence in this repository) | Hardware status |
 | --- | --- | --- |
 | Target/subtarget metadata | `make defconfig` + `make target/linux/prepare` RC=0 on `openwrt main` `27663a0` (linux-6.18.60); generated `CONFIG_TARGET_hisilicon_luofu_DEVICE_cudy_wr3000-v2=y` | never built on a device |
-| Kernel series (patches 001–021) | **21/21** apply in order to pristine linux-6.18.60 with `patch(1)`: 82 files patched, 0 failed hunks, 0 rejects; the review-form subset 001–019 also applies with `git am` (identical trees, 0 rejects, 0 fuzz) and keeps checkpatch 0 errors / 49 warnings, while the two new drafts are checkpatch 0/0/0 on their files | no kernel from this work has ever booted the board |
+| Kernel series (patches 001–021) | **21/21** apply in order to pristine linux-6.18.60 with `patch(1)` (82 file-patch events, 0 failed hunks, 0 rejects, 0 fuzz, 3 apply offsets) **and with `git am`** (identical trees, clean work tree); the review form carries all 21 patches and keeps checkpatch 0 errors / 53 warnings (6 strict CHECKs), enumerated in [04-validation.md](upstream/series-6.18/04-validation.md); the two draft follow-ups 020/021 are marked do-not-merge and have never run | no kernel from this work has ever booted the board |
 | Kernel compile | full `linux-6.18.60` compile of the 001–021 series RC=0 under `CONFIG_WERROR=y`, 0 warnings / 0 errors; zImage 3,279,096 B (`96b927d3…`); load/entry `0x80608000` unchanged (`_text = 0xc0608000`) | never booted |
 | Board DTS | compiles with the kernel's own dtc (1.7.2), zero warnings; every new YAML binding passes `dt_binding_check` | never used to boot; full `dtbs_check` is **not** clean |
 | FIP trailer generator | reproduces both recorded vendor containers byte-for-byte; fail-closed on every decoded loader check | **no generated trailer has been booted** |
@@ -80,21 +80,25 @@ describes the MediaTek v1 hardware. This board is the HiSilicon luofu v2 design.
 
 ## The Linux 6.18 kernel series (patches 001–021)
 
-The target tree carries the **21-patch** series; the upstream **review form** covers the first
-**19** patches. Both copies are included, by design:
+The target tree carries the **21-patch** series, and the upstream **review form** now covers
+the same 21 patches. Both copies are included, by design:
 
 - [`target-skeleton/target/linux/hisilicon/patches-6.18/`](target-skeleton/target/linux/hisilicon/patches-6.18/) —
   all 21 plain diffs that OpenWrt's patch application consumes (this is what the recorded
   kernel compile evidence used);
-- [`upstream/series-6.18/`](upstream/series-6.18/) — the **review form** of patches 001–019:
+- [`upstream/series-6.18/`](upstream/series-6.18/) — the **review form** of patches 001–021:
   cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, a
   repeatable validation record and raw logs, plus a commit-ready `git am` copy.
   The readable overview is its [README](upstream/series-6.18/README.md).
 
-Patches `020` (PIE ring engine + GEMAC front end) and `021` (read-only LSW baseline probe)
-are target-tree drafts only: they are deliberately **not** in the upstream review form,
-because `020` is an arm-gated data-path draft and `021` is a read-only probe of a block
-our own driver still does not program. Both are host-compiled and never booted.
+The review form is not a merge list: `020` (PIE ring engine + GEMAC front end) and `021`
+(read-only LSW baseline probe) are included as **draft / do-not-merge** patches documenting
+the measured-inventory follow-ups. `020` is an arm-gated data-path draft whose engine has
+never run (its RX completion decode is still [U]); `021` is a read-only probe of a block our
+own driver still does not program. Both are host-compiled and never booted; the
+ready-for-review split and the do-not-merge reasoning are in the series
+[README](upstream/series-6.18/README.md) and
+[01-commit-messages.md](upstream/series-6.18/01-commit-messages.md).
 
 | # | Patch | Contents | Upstream intent |
 | --- | --- | --- | --- |
@@ -117,19 +121,22 @@ our own driver still does not program. Both are host-compiled and never booted.
 | 0017 | soc: hisilicon: add Luofu A/B boot selector | `current_pair`/`next_pair` sysfs over the shared SYSCTRL cell; loader-style low-byte store + read-back | RFC |
 | 0018 | ARM: mach-hisilicon: add Hi5671Y SMP bring-up support | `CPU_METHOD_OF_DECLARE(luofu_smp)`, SCU enable, fail-safe missing-node path; board DTS integration is not in the series | RFC / attended |
 | 0019 | clk: hisilicon: add the Luofu CRG clock tree | gate parents on real input clocks; two PLLs + two muxes as **read-only** clocks; seven required input clocks | ready for review |
-| 0020 | net: ethernet: hisilicon: add the Luofu PIE datapath and GEMAC front end | extends `015`'s PIE driver into a draft ring engine (coherent descriptor rings for the measured two active RX/TX channels, recovered v250 channel/IRQ init, mask/unmask + NAPI RX path, TX producer with poll-only completion, read-back verification that tears down on mismatch) and `009`'s GEMAC into a draft phylink/netdev front end; the data path arms only behind the kernel-command-line opt-in `luofu_pie.arm=1` and refuses before the first register write otherwise | target-only draft; do not merge |
-| 0021 | net: ethernet: hisilicon: add the Luofu switch read-only baseline probe | extends `016` to the measured 17-window model (two engine DDR windows validated, never mapped), the CRG powered-state gate (gate word bits + four active-low reset lines), a 30-word W1 register baseline and a word-for-word read-only check of both qid maps; contains no `writel()`, registers no netdev, always fails closed | target-only draft; do not merge |
+| 0020 | net: ethernet: hisilicon: add the Luofu PIE datapath and GEMAC front end | extends `015`'s PIE driver into a draft ring engine (coherent descriptor rings for the measured two active RX/TX channels, recovered v250 channel/IRQ init, mask/unmask + NAPI RX path, TX producer with poll-only completion, read-back verification that tears down on mismatch) and `009`'s GEMAC into a draft phylink/netdev front end; the data path arms only behind the kernel-command-line opt-in `luofu_pie.arm=1` and refuses before the first register write otherwise | review-form draft; do not merge |
+| 0021 | net: ethernet: hisilicon: add the Luofu switch read-only baseline probe | extends `016` to the measured 17-window model (two engine DDR windows validated, never mapped), the CRG powered-state gate (gate word bits + four active-low reset lines), a 30-word W1 register baseline and a word-for-word read-only check of both qid maps; contains no `writel()`, registers no netdev, always fails closed | review-form draft; do not merge |
 
 Series facts (all host-only; evidence in [`upstream/series-6.18/validation/`](upstream/series-6.18/validation/)):
 
-- 21/21 apply in order to pristine `linux-6.18.60` with `patch(1)`: 82 files patched,
-  0 failed hunks, 0 rejects, 0 `.rej`; `021` applies after `020` with a 6-line offset in a
-  Kconfig file. The review-form subset 001–019 also applies with `git am`; both trees are
-  identical, 0 rejects, 0 fuzz.
-- `checkpatch.pl --no-tree`: **0 errors, 49 warnings** (default and strict), plus 6 strict
-  CHECKs for the review-form series — review items such as binding split, MAINTAINERS entry
-  and line wrapping, not behavioural defects. The two new drafts are checkpatch **0/0/0** on
-  their added/changed files.
+- 21/21 apply in order to pristine `linux-6.18.60` with `patch(1)` (82 file-patch events,
+  0 failed hunks, 0 rejects, 0 `.rej`) **and with `git am`** (clean work tree; the two
+  resulting trees are identical, 0 rejects, 0 fuzz). Three hunks apply with an offset: the
+  pre-existing two in `0008`, plus a 6-line offset for `021` after `020` edits the same
+  Kconfig file.
+- `checkpatch.pl --no-tree`: **0 errors, 53 warnings** (default and strict), plus 6 strict
+  CHECKs — review items such as binding split, MAINTAINERS entry and line wrapping, not
+  behavioural defects. The 4 new warnings are the expected per-patch review items for
+  `020`/`021` (one MAINTAINERS and one binding-split warning each).
+- `sha256sum -c` on the recorded `validation/sha256sums.txt`: **42/42 OK** (21 series
+  patches + 21 source patches); series `0020` sha256 `5f3e1e52…`, `0021` `7ed09990…`.
 - The final 001–021 series is what the LSW-init lane compiled in an isolated `openwrt main`
   clone: `make target/linux/prepare` RC=0 and `make target/linux/compile` RC=0 with
   **0 warnings / 0 errors** under `CONFIG_WERROR=y`; zImage 3,279,096 B, sha256
@@ -320,11 +327,12 @@ so no vendor object that ever existed there is present here).
 - Lab notebook / live research record: **[cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2)**
 - Security research (CVE write-ups, affected versions, disclosure status): **[cudy-wr3000v2-cve](https://github.com/ShibbityShwab/cudy-wr3000v2-cve)**
 - This repository is a curated, fresh-history snapshot of the lab notebook's `opensource/`
-  subtree at commit `6bcea12` (2026-11-18, series 001–021), with the publication policy in
+  subtree at commit `9d5005c` (2026-11-18, series 001–021), with the publication policy in
   [`docs/PUBLISHING.md`](docs/PUBLISHING.md) and provenance in [NOTICE.md](NOTICE.md).
 
-> **The honest bottom line:** the target, DTS, 21-patch kernel series (19 in review form),
-> image recipe and A/B path are real host-validated engineering. **Nothing here has run on the router.** The
+> **The honest bottom line:** the target, DTS, 21-patch kernel series (all 21 in review
+> form; `020`/`021` are do-not-merge drafts), image recipe and A/B path are real
+> host-validated engineering. **Nothing here has run on the router.** The
 > hardware gates — one attended boot, one A/B install, the Wi-Fi source question — are still
 > open, and the Wi-Fi/LAN-switch work is not close. Treat it as a well-documented
 > starting point for an upstream port, not as a firmware.

@@ -9,8 +9,9 @@ material was sanitized, and how to verify the publication claims.
 
 - Source tree: the research lab notebook's `opensource/` subtree
   ([cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2) at its `opensource`
-  submodule), **commit `6bcea12`** ("lsw: read-only D1b baseline probe (021)"; kernel-patch
-  series 001–021, 2026-11-18).
+  submodule), **commit `9d5005c`** ("upstream: extend review-form series to 001-021 and
+  revalidate 21/21"; kernel-patch series 001–021 and the upstream review form for 001–021,
+  2026-11-18, 21 patches validated).
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -19,7 +20,13 @@ material was sanitized, and how to verify the publication claims.
   pages (`README.md`, `NOTICE.md`, `docs/PUBLISHING.md`, this index, licenses, `.gitignore`),
   (b) absolute host paths sanitized to `~` and the project SSH-key filename genericised,
   (c) tool SPDX headers changed to MIT per the license split in [`NOTICE.md`](../NOTICE.md),
-  (d) one documentation copy under `docs/` whose relative links were adjusted.
+  (d) one documentation copy under `docs/` whose relative links were adjusted,
+  (e) in `upstream/series-6.18/`, the repo-layout adaptation for this repository: the series
+  generator (`tools/gen-series.py`) locates `target-skeleton/` in either layout and its
+  mapping table, the review-form README and the `validation/sha256sums.txt` comment name
+  `target-skeleton/...` (in the notebook this tree is `opensource/target-skeleton/`).  The
+  generated `series/` patches are byte-identical to the source tree and the validation logs
+  are copied verbatim apart from that `sha256sums.txt` comment.
 
 ## What is included (and why)
 
@@ -28,7 +35,7 @@ material was sanitized, and how to verify the publication claims.
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
 | `docs/` (15 engineering documents) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance and the consolidated reversal report |
 | `target-skeleton/` | the schematic OpenWrt target, board DTS, 21 kernel patches (001–021), image recipe, base-files and tools — the actual deliverable |
-| `upstream/series-6.18/` | the review-form submission series (cover letter, commit messages, MAINTAINERS proposal, validation logs) |
+| `upstream/series-6.18/` | the 21-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`/`021` are carried as do-not-merge drafts |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 

@@ -1,7 +1,8 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at commit
-`6bcea12` (2026-11-18, kernel-patch series `001`-`021`). The live status of the work is the
+`9d5005c` (2026-11-18, kernel-patch series `001`-`021`, all 21 patches in the upstream
+review form). The live status of the work is the
 lab notebook's `STATUS.md`; the honest summary of what is host-validated vs
 hardware-unverified is in
 [`../README.md`](../README.md). Read [`PUBLISHING.md`](PUBLISHING.md) for the curation rules,

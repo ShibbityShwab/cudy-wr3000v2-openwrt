@@ -9,9 +9,10 @@ not a flashing guide, and contains no hardware-validated result.
 - Our own documentation: OpenWrt target/device-tree/image design, reverse-engineering
   specifications, the roadmap, the consolidated reversal report and the validation logs.
 - Our own tooling: FIP image-slicing/trailer tools, image builders and mocked host tests.
-- Our own kernel code (as patches): the 21-patch Linux 6.18 series (19 patches in upstream
-  review form plus the two fail-closed data-path drafts), the draft board DTS and the
-  schematic OpenWrt target/base-files files.
+- Our own kernel code (as patches): the 21-patch Linux 6.18 series, carried in the upstream
+  review form as a 001-021 set (19 merge-intent patches plus the two fail-closed data-path
+  drafts `020`/`021`, marked do-not-merge), the draft board DTS and the schematic OpenWrt
+  target/base-files files.
 
 ## What is deliberately **not** in this repository
 
