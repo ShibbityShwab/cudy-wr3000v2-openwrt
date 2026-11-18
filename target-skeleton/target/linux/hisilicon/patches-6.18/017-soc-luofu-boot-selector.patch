@@ -1,0 +1,451 @@
+--- a/drivers/soc/hisilicon/Kconfig
++++ b/drivers/soc/hisilicon/Kconfig
+@@ -21,4 +21,26 @@
+ 	  health status and port information of HCCS, or reducing system
+ 	  power consumption on Kunpeng SoC.
+ 
++config LUOFU_SELECTOR
++	tristate "HiSilicon Luofu A/B boot selector"
++	depends on ARCH_LUOFU || COMPILE_TEST
++	depends on MFD_SYSCON
++	help
++	  Sysfs interface to the SYSCTRL cell in the Hi5671Y "luofu" SoC that
++	  records the A/B firmware pair (kernela + rootfsa, or kernelb +
++	  rootfsb).  The stock bootloader selects the pair from its environment
++	  (bootflag) and uses this cell as its record: before Linux starts it
++	  stores the opposite pair's low byte, and a boot that reaches
++	  userspace has to re-record the running pair or the next reset
++	  follows the bootloader's failover path and switches back.
++
++	  "current_pair" decodes the cell, and "next_pair" writes one of the
++	  two measured recorded-pair values as a low-byte read-modify-write
++	  (the upper 24 bits are unmeasured and are preserved) and verifies
++	  the read-back.  The driver shares the SYSCTRL regmap with the
++	  machine-restart driver and performs no register access at probe
++	  time: the cell is only read or written when userspace asks.  It is
++	  needed by the A/B sysupgrade path and the boot-time pair recorder;
++	  say N unless you are building that path.
++
+ endmenu
+--- a/drivers/soc/hisilicon/Makefile
++++ b/drivers/soc/hisilicon/Makefile
+@@ -2 +2,2 @@
+ obj-$(CONFIG_KUNPENG_HCCS)	+= kunpeng_hccs.o
++obj-$(CONFIG_LUOFU_SELECTOR)	+= luofu-selector.o
+--- /dev/null
++++ b/drivers/soc/hisilicon/luofu-selector.c
+@@ -0,0 +1,285 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * HiSilicon Hi5671Y "luofu" A/B boot selector
++ *
++ * The board carries two complete firmware pairs: pair A (kernela + rootfsa)
++ * and pair B (kernelb + rootfsb).  The bootloader chooses the pair from its
++ * environment ("bootcmd=mtd read kernel${bootflag} ${loadaddr}; bootfip
++ * ${loadaddr}"), so env bootflag=a reads kernela and bootflag=b reads
++ * kernelb.  A 32-bit SYSCTRL cell (0x10100000 + 0x0c08 on the R116 board) is
++ * the bootloader's record of the pair, not a second selector:
++ *
++ *   0x10  the A pair is recorded.
++ *   0x11  the B pair is recorded.
++ *   0x00  the cell a true power-on clears.  The loader initialises it from
++ *         the environment ("bootreg init, set 10" / "set 11").
++ *   0x21  the project's measured *bench* handover value.  Vendor userspace
++ *         never writes it; the loader ignores the 0x20 marker bit, treats
++ *         the value as "not the opposite pair" and normalises the low byte
++ *         to 0x10/0x11 on the same boot, so 0x21 never persists.
++ *
++ * The write side matters as much as the encoding.  Before Linux starts,
++ * bootfip stores the low byte of the *opposite* pair of the env bootflag
++ * (0x11 for an A boot, 0x10 for a B boot) with a low-byte read-modify-write
++ * that preserves the upper 24 bits.  If the recorded pair then contradicts
++ * the env on the next boot, the loader prints "boot from kernelX failed,
++ * change to kernelY", re-stamps env bootflag to the other pair, saves the
++ * env and boots it.  A boot is therefore only stable if userspace records
++ * the running pair after it comes up: the vendor firmware does that at
++ * boot-done time (/etc/init.d/hsan_appm writes /sys/.../boot_done, and the
++ * vendor driver toggles the cell to the running pair).  A target image needs
++ * the equivalent boot-time recorder (the target's
++ * /etc/init.d/luofu_record_pair); without it the opposite-pair marker
++ * survives and the reboot after a normal boot silently follows the failover
++ * path back to the previous pair.
++ *
++ * Vendor userspace writes only the two recorded-pair values: libhi_upgrade.so
++ * and the vendor platform.sh both format 0x10|flag.  This driver therefore
++ * accepts only 0x10 and 0x11 on the write path and reports 0x21 for
++ * diagnostics only.  The store is a low-byte read-modify-write, like the
++ * loader's own store and the vendor sysenv driver's, and it verifies the
++ * whole cell read-back; the upper 24 bits are unmeasured and are preserved
++ * rather than zeroed.
++ *
++ * Evidence: parent project opensource/docs/SELECTOR-0x21.md (the
++ * reconstruction from the dumped U-Boot image, the vendor rootfs trees and
++ * the read-only console captures), BENCH-FACTS.md section 5 and the
++ * controlled 0x10/0x11 tests in ledger phase 67.  The upper 24 bits were zero
++ * in every local observation; their meaning is unknown and this driver does
++ * not change them.
++ *
++ * The cell is shared: the machine-restart driver also reads it (and writes
++ * the same value back) before a reset, and the vendor loader owns its
++ * power-on meaning.  The SYSCTRL page is therefore a syscon and this driver
++ * only borrows the regmap.  It never maps, claims or ioremaps the page, so
++ * the shared-page contract is preserved and a second mapping cannot happen.
++ *
++ * Probe performs no register access at all: the first cell read happens when
++ * userspace reads an attribute, and the first write only when userspace
++ * stores "a" or "b" into next_pair.
++ *
++ * sysfs ABI (Documentation/ABI/testing/sysfs-driver-luofu-selector):
++ *   current_pair  read-only   "a", "b", "manual-b", "uninitialised" or
++ *                             "unknown" - the decoded recorded pair.
++ *   raw           read-only   the whole cell as 0x%08x (diagnostics; the
++ *                             loader only interprets the low byte).
++ *   next_pair     write-only  accepts exactly "a" (0x10) or "b" (0x11),
++ *                             read-modify-writes the low byte preserving
++ *                             the upper 24 bits, and verifies the read-back.
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/string.h>
++#include <linux/sysfs.h>
++
++/* Measured selector encodings (full 32-bit cell values). */
++#define LUOFU_SELECTOR_PAIR_A		0x10
++#define LUOFU_SELECTOR_PAIR_B		0x11
++#define LUOFU_SELECTOR_MANUAL_B		0x21
++#define LUOFU_SELECTOR_UNINITIALISED	0x00
++#define LUOFU_SELECTOR_LOW_BYTE		0xff
++
++struct luofu_selector {
++	struct device *dev;
++	struct regmap *sysctrl;
++	u32 offset;
++	/* Serialises read-check-write sequences against the restart handler. */
++	struct mutex lock;
++};
++
++static const char *luofu_selector_state_name(u32 val)
++{
++	switch (val) {
++	case LUOFU_SELECTOR_PAIR_A:
++		return "a";
++	case LUOFU_SELECTOR_PAIR_B:
++		return "b";
++	case LUOFU_SELECTOR_MANUAL_B:
++		return "manual-b";
++	case LUOFU_SELECTOR_UNINITIALISED:
++		return "uninitialised";
++	default:
++		return "unknown";
++	}
++}
++
++static ssize_t current_pair_show(struct device *dev,
++				 struct device_attribute *attr, char *buf)
++{
++	struct luofu_selector *sel = dev_get_drvdata(dev);
++	u32 val;
++	int ret;
++
++	mutex_lock(&sel->lock);
++	ret = regmap_read(sel->sysctrl, sel->offset, &val);
++	mutex_unlock(&sel->lock);
++	if (ret)
++		return ret;
++
++	return sysfs_emit(buf, "%s\n", luofu_selector_state_name(val));
++}
++static DEVICE_ATTR_RO(current_pair);
++
++static ssize_t raw_show(struct device *dev, struct device_attribute *attr,
++			char *buf)
++{
++	struct luofu_selector *sel = dev_get_drvdata(dev);
++	u32 val;
++	int ret;
++
++	mutex_lock(&sel->lock);
++	ret = regmap_read(sel->sysctrl, sel->offset, &val);
++	mutex_unlock(&sel->lock);
++	if (ret)
++		return ret;
++
++	return sysfs_emit(buf, "0x%08x\n", val);
++}
++static DEVICE_ATTR_RO(raw);
++
++static ssize_t next_pair_store(struct device *dev, struct device_attribute *attr,
++			       const char *buf, size_t count)
++{
++	struct luofu_selector *sel = dev_get_drvdata(dev);
++	u32 target, cur, next, readback;
++	int ret;
++
++	/*
++	 * Only the two measured recorded-pair values may be written.  The
++	 * bench handover value 0x21 is deliberately not reachable from this
++	 * interface: vendor userspace never writes it, the loader discards
++	 * its marker bit on the same boot, and no automated path should
++	 * depend on it.
++	 */
++	if (sysfs_streq(buf, "a"))
++		target = LUOFU_SELECTOR_PAIR_A;
++	else if (sysfs_streq(buf, "b"))
++		target = LUOFU_SELECTOR_PAIR_B;
++	else
++		return -EINVAL;
++
++	mutex_lock(&sel->lock);
++
++	ret = regmap_read(sel->sysctrl, sel->offset, &cur);
++	if (ret)
++		goto out_unlock;
++	if (cur != LUOFU_SELECTOR_PAIR_A &&
++	    cur != LUOFU_SELECTOR_PAIR_B &&
++	    cur != LUOFU_SELECTOR_MANUAL_B &&
++	    cur != LUOFU_SELECTOR_UNINITIALISED)
++		dev_warn(dev, "boot selector reads 0x%08x, a value outside the measured encodings; writing the low byte anyway\n",
++			 cur);
++
++	/*
++	 * Low-byte read-modify-write, exactly like the bootloader's bootfip
++	 * store and the vendor sysenv driver: the loader interprets only the
++	 * low byte, and the upper 24 bits are unmeasured, so they are
++	 * preserved instead of zeroed.
++	 */
++	next = (cur & ~LUOFU_SELECTOR_LOW_BYTE) | target;
++	ret = regmap_write(sel->sysctrl, sel->offset, next);
++	if (ret) {
++		dev_err(dev, "cannot write the boot selector: %d\n", ret);
++		goto out_unlock;
++	}
++
++	/*
++	 * Fail closed on a write that did not stick: the caller must not
++	 * reboot into a pair the selector does not actually record.
++	 */
++	ret = regmap_read(sel->sysctrl, sel->offset, &readback);
++	if (ret)
++		goto out_unlock;
++	if (readback != next) {
++		dev_err(dev, "boot selector write did not stick: read back 0x%08x, wrote 0x%08x\n",
++			readback, next);
++		ret = -EIO;
++		goto out_unlock;
++	}
++
++	dev_info(dev, "boot selector low byte set to pair %s (0x%02x), upper 24 bits preserved (cell 0x%08x)\n",
++		 target == LUOFU_SELECTOR_PAIR_A ? "a" : "b", target, readback);
++	ret = count;
++
++out_unlock:
++	mutex_unlock(&sel->lock);
++	return ret;
++}
++static DEVICE_ATTR_WO(next_pair);
++
++static struct attribute *luofu_selector_attrs[] = {
++	&dev_attr_current_pair.attr,
++	&dev_attr_raw.attr,
++	&dev_attr_next_pair.attr,
++	NULL,
++};
++
++static const struct attribute_group luofu_selector_group = {
++	.attrs = luofu_selector_attrs,
++};
++
++static int luofu_selector_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct luofu_selector *sel;
++	int ret;
++
++	sel = devm_kzalloc(dev, sizeof(*sel), GFP_KERNEL);
++	if (!sel)
++		return -ENOMEM;
++	sel->dev = dev;
++	mutex_init(&sel->lock);
++
++	sel->sysctrl = syscon_regmap_lookup_by_phandle(dev->of_node,
++						       "hisilicon,sysctrl");
++	if (IS_ERR(sel->sysctrl))
++		return dev_err_probe(dev, PTR_ERR(sel->sysctrl),
++				     "cannot get the SYSCTRL regmap\n");
++
++	ret = of_property_read_u32(dev->of_node, "hisilicon,selector-offset",
++				   &sel->offset);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "cannot read hisilicon,selector-offset\n");
++	if (sel->offset & 3)
++		return dev_err_probe(dev, -EINVAL,
++				     "selector offset 0x%x is not word aligned\n",
++				     sel->offset);
++
++	platform_set_drvdata(pdev, sel);
++
++	ret = devm_device_add_group(dev, &luofu_selector_group);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "cannot create the selector attributes\n");
++
++	dev_info(dev, "A/B boot selector at SYSCTRL+0x%x (no register access until userspace asks)\n",
++		 sel->offset);
++
++	return 0;
++}
++
++static const struct of_device_id luofu_selector_of_match[] = {
++	{ .compatible = "hisilicon,luofu-boot-selector" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, luofu_selector_of_match);
++
++static struct platform_driver luofu_selector_driver = {
++	.probe = luofu_selector_probe,
++	.driver = {
++		.name = "luofu-selector",
++		.of_match_table = luofu_selector_of_match,
++	},
++};
++module_platform_driver(luofu_selector_driver);
++
++MODULE_DESCRIPTION("HiSilicon Hi5671Y luofu A/B boot selector");
++MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/hisilicon/hisilicon,luofu-boot-selector.yaml
+@@ -0,0 +1,70 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/soc/hisilicon/hisilicon,luofu-boot-selector.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: HiSilicon Luofu A/B boot selector
++
++maintainers:
++  - ShibbityShwab <18537102+ShibbityShwab@users.noreply.github.com>
++
++description: |
++  The Hi5671Y "luofu" SoC boots one of two complete firmware pairs, "A"
++  (kernela + rootfsa) and "B" (kernelb + rootfsb).  The bootloader selects
++  the pair from its environment (bootflag) and keeps a 32-bit record of the
++  selected pair in the SYSCTRL page: the low byte of that cell reads 0x10
++  while pair A is recorded and 0x11 while pair B is recorded.  Before Linux
++  starts, the loader stores the opposite pair's value in the cell, and a
++  boot that reaches userspace has to re-record the running pair; if the
++  recorded value contradicts the environment on the next boot, the loader
++  re-stamps the environment and boots the other pair (its failover path).
++
++  Only the low byte of the cell is interpreted.  The upper 24 bits are
++  unmeasured and are preserved by any write.  A value of 0 means the cell
++  was cleared by a true power-on; the loader then initialises it from the
++  environment.  The kernel must not reset the cell across a software
++  reboot, and userspace has to be able to re-record the running pair and to
++  move the cell to the other measured value.
++
++  The cell is shared with the machine-restart driver, which writes the value
++  it read back before resetting, and with the bootloader.  The SYSCTRL page
++  is therefore modelled as a syscon and this node only references it; it has
++  no register range of its own.
++
++properties:
++  compatible:
++    const: hisilicon,luofu-boot-selector
++
++  hisilicon,sysctrl:
++    $ref: /schemas/types.yaml#/definitions/phandle
++    description:
++      phandle to the SYSCTRL syscon node that holds the boot-selector cell
++
++  hisilicon,selector-offset:
++    $ref: /schemas/types.yaml#/definitions/uint32
++    description:
++      Offset of the 32-bit boot-selector cell inside the SYSCTRL page.  On
++      the R116 board (Cudy WR3000 v2.0) the measured offset is 0xc08.  The
++      low byte is written with a read-modify-write; the upper 24 bits are
++      preserved.
++
++required:
++  - compatible
++  - hisilicon,sysctrl
++  - hisilicon,selector-offset
++
++additionalProperties: false
++
++examples:
++  - |
++    sysctrl: system-controller@10100000 {
++        compatible = "hisilicon,luofu-sysctrl", "syscon";
++        reg = <0x10100000 0x1000>;
++    };
++
++    boot-selector {
++        compatible = "hisilicon,luofu-boot-selector";
++        hisilicon,sysctrl = <&sysctrl>;
++        hisilicon,selector-offset = <0x0c08>;
++    };
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-driver-luofu-selector
+@@ -0,0 +1,53 @@
++What:		/sys/devices/platform/luofu-selector/current_pair
++Date:		November 2026
++KernelVersion:	6.18
++Contact:	ShibbityShwab <18537102+ShibbityShwab@users.noreply.github.com>
++Description:
++		Read-only. The firmware pair recorded in the SYSCTRL boot-selector
++		cell, decoded from the low byte (the only byte the stock
++		bootloader interprets). One of: "a" (cell low byte 0x10, pair
++		kernela + rootfsa), "b" (0x11, pair kernelb + rootfsb),
++		"manual-b" (0x21, the project's measured bench handover value;
++		vendor userspace never writes it, the bootloader discards the
++		0x20 marker bit and normalises the low byte on the same boot,
++		so it does not persist), "uninitialised" (0x00, the value a true
++		power-on clears the cell to, after which the bootloader
++		initialises it from its environment) or "unknown" (any other
++		value, including a cell whose upper 24 bits are not zero: those
++		bits are unmeasured and the driver does not guess at them).
++		The cell is the bootloader's record, not a selector of its own:
++		the bootloader selects the pair from the bootflag in its
++		environment and compares it with this record. A boot that
++		reaches userspace must re-record the running pair, otherwise the
++		next reset takes the bootloader's failover path and boots the
++		other pair.
++
++What:		/sys/devices/platform/luofu-selector/raw
++Date:		November 2026
++KernelVersion:	6.18
++Contact:	ShibbityShwab <18537102+ShibbityShwab@users.noreply.github.com>
++Description:
++		Read-only. The whole 32-bit boot-selector cell as 0x%08x, for
++		diagnostics. The stock bootloader interprets only the low byte;
++		the upper 24 bits were zero in every local observation, their
++		meaning is not established, and a write through next_pair
++		preserves whatever they contain.
++
++What:		/sys/devices/platform/luofu-selector/next_pair
++Date:		November 2026
++KernelVersion:	6.18
++Contact:	ShibbityShwab <18537102+ShibbityShwab@users.noreply.github.com>
++Description:
++		Write-only. Moves the recorded pair to one of the two measured
++		values: "a" writes low byte 0x10, "b" writes 0x11. The store is
++		a low-byte read-modify-write that preserves the upper 24 bits,
++		exactly like the bootloader's own store and the vendor sysenv
++		driver, and it is verified by reading the whole cell back. A
++		write that does not stick fails with -EIO; any other string is
++		rejected with -EINVAL. The bench handover value 0x21 is not
++		reachable from this attribute.
++		The record only takes effect on the next boot: writing the pair
++		that does not match the bootloader environment makes the next
++		boot take the failover path and boot the written pair, and the
++		running pair must then be re-recorded by userspace on every
++		successful boot (the target image does that at boot time).
