@@ -23,6 +23,12 @@ products it records are the kernel compile product, a structurally validated ker
 slice and the two driver objects linked into that kernel - no rootfs, no sysupgrade
 container, no install image and no boot.
 
+> **Update 2026-11-19:** the last section of this page records the first **attended hardware
+> boot** of this target - a 6.18.60 kernel + OpenWrt rootfs built from it reached a userspace
+> console on the WR3000 v2 (console only: no network, tmpfs overlay). The "nothing has been
+> booted" statements above describe the 2026-11-18 host-only state at the time they were
+> written.
+
 ## Environment
 
 - OpenWrt `main`, shallow clone, commit `27663a0` (2026-11-18).
@@ -2443,6 +2449,33 @@ bdinfo read has never run on a booted target; preinit `/dev/mtdN`/`/dev/mtdblock
 availability is argued from `CONFIG_DEVTMPFS_MOUNT=y` + the MTD core (not measured); and
 the addresses cannot reach a netdev until the LSW switch port map exists
 (TARGET-DESIGN.md 8.1). No device, router, UART, TFTP or flash tool was touched.
+
+## 2026-11-19 (attended hardware bring-up): our kernel + our rootfs reached userspace on the WR3000 v2
+
+**Result: SUCCESS.** U-Boot's failover path booted the written pair: `Image Name: Linux-6.18.60`
+and our kernel banner on real hardware (the captured SMP bring-up line reports
+`Brought up 1 node, 1 CPU`; the CPU1 release path is not proven by this boot), UBI
+attached `mtd14` (`rootfsb`), `ubiblock0_0` was created from the static squashfs volume, the
+kernel mounted the squashfs root read-only, and `/sbin/init` -> preinit -> procd (early/watchdog/ubus/init) ->
+kmodloader -> urngd -> overlayfs (tmpfs fallback) completed; the console reached
+"Please press Enter to activate this console." Evidence: `build/evidence-firstboot/`
+(`uart-boot8-SUCCESS.log`, `SUCCESS.md`); the failure logs show the earlier empty-cmdline
+VFS panic, the U-Boot data abort from a DTB bootargs property, the 512-byte ubiblock
+truncation, and the XZ ARM-BCJ decompression failures that led to the fixes.
+
+**Fixes that made it boot (all in the target tree now):** built-in `CONFIG_CMDLINE_FORCE`
+(loader supplies no cmdline; DTB bootargs crashed U-Boot), 4 KiB squashfs payload padding
+before ubinize (ubiblock rounds volumes to 512 B), `CONFIG_XZ_DEC_ARM=y` (OpenWrt squashfs uses
+`Filters selected: arm`), semantic UBI-volume read-back verification in the first-install tool
+(`ubiformat` rewrites EC image_seq, so a raw-partition hash can never match), and the
+single-write sysfs selector recipe.
+
+**Not there yet (observed during the same boot):** no network (LSW/PIE/GEMAC netdevs are not
+wired), no persistent overlay (the image has no rootfs_data volume; mount_root falls back to
+tmpfs), and `/lib/functions/board.sh` missing for `board_detect`. The running image is the
+debug-CRC build used to localize the XZ failure; a clean production rebuild exists but has not
+been re-flashed (re-flashing needs the stock userspace or physical TFTP recovery, because the
+running image has no network).
 
 ## 2026-11-18 (CRG clock-tree session): gate parents, fixed clocks, read-only PLLs/muxes (patch 019)
 
