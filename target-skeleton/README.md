@@ -1,11 +1,16 @@
 # Luofu / Cudy WR3000 v2.0 - OpenWrt target skeleton
 
-> **Curated copy (2026-11-18).** This status page is reproduced from the project's lab
-> notebook. The "PUBLICATION: NOT READY" paragraph below refers to the *old* `opensource/`
-> repository history (ten vendor `.o` files removed from HEAD but still present in that
-> history); this curated repository was created fresh and contains no vendor binaries.
-> Live status remains the lab notebook's `STATUS.md`. Absolute host paths were sanitized
-> to `~`.
+> **Curated copy (2026-11-18 snapshot; synced 2026-11-19).** This status page is reproduced
+> from the project's lab notebook and records the host-validation sessions up to 2026-11-18;
+> its status lines below (including "UNTESTED") are that snapshot. It predates the
+> **2026-11-19 attended hardware bring-up**, in which a build of this target (6.18.60 kernel +
+> OpenWrt rootfs) booted to a userspace console - see the top-level
+> [README](../README.md#2026-11-19-hardware-milestone-first-boot-to-userspace) for that
+> milestone and its gaps. The "PUBLICATION: NOT READY" paragraph refers to the *old*
+> `opensource/` repository history (ten vendor `.o` files removed from HEAD but still
+> present in that history); this curated repository was created fresh and contains no vendor
+> binaries. Live status remains the lab notebook's `STATUS.md`. Absolute host paths were
+> sanitized to `~`.
 
 > **STATUS: UNTESTED - SCHEMATIC - NOT A WORKING TARGET.**
 >
@@ -214,6 +219,7 @@ Everything here is marked one of:
 | `dts/luofu-r116-overlay.dts` | minimal **loader-match stub** for our own base DTB: root `vendor_id="hsan"`, compatible `hsan-luofu`, `board_id=<3>`, one no-op fragment targeting `/`; mirrors the decoded overlay matcher and applies with libfdt. Not a vendor DTBO, no vendor bytes; it becomes a real board overlay only when there is a real board delta (and binding) to carry (**UNTESTED**, never booted) | `target/linux/hisilicon/dts/luofu-r116-overlay.dts` |
 | `tools/fip-slice.py` | decoded trailer parser + fail-closed check/assemble/manifest + **`make-trailer`** (generates a structurally valid trailer from user-supplied base DTB + overlays; refuses to skip the gate/match/overlay checks; no vendor bytes embedded; one attended boot of a novel trailer still required) | `scripts/fip-slice.py` (or a target-local tools path) in the OpenWrt tree |
 | `tools/luofu-image.py` | host assembly/validation helper for the image recipe: `rootfs-ubi` (squashfs -> one static UBI volume named `squashfs` with the measured geometry; re-parses EC/VID headers, their CRCs, the layout volume table, every static-LEB data CRC and the rootfs slot budget), `sysupgrade` (deterministic tar with `CONTROL`, `kernel`, `root`, `fip-manifest.txt`, `INSTALL-STATUS.txt`; cross-checks the slice against a manifest re-derived from the bytes) and `check-container` (independent read-back of a built container). Refuses vendor-derived input paths and unknown ubinize-cfg keys; never touches a device | `scripts/luofu-image.py` |
+| `tools/ubi-volume-check.py` | host-side **semantic UBI-volume verifier** for the first-install read-back (added with the 2026-11-19 bring-up): parses the EC/VID headers of both the expected `ubinize` image and the flashed-partition read-back, lays the static volume payload out in LNM order and compares `used_ebs`/`data_pad`/payload sha256 - a raw-partition hash can never match because `ubiformat` rewrites the EC `image_seq`. Read-only; handles the UBI layout volume and erased/formatting PEBs; no device access | host-side first-install verifier (no device) |
 | `tools/build-kernel-slice.sh` | reproducible, fail-closed **host** script for the first own-artifact FIP kernel slice: cpp+dtc the base DTS and the match overlay, `mkimage` the 6.18 zImage, generate the trailer with `make-trailer`, assemble the slice, run `check`/`manifest`, and re-read the gate/descriptor/load address independently. Refuses missing inputs and any vendor-derived input path; never touches a device. It outputs a structurally validated slice that has **never been booted** | the standalone host reproduction that produced the first own-artifact slice (never booted); its steps are now also wired into `image/luofu.mk` |
 | `tools/test-platform-abinstall.sh` | host-side mocked test for the A/B install path: sources the real `base-files/lib/upgrade/platform.sh`, exports the script's `LUOFU_TEST_ROOT` hook to a fixture tree and runs `platform_do_upgrade` against fake `/proc/mtd`, fake `/sys/class/ubi/ubi0/mtd_num`, fake selector sysfs and `mtd`/`ubiformat`/`sync`/`reboot` shims. Covers A->B and B->A slot selection, the kernel-then-rootfs-then-sync write order, the last-step selector move, and refusals for an unmeasured selector, a selector/rootfs pair mismatch, a missing selector, slot-budget overflows, a foreign image, a failing kernel/rootfs write, a failing selector store and a failed container re-check; and the boot-time recorder (16 additional scenarios: A/B boot recording, idempotence, manual/unknown/absent-interface/absent-UBI fail-safe paths, a failing store, a failed read-back and a cmdline cross-check disagreement); with `--container` it also runs the real built image through the real `platform_check_image`. 94/94 fixture assertions and 100/100 with the real 6,185,262 B container pass (2026-11-18 selector-fix session) | repo tool (host-only; no device) |
 | `../docs/TARGET-SKELETON.md` | one-page index/status of this skeleton, pointing back at TARGET-DESIGN.md | nowhere (repo documentation) |

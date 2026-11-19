@@ -1,8 +1,11 @@
 # NOTICE
 
-This repository is a **curated, fresh-history publication** of host-validated engineering for
-the Cudy WR3000 v2.0 (HiSilicon Hi5671Y "luofu", board R116). It is not a firmware release,
-not a flashing guide, and contains no hardware-validated result.
+This repository is a **curated, fresh-history publication** of engineering for the Cudy WR3000
+v2.0 (HiSilicon Hi5671Y "luofu", board R116): host-validated target, driver, image and install
+work, plus **one attended hardware result** - a build of this target booted to a userspace
+console on 2026-11-19. It is not a firmware release and not a flashing guide; the running
+image has no network or persistent overlay, the clean rebuild was not re-flashed, and the
+published image stays marked `NOT FLASHABLE`.
 
 ## What is in this repository
 
@@ -13,6 +16,9 @@ not a flashing guide, and contains no hardware-validated result.
   review form as a 001-021 set (19 merge-intent patches plus the two fail-closed data-path
   drafts `020`/`021`, marked do-not-merge), the draft board DTS and the schematic OpenWrt
   target/base-files files.
+- The five first-boot fixes found by the 2026-11-19 attended bring-up: built-in kernel
+  command line, 4 KiB squashfs payload padding before ubinize, the XZ ARM-BCJ decoder config,
+  the semantic UBI-volume read-back verifier, and the single-write selector recipe.
 
 ## What is deliberately **not** in this repository
 
@@ -74,8 +80,10 @@ HiSilicon.
 
 ## Safety, radio and legal
 
-- **Nothing in this repository has been booted or flashed on hardware.** The image is marked
-  `NOT FLASHABLE`; there are no install or recovery instructions here.
+- **One attended bench bring-up booted a build of this tree to a userspace console on
+  2026-11-19.** That is the only hardware result: the running image has no network and no
+  persistent overlay, the clean rebuild was not re-flashed, and the published image remains
+  marked `NOT FLASHABLE`. There are no install or recovery instructions here.
 - **UART on the bench unit is read-only** (the host→router serial path is physically dead).
   Do not write to a UART on a board whose wiring you have not verified.
 - **Do not flash a WR3000 v1 / MediaTek image** to this board; it is the HiSilicon luofu v2
@@ -83,7 +91,7 @@ HiSilicon.
 - **Radio regulation:** any experimentation with power tables, calibration values or
   `txpower` must remain inside the regulatory limits of the country of operation. The
   documentation notes where those limits live; it does not authorise exceeding them.
-- **No warranty.** Everything here is host-validated research material provided "as is".
+- **No warranty.** Host-validated engineering plus one attended bench boot, provided "as is".
 
 ## Publication policy
 

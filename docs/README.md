@@ -1,18 +1,18 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at commit
-`9d5005c` (2026-11-18, kernel-patch series `001`-`021`, all 21 patches in the upstream
-review form). The live status of the work is the
-lab notebook's `STATUS.md`; the honest summary of what is host-validated vs
-hardware-unverified is in
-[`../README.md`](../README.md). Read [`PUBLISHING.md`](PUBLISHING.md) for the curation rules,
-the license split and the sanitization performed.
+`12eb48c` (2026-11-19: kernel-patch series `001`-`021`, all 21 patches in the upstream
+review form, plus the first-boot bring-up fixes and the 2026-11-19 attended hardware session).
+The live status of the work is the lab notebook's `STATUS.md`; the honest summary of what is
+host-validated and what the one attended hardware boot did - and did **not** - prove is in
+[`../README.md`](../README.md). Read [`PUBLISHING.md`](PUBLISHING.md) for the curation
+rules, the license split, the sanitization performed and the 2026-11-19 sync.
 
 ## Documents
 
 | File | What it is | Status |
 | --- | --- | --- |
-| [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan — three [U] rows closed by the 2026-11-18 read-only inventory | design proposal (host-validated drafts; not accepted upstream) |
+| [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan — three [U] rows closed by the 2026-11-18 read-only inventory; sections 5.5/5.6 updated by the 2026-11-19 attended boot (first-install path executed; boot-argument question closed) | design proposal (host-validated drafts + one attended boot; not accepted upstream) |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; sections that are superseded are marked as such | phase plan / history |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
 | [SELECTOR-0x21.md](SELECTOR-0x21.md) | reconstruction of the stock A/B boot-selector contract (env `bootflag`, SYSCTRL record cell, the project's `0x21` bench marker) | RE specification, host-only |
@@ -24,7 +24,7 @@ the license split and the sanitization performed.
 | [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md) | analysis of the first attended read-only silicon inventory: live post-overlay DT windows, the queue/flow DDR base, PIE channel/ring state, LSW W1 baseline and qid tables A/B, CRG `clk_summary`, SYSCTRL cells, the 16 expectation-token corrections and what stays [U] | measured record, read-only: 600/600 reads OK, one stock boot, zero writes |
 | [BENCH-READONLY-INVENTORY.md](BENCH-READONLY-INVENTORY.md) | the attended read-only register/table inventory procedure for the stock vendor system: safety contract and gates, static allowlist, evidence format, mock tests, limitations, repeat-run steps | procedure + first run complete (600/600 reads, no writes); repeats need the same attended gates |
 | [REMAINING-DRIVERS.md](REMAINING-DRIVERS.md) | evidence survey and port plan for the drivers still missing (Wi-Fi, switch, PIE, GEMAC data path, PCIe, …) | plan |
-| [SKELETON-SMOKE.md](SKELETON-SMOKE.md) | the full host-validation session log: every build, apply, binding check, image and mocked-test result the project recorded for the target layer, through the 2026-11-18 PIE-datapath (`020`) and LSW-init (`021`) sessions | validation record |
+| [SKELETON-SMOKE.md](SKELETON-SMOKE.md) | the full validation session log: every build, apply, binding check, image and mocked-test result the project recorded for the target layer, through the 2026-11-18 PIE-datapath (`020`) and LSW-init (`021`) sessions, plus the **2026-11-19 attended hardware bring-up** (first boot of our kernel + rootfs to a userspace console; the five fixes) | validation record + boot record |
 | [REVERSAL-REPORT.md](REVERSAL-REPORT.md) | the consolidated bench-reversal report (two tracks: the bench reversal and the upstream preparation) | synthesis, host-only |
 | [PUBLISHING.md](PUBLISHING.md) | what this curated repository contains, what is excluded, history/license/sanitization policy, verification commands | meta |
 
@@ -64,7 +64,10 @@ Additional status pages:
   resolve in the lab notebook's source subtree, not here.
 - `~/openwrt-lab*` paths were the author's host build clones and were sanitized to `~`.
   `build/`, `dumps/`, `firmware/`, `rootfs-*/` are private local evidence and are **not**
-  published in this repository.
+  published in this repository. The 2026-11-19 boot evidence
+  (`build/evidence-firstboot/`: UART logs, `SUCCESS.md`) is the same kind of private lab
+  evidence; the prose record is in [`../README.md`](../README.md) and
+  [SKELETON-SMOKE.md](SKELETON-SMOKE.md).
 - Statements in the copied documents that the old `opensource/` tree is "NOT READY to
   publish" (a vendor-`.o` history purge) describe the **old repository's history**. This
   repository was created fresh and has never contained those objects; see
