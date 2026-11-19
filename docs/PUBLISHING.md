@@ -9,10 +9,12 @@ material was sanitized, and how to verify the publication claims.
 
 - Source tree: the research lab notebook's `opensource/` subtree
   ([cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2) at its `opensource`
-  submodule), **commit `12eb48c`** ("bring-up: first full boot of our kernel+rootfs on
-  WR3000 v2; fix cmdline/padding/XZ", 2026-11-19; kernel-patch series 001-021 and the upstream
-  review form for 001-021, 21 patches validated). It adds the first-boot bring-up machinery on
-  top of the previous curated snapshot at source commit `9d5005c` (2026-11-18).
+  submodule), **commit `8bb7f2e`** ("upstream: finalize 23-patch series validation logs and
+  net staging docs", 2026-11-19; kernel-patch series `001`-`023` and the upstream review form
+  for 001-023, 23 patches validated). It adds the final host-only full-series image work
+  (persistent `rootfs_data` overlay volume, connectivity drafts `022`/`023`) on top of the
+  previous curated snapshots at source commits `12eb48c` (2026-11-19: first-boot bring-up
+  machinery, series 001-021) and `9d5005c` (2026-11-18: 21-patch review form).
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -28,30 +30,36 @@ material was sanitized, and how to verify the publication claims.
   `target-skeleton/...` (in the notebook this tree is `opensource/target-skeleton/`).  The
   generated `series/` patches are byte-identical to the source tree and the validation logs
   are copied verbatim apart from that `sha256sums.txt` comment;
-  (f) the second sync from source commit `12eb48c` (2026-11-19) brings the first-boot
+  (f) the second sync from source commit `12eb48c` (2026-11-19) brought the first-boot
       configuration/image/tools changes, the TARGET-DESIGN/SKELETON-SMOKE/DTS updates and one
       new MIT-licensed host tool (`target-skeleton/tools/ubi-volume-check.py`, SPDX header
       added and usage genericised for this repository);
-  (g) one factual correction in the synced 2026-11-19 session record: the source text said the
-      boot came up with "2 CPUs via the SMP release", but the cited boot log's SMP line
-      reports `Brought up 1 node, 1 CPU`; the curated copy states the measured count, and
-      the same claim should be corrected in the notebook; and
-  (h) a short curated update note at the top of `docs/SKELETON-SMOKE.md` (and an updated
-      curated copy header in `target-skeleton/README.md`) so the 2026-11-18 "nothing has
-      been booted" statements are not read as current after the 2026-11-19 boot.
+  (g) the third sync from source commit `8bb7f2e` (2026-11-19) brings the final full-series
+      state: the persistent `rootfs_data` overlay volume in the image recipe/tool, kernel
+      patches `022`/`023` and the regenerated 23-patch review form, the port-notes overlay/net
+      lane records (converted from incoming-only packages to durable integration records),
+      the TARGET-DESIGN/LSW-SPEC/PIE-DATAPATH/SKELETON-SMOKE updates and the final host-only
+      image facts; the same curation rules as the earlier syncs apply (host paths to `~`, MIT
+      headers for tools, the `target-skeleton/` layout adaptation in the series
+      generator/README/checksums, no incoming/lane-private material); and
+  (h) short curated status notes at the top of `docs/SKELETON-SMOKE.md`, the review-form
+      README and `target-skeleton/README.md` so snapshot-time statements are not read as
+      current. The 2026-11-19 CPU-count correction the curated copy previously carried locally
+      is now in the source tree itself (commit `4030e86`), so this sync has no such
+      divergence.
 
 ## What is included (and why)
 
 | Content | Why it is published |
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
-| `docs/` (14 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report and the 2026-11-19 boot record |
-| `target-skeleton/` | the schematic OpenWrt target, board DTS, 21 kernel patches (001–021), image recipe, base-files and tools — the actual deliverable |
-| `upstream/series-6.18/` | the 21-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`/`021` are carried as do-not-merge drafts |
+| `docs/` (14 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report and the 2026-11-19 boot + host-only full-series rebuild records |
+| `target-skeleton/` | the schematic OpenWrt target, board DTS, 23 kernel patches (001–023), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume), base-files and tools — the actual deliverable |
+| `upstream/series-6.18/` | the 23-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`023` are carried as do-not-merge drafts |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 
-### 2026-11-19 sync and the first hardware result
+### The 2026-11-19 syncs: hardware result and final host-only rebuild
 
 A second curated sync brought this repository to source commit `12eb48c` (2026-11-19):
 
@@ -66,15 +74,41 @@ A second curated sync brought this repository to source commit `12eb48c` (2026-1
 | `docs/SKELETON-SMOKE.md` | 2026-11-19 attended hardware bring-up session added |
 | `README.md`, `NOTICE.md`, `docs/README.md`, this page | milestone status, honest remaining gaps, snapshot pin |
 
-The same sync carries the repository's **only hardware result**: a 6.18.60 kernel + OpenWrt
+That sync carries the repository's **only hardware result**: a 6.18.60 kernel + OpenWrt
 rootfs build booted to a userspace console in an attended bench session on 2026-11-19, behind
 an armed recovery door and with a read-only UART capture. The image running on the unit is the
-debug build; the clean rebuild (sha256 `e893c388...`) was not re-flashed, and there is still
-no network, no persistent overlay and no A/B sysupgrade run. See `README.md`.
+debug build, built from patches `001`-`017`; the clean rebuild (sha256 `e893c388...`) was not
+re-flashed, and there was still no network, no persistent overlay and no A/B sysupgrade run.
+See `README.md`.
 
-The source commit also added one Python bytecode cache
-(`target-skeleton/tools/__pycache__/*.pyc`); this repository's `.gitignore` excludes build
-products and caches, and the curated tree deliberately does not contain it.
+A third curated sync brought this repository to source commit `8bb7f2e` (2026-11-19), the
+final full-series state:
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/target/linux/hisilicon/image/luofu-ubinize.cfg` | second UBI volume `rootfs_data`: dynamic, empty, `vol_size=1MiB`, `vol_flags=autoresize` (the persistent overlay) |
+| `target-skeleton/target/linux/hisilicon/image/luofu.mk` | two-volume rootfs UBI description, `LUOFU_ROOTFS_DATA_VOLUME_NAME` and a fail-closed `/etc/board.d` helper guard |
+| `target-skeleton/tools/luofu-image.py` | v0.2-overlay: two-volume cfg parser/validator (flags, reserved PEBs, empty-overlay enforcement, `vol_size` cross-check, reserve-vs-slot budget) and the `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker |
+| `target-skeleton/target/linux/hisilicon/patches-6.18/022-...`, `023-...` | gated LSW qid-map write path (W3/W4/W5 behind `luofu_lsw.arm`/`qidmap`) and GEMAC netdev readiness |
+| `target-skeleton/dts/luofu-r116.dts`, `.../luofu/config-6.18` | net-lane DTS node/port-number and config provenance updates |
+| `target-skeleton/docs/port-notes/overlay/SUMMARY.md` | **new** durable lane record for the persistent overlay + full-series image rebuild |
+| `target-skeleton/docs/port-notes/net/SUMMARY.md` | connectivity-lane record, converted from an incoming package to a durable integration record |
+| `docs/TARGET-DESIGN.md`, `docs/LSW-SPEC.md`, `docs/PIE-DATAPATH.md`, `docs/SKELETON-SMOKE.md` | overlay design sections 5.1/5.3/5.4/5.5, gated write path, netdev readiness, afternoon rebuild + connectivity session |
+| `upstream/series-6.18/` | regenerated 23-patch review form: `0022`/`0023` messages + patches, updated cover letter/rationale/validation, raw logs re-run (23/23 apply, 0 errors, 56 warnings, 46/46 hashes) |
+| `target-skeleton/README.md`, `README.md`, `NOTICE.md`, `docs/README.md`, this page | status, final image facts, connectivity gate plan, snapshot pin |
+
+The third sync carries the repository's **final host-side artifact**: the full-series `001`-`023`
+sysupgrade image, **6,205,742 B**, sha256 `15dae772...`, with kernel slice `6c99aa3d...` and
+rootfs UBI `81d04951...` carrying the static `squashfs` volume plus the empty dynamic
+`rootfs_data` overlay volume. The container is marked
+`BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED`: the marker records the earlier
+`001`-`017` userspace boot and states that **this exact rebuild was neither flashed nor
+booted**. No network has ever run and no A/B sysupgrade has been executed. See `README.md`.
+
+The intermediate source commit `12eb48c` had also added one Python bytecode cache
+(`target-skeleton/tools/__pycache__/*.pyc`); the source tree dropped it again in `4030e86`,
+this repository's `.gitignore` excludes build products and caches in any case, and the curated
+tree contains no caches.
 
 ## What is excluded (and why)
 
@@ -86,7 +120,7 @@ products and caches, and the curated tree deliberately does not contain it.
 | extracted vendor DTBs/DTBOs and DTS dumps | vendor-derived binary content; our own DTS is included instead |
 | NAND/rootfs/U-Boot dumps, register dumps, `dumps/` | local evidence, large, and partly vendor-derived |
 | build trees, toolchains, kernel/tarball caches, `build/` | build artifacts; reproducible by the reader from the recipe |
-| Python bytecode caches and UART/boot evidence logs | build/evidence artifacts from the lab; the source commit `12eb48c` added a `__pycache__/*.pyc` file that is deliberately not synced, and the 2026-11-19 boot logs stay private lab evidence described only in prose |
+| Python bytecode caches and UART/boot evidence logs | build/evidence artifacts from the lab; the intermediate source commit `12eb48c` had a `__pycache__/*.pyc` file that is deliberately not synced (the source tree removed it in `4030e86`), and the 2026-11-19 boot/rebuild logs stay private lab evidence described only in prose |
 | per-unit identifiers (MAC/serial/PIN/efuse/`secret`/UUID values) | privacy and responsible disclosure; the docs name the offset instead of printing the value |
 | credentials, keys, tokens, Lab/bench secrets | never published (and never committed to the source tree either) |
 | the `lab/` programs and vendor-module analysis fixtures | out of scope for the OpenWrt port repo; the relevant specifications are in `docs/` |
@@ -127,7 +161,7 @@ gh api repos/ShibbityShwab/cudy-wr3000v2-openwrt --jq '{private, default_branch,
 | --- | --- |
 | Documentation (`README.md`, `NOTICE.md`, `docs/`, `target-skeleton/README.md`, `target-skeleton/docs/`) | **MIT** (`LICENSE-MIT`) |
 | Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | **MIT** (`LICENSE-MIT`; SPDX `MIT` header in each file) |
-| Kernel code: patches 001–021, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
+| Kernel code: patches 001–023, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
 
 The GPL-2.0-only choice is deliberate provenance: the drivers were derived by documenting the
 interface of the vendor's GPL-declared binaries (see [NOTICE.md](../NOTICE.md)). The MIT/GPL
@@ -156,9 +190,10 @@ tree.
 
 ## Documentation status and link conventions
 
-The copied documents are **snapshots** written inside the lab notebook on 2026-11-18 (with the
-2026-11-19 attended bring-up session appended to `SKELETON-SMOKE.md` and `TARGET-DESIGN.md`
-5.5/5.6 updated in the second sync). Some of
+The copied documents are **snapshots** written inside the lab notebook between 2026-11-18 and
+2026-11-19 (with the attended bring-up session, the host-only full-series rebuild and the
+connectivity session appended to `SKELETON-SMOKE.md` in the second and third syncs, and
+TARGET-DESIGN.md sections 5.1/5.3/5.5/5.6 updated). Some of
 them describe the *old* `opensource/` repository as "not publishable" because ten vendor
 `.o` files were removed from its HEAD but remained in its history. **That statement does not
 apply to this repository**, which never had that history. Where a document says "publication
@@ -197,8 +232,9 @@ and it will be removed promptly; corrections are welcome.
 
 ## Scope reminder
 
-One attended bench bring-up (2026-11-19) booted a build of this tree to a userspace console;
-that is the only hardware result and it is not an install or recovery procedure. The clean
-rebuild was not re-flashed, so the repository remains curated research material, not a firmware
-release; see the safety and legal section of [`../README.md`](../README.md) and
-[`../NOTICE.md`](../NOTICE.md).
+One attended bench bring-up (2026-11-19) booted a build of this tree (patches `001`-`017`) to
+a userspace console; that is the only hardware result and it is not an install or recovery
+procedure. The later host-only full-series rebuild (persistent `rootfs_data` overlay volume and
+the connectivity drafts) was never flashed or booted either, so the repository remains curated
+research material, not a firmware release; see the safety and legal section of
+[`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).

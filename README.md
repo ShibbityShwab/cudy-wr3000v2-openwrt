@@ -1,25 +1,30 @@
 # cudy-wr3000v2-openwrt
 
-> **One attended hardware bring-up on top of host-validated engineering.** On **2026-11-19** a
-> `linux-6.18.60` kernel built from this target tree and an OpenWrt rootfs built from this
-> image recipe booted to a userspace console on the WR3000 v2, in an **attended bench
-> bring-up** (recovery door armed, UART captured read-only). That is the only hardware result
-> in this repository, and it is **not a release**: there is still **no network** and **no
-> persistent overlay**, the image running on the unit is the debug build, and the clean
-> production image was **rebuilt but not re-flashed**. Everything else here is host-validated
-> only; the sysupgrade container is still deliberately marked `NOT FLASHABLE`; and this
-> repository contains **no flashing or recovery instructions**. Milestone detail:
-> [below](#2026-11-19-hardware-milestone-first-boot-to-userspace).
+> **One attended hardware bring-up plus one host-only full-series image rebuild, on top of
+> host-validated engineering.** On **2026-11-19** a `linux-6.18.60` kernel built from this
+> target tree and an OpenWrt rootfs built from this image recipe booted to a userspace console
+> on the WR3000 v2, in an **attended bench bring-up** (recovery door armed, UART captured
+> read-only). That is the only hardware result in this repository, and it is **not a release**:
+> the booted image was built from patches `001`-`017` only (UP, 1 CPU), it had **no network**
+> and **no persistent overlay**, and it is not re-flashed. A later **host-only rebuild** from
+> the full series `001`-`023` adds the persistent `rootfs_data` overlay volume and the
+> connectivity draft drivers, and is deliberately marked
+> `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` - **it has never been flashed or
+> booted**. Everything else here is host-validated only, and this repository contains **no
+> flashing or recovery instructions**. Milestones:
+> [the boot](#2026-11-19-hardware-milestone-first-boot-to-userspace) and
+> [the final image](#final-full-series-image-host-only-rebuild-not-flashed).
 
 An upstream-style **OpenWrt / Linux bring-up for the Cudy WR3000 v2.0** - a HiSilicon
 **Hi5671Y "luofu"** (board R116) router that ships a vendor OpenWrt 22.03.6 / Linux 5.10.201
 image. The goal is a mainline OpenWrt target, device tree and driver set for this board.
 
 This curated repository collects the parts of the research that are **safe and useful to
-publish**: a Linux 6.18 kernel patch series (all 21 patches in the upstream review form;
-19 merge-intent patches plus two fail-closed data-path drafts marked do-not-merge), an OpenWrt
-target skeleton and board DTS, an image/install recipe, reverse-engineering specifications
-and measured read-only silicon inventory, and an honest status report.
+publish**: a Linux 6.18 kernel patch series (all 23 patches in the upstream review form;
+19 merge-intent patches plus four fail-closed data-path drafts marked do-not-merge), an OpenWrt
+target skeleton and board DTS, an image/install recipe (with the standard squashfs +
+`rootfs_data` overlay UBI layout), reverse-engineering specifications and measured read-only
+silicon inventory, and an honest status report.
 It is a curated snapshot of the lab notebook
 [**cudy-wr3000v2**](https://github.com/ShibbityShwab/cudy-wr3000v2) with fresh git history; the
 security findings from the same research live in the separate
@@ -38,11 +43,11 @@ reverse-engineered code.
 | Area | Host-validated (evidence in this repository) | Hardware status |
 | --- | --- | --- |
 | Target/subtarget metadata | `make defconfig` + `make target/linux/prepare` RC=0 on `openwrt main` `27663a0` (linux-6.18.60); generated `CONFIG_TARGET_hisilicon_luofu_DEVICE_cudy_wr3000-v2=y` | the target tree built the kernel and machine DTB used by the 2026-11-19 boot (U-Boot `Image Name: Linux-6.18.60`; boot log machine model `Cudy WR3000 v2.0 (HiSilicon luofu R116)`) |
-| Kernel series (patches 001-021) | **21/21** apply in order to pristine linux-6.18.60 with `patch(1)` (82 file-patch events, 0 failed hunks, 0 rejects, 0 fuzz, 3 apply offsets) **and with `git am`** (identical trees, clean work tree); the review form carries all 21 patches and keeps checkpatch 0 errors / 53 warnings (6 strict CHECKs), enumerated in [04-validation.md](upstream/series-6.18/04-validation.md); the two draft follow-ups 020/021 are marked do-not-merge | a 6.18.60 kernel built in this target tree booted to userspace on 2026-11-19. The running build is the debug-CRC build used to localise the XZ failure; the clean post-bring-up rebuild was not booted |
-| Kernel compile | full `linux-6.18.60` compile of the 001-021 series RC=0 under `CONFIG_WERROR=y`, 0 warnings / 0 errors; zImage 3,279,096 B (`96b927d3...`); load/entry `0x80608000` unchanged (`_text = 0xc0608000`) | the 2026-11-19 boot loaded our kernel at `0x80608000`; the recorded 001-021 zImage (`96b927d3...`) was not the booted artifact |
+| Kernel series (patches 001-023) | **23/23** apply in order to pristine linux-6.18.60 with `patch(1)` (90 file-patch events, 0 failed hunks, 0 rejects, 0 fuzz, 3 apply offsets) **and with `git am`** (identical trees, clean work tree); the review form carries all 23 patches and keeps checkpatch 0 errors / 56 warnings (6 strict CHECKs), enumerated in [04-validation.md](upstream/series-6.18/04-validation.md); the four draft follow-ups 020-023 are marked do-not-merge | a 6.18.60 kernel built in this target tree booted to userspace on 2026-11-19, but that image was built from patches **001-017** only; the full-series `001-023` rebuild has never been booted |
+| Kernel compile | full `linux-6.18.60` compile of the 001-023 series RC=0 under `CONFIG_WERROR=y`, 0 warnings / 0 errors; zImage 3,281,376 B (`5903db04...`); load/entry `0x80608000` unchanged (`_text = 0xc0608000`) | the 2026-11-19 boot loaded our kernel at `0x80608000`, but it was built from patches 001-017; the recorded 001-023 compile has never run on hardware |
 | Board DTS | compiles with the kernel's own dtc (1.7.2), zero warnings; every new YAML binding passes `dt_binding_check` | a DTB compiled from this DTS was applied by the loader and used by the 2026-11-19 boot (machine model matches); full `dtbs_check` is **not** clean |
 | FIP trailer generator | reproduces both recorded vendor containers byte-for-byte; fail-closed on every decoded loader check | a FIP kernel slice assembled from our own base DTB + loader-match overlay + uImage was booted from the inactive slot on 2026-11-19; per-slot A/B trailer handling is still [U] |
-| Target image | `make world -j16` RC=0 in an isolated clone; two consecutive builds byte-identical in the first lane; the post-bring-up clean rebuild is 6,185,262 B (sha256 `e893c388...`, `CONFIG_CMDLINE`/`CONFIG_XZ_DEC_ARM` verified, repo tool re-validates it) | a kernel slice + rootfs UBI assembled with this tree's host tooling were written to the inactive pair and booted (2026-11-19 attended). The published sysupgrade container itself was **not** flashed, and the clean rebuild was **not re-flashed** |
+| Target image | `make world -j16` RC=0 in isolated clones; the **final full-series rebuild** (patches 001-023, persistent `rootfs_data` overlay volume) is **6,205,742 B**, sha256 `15dae772...` (kernel slice `6c99aa3d...`, rootfs UBI `81d04951...`; `check-container` PASS, repo tool re-validates it) | a kernel slice + rootfs UBI assembled with this tree's host tooling were written to the inactive pair and booted (2026-11-19 attended) - but that build was patches 001-017. The final 001-023 container is marked `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` and was **not flashed** |
 | A/B install path | `platform_do_upgrade` runs against mocked MTD/sysfs/ubiformat: 94/94 assertions (100/100 with the real built container) | the fail-closed sequence (inactive pair only, read-backs, semantic UBI verify, selector last) was executed **manually** on the unit on 2026-11-19; `platform_do_upgrade` itself still has never run on a device; the loader env re-stamp remains open |
 | Factory-MAC provisioning | bdinfo `+0xde00` derivation + validation: 103/103 mocked assertions | no MAC read from a real unit; no netdev wired (the 2026-11-19 boot had no network) |
 | Silicon inventory 2026-11-18 | first attended **read-only** inventory of the stock vendor boot: **600/600** planned register/table reads OK (476 LSW + 108 PIE + 13 CRG + 3 SYSCTRL), 0 failed batches, boot_id unchanged; live post-overlay DT windows, queue/flow DDR base, PIE ring geometry, LSW W1 baseline + qid maps A/B, CRG `clk_summary` and SYSCTRL cells measured; 16 base-DT expectation tokens corrected | no write, no reboot: one boot, read-only; no traffic/behaviour claim |
@@ -50,10 +55,10 @@ reverse-engineered code.
 | Watchdog, thermal, pinctrl, PCIe, FMC/NAND, restart (005, 006, 010, 011, 012, 013) | compile + binding checks pass; drivers are built-in in the target config | the 2026-11-19 boot registered the FMC/SPI-NAND (ESMT 128 MiB, 17 partitions, UBI rootfs mounted), watchdog, thermal and restart drivers; pinctrl/PCIe were not exercised |
 | SMP bring-up (018) | platsmp draft compiles; vendor release sequence decoded and documented | the 2026-11-19 boot log reports `Brought up 1 node, 1 CPU`, so the CPU1 release path is still unproven on hardware |
 | MDIO + PHY (007, 008) | complete driver ports, compile clean | bus/PHY never enumerated |
-| Ethernet data path (GEMAC/PIE/LSW, 009/015/016/020/021) | patch `020` turns PIE into a draft ring engine (coherent descriptor rings for the measured two active RX/TX channels, recovered channel/IRQ init, NAPI RX path, TX producer, read-back verification) and GEMAC into a phylink/netdev front end; the engine only arms behind the attended `luofu_pie.arm=1` opt-in and refuses before the first register write otherwise. Patch `021` makes the LSW probe read-only: validated DDR windows, powered-state gate, 30-word W1 baseline and a word-for-word qid-map check, no `writel()`, always fails closed | never ran on hardware; **no PIE or switch register has ever been written** |
+| Ethernet data path (GEMAC/PIE/LSW, 009/015/016/020-023) | patch `020` turns PIE into a draft ring engine (coherent descriptor rings for the measured two active RX/TX channels, recovered channel/IRQ init, NAPI RX path, TX producer, read-back verification) and GEMAC into a phylink/netdev front end; patch `021` makes the LSW probe read-only. **Patches 022/023 add the host-only minimum-connectivity gates:** 022 implements the reviewed W3/W4/W5 switch steps behind `luofu_lsw.arm=1` (power/snapshot) and `luofu_lsw.qidmap=1` (qid-map write + readback) with `luofu_switch_ready()`; 023 registers the GEMAC netdevs only when PIE is armed **and** the egress map is ready, fixes phylink to `PHYLINK_NETDEV`, and takes the MAC from the DT with a random fallback. The PIE engine arms only behind `luofu_pie.arm=1` and every driver fails closed by default | never ran on hardware; **no PIE ring has been armed and no LSW register has been written by our kernel**; RX completion decode and PIE TX egress selection remain [U] |
 | A/B boot selector (017) | sysfs contract reconstructed from local evidence; mocked harness; the record cell was read **read-only** in the 2026-11-18 inventory (`0xc08` = `0x10`, pair A, upper 24 bits zero) | the 2026-11-19 handover moved the selector by a **single write from the stock userspace**, and the loader failover then booted slot B; patch 017's own store path still never ran |
 | Wi-Fi (Hi5622V100) | reverse-engineering specification only; no open driver | vendor binary stack; GPL section 3 source request sent 2026-10-01, **no reply held** |
-| **On-device validation** | - | **2026-11-19: one attended bring-up reached a userspace console** (kernel 6.18.60 + our rootfs in slot B); no network, no persistent overlay; the clean image was not re-flashed |
+| **On-device validation** | - | **2026-11-19: one attended bring-up reached a userspace console** (kernel 6.18.60 + our rootfs in slot B, built from patches 001-017); no network, no persistent overlay in that build; the full-series 001-023 image with the overlay volume was rebuilt host-side and **not flashed** |
 
 The one-line summary: the **design/build layer is real and host-validated**, and the first
 hardware milestone now exists - an attended bring-up booted our kernel and our rootfs to a
@@ -104,12 +109,17 @@ now):
 
 **Honest gaps observed during the same boot:**
 
-- **No network.** The LSW/PIE/GEMAC netdevs are not wired yet; the running image is console-only
-  and has no SSH. Re-flashing would need the stock userspace or physical TFTP recovery.
-- **No persistent overlay.** Our image has no `rootfs_data` volume; `mount_root` falls back
-  to a tmpfs overlay. Changes do not survive a reboot.
-- **`/lib/functions/board.sh` is missing** for `board_detect` (logged by preinit); the
-  board/network setup stage is therefore incomplete.
+- **No network.** The LSW/PIE/GEMAC netdevs were not wired yet; the booted image is
+  console-only and has no SSH. Re-flashing would need the stock userspace or physical TFTP
+  recovery. The host-side connectivity gates (patches `022`/`023`) are described
+  [below](#final-full-series-image-host-only-rebuild-not-flashed) and have never run.
+- **No persistent overlay in the booted image.** It had no `rootfs_data` volume, so
+  `mount_root` fell back to a tmpfs overlay. The full-series rebuild adds the standard empty
+  dynamic `rootfs_data` UBI volume (host-validated, never booted).
+- **`/lib/functions/board.sh` was missing** for `board_detect` (logged by preinit): the stale
+  `board.d/02_network` sourced a helper that does not exist in OpenWrt main. The rebuild ships
+  the corrected `board.d` and fails the build if any installed `board.d` sources a missing
+  helper (host-validated, never booted).
 - The loader env re-stamp and the A/B sysupgrade path remain unexercised.
 
 **Artifacts and the "not re-flashed" caveat.** The image running on the unit is the
@@ -126,6 +136,56 @@ published); the session is recorded in
 > This milestone is not an install or recovery procedure. The published image recipe still
 > marks its sysupgrade container `NOT FLASHABLE`, and this repository deliberately contains
 > no flashing instructions.
+
+## Final full-series image (host-only rebuild, NOT flashed)
+
+On the afternoon of 2026-11-19 the image recipe was rebuilt from the **full kernel series
+`001`-`023`**, closing the two boot-gaps the bring-up exposed: the rootfs slot now carries the
+standard OpenWrt **two-volume UBI** - static `squashfs` plus an **empty dynamic `rootfs_data`
+overlay volume** (`vol_size=1MiB`, `vol_flags=autoresize`) that the kernel's first read-write
+UBIFS mount formats, so the next boot gets a persistent overlay instead of the tmpfs fallback -
+and the image recipe fails the build if any installed `/etc/board.d/*` sources a `/lib/...`
+helper that is not in the image (the `board_detect` failure class).
+
+| item | value |
+| --- | --- |
+| sysupgrade image | **6,205,742 B**, sha256 `15dae772984669545f175806cff70216039684e494f6196e0a94b71530026b99` |
+| kernel slice | 3,305,732 B, sha256 `6c99aa3d0c7b4e104c74fef5d14f355e483b90ff0fa91aa9fc2c4f4e10ea95ca`; uImage `Linux-6.18.60`, ih_size 3,293,803, load/ep `0x80608000`; FIP trailer 11,865 B (base DTB 11,571 B; gate `0xd7b7ab1e` at `0x326fde`) |
+| rootfs UBI | 2,883,584 B (22 PEBs), sha256 `81d049511cb1775a1b6efc9fab9182eda86ea8069f45a75580dada9ab8330028`; volume 0 `squashfs` static (used/reserved 20 PEBs), volume 1 `rootfs_data` dynamic, **EMPTY**, 9 reserved PEBs, flags `0x01` (autoresize); 31 of the slot's 185 PEBs reserved, image well under the 24,313,856 B budget |
+| container marker | `STATUS: BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` (the literal `NOT FLASHABLE` substring is kept on purpose: the install/check tooling greps it) |
+| host checks | patch application 23/23 (0 rejects), `make defconfig` + `make world -j16` RC=0 with 0 warnings, `check-container` PASS, negative tests refuse the old/single-volume/pre-filled variants, `test-platform-abinstall.sh --container` 100/100, MAC provisioning 103/103 |
+
+**The caveat is the point.** The marker records that an **earlier build of this recipe**
+(patches `001`-`017`, UP, 1 CPU, no overlay volume) booted to userspace; **this exact rebuild
+was never flashed and never booted.** The next attended boot would be the first test of SMP
+(patch `018`), the clock tree (`019`), the PIE datapath (`020`), the LSW probe and gated
+write path (`021`/`022`), the GEMAC readiness path (`023`) and the persistent overlay as a set.
+
+### Connectivity gate plan (first network bring-up)
+
+No network has ever run. Patches `022`/`023` implement the deterministic host-side half behind
+explicit attended gates, so the first connectivity session is a single-variable sequence with
+the recovery door armed - physical RESET + TFTP remains the only recovery:
+
+| step | boot parameters | what it would exercise / prove |
+| --- | --- | --- |
+| **W3** | `luofu_lsw.arm=1` | the first own-kernel CRG write on the switch block: enable the two gate clocks, release the four resets, re-check the powered state read-only, snapshot the 30 measured words and both qid maps; **no LSW register write** in this step |
+| **W4/W5** | `luofu_lsw.arm=1 luofu_lsw.qidmap=1` | pre-write conformance gate (unpopulated qid-map rows must read zero), program the reviewed W2 set (table A ports 4-12, table B ports 40-43, value `0x100 \| qid`), read every programmed word back and restore on mismatch; `luofu_switch_ready()` only after full verification |
+| **PIE arm** | `luofu_pie.arm=1` + both LSW gates | arms the PIE rings/IRQs; the four GEMAC netdevs then register (eth0-eth3 in DT order; the bench cable is on **eth2**/gmac3) and phylink drives the carrier |
+| **traffic** | + static IP / `udhcpc` on the bench-link host side | expected to expose the remaining gaps: PIE RX completion decode [U], PIE TX descriptor -> egress queue/port selection [U], pinctrl consumer states for MDIO/GEMAC still TODO |
+
+None of those parameters is in the built-in command line, so a normal boot only logs refusals;
+passing them needs a loader-supplied command line or a temporary rebuilt cmdline
+(`CONFIG_CMDLINE_FORCE=y`). The exact expected console lines, the gate-model table and the
+proven/unverified split are in [SKELETON-SMOKE.md](docs/SKELETON-SMOKE.md) and
+[target-skeleton/docs/port-notes/net/SUMMARY.md](target-skeleton/docs/port-notes/net/SUMMARY.md).
+
+**Honest remaining gaps:** no network path has ever executed on hardware; the PIE RX completion
+decode and the TX-to-egress binding are unwritten; the persistent overlay, SMP/CPU1 and patches
+`018`-`023` have never run; `platform_do_upgrade` has still never run on a device and the loader
+env re-stamp is unproven; Wi-Fi is externally blocked (vendor binary; GPL request unanswered);
+the image is not byte-reproducible across kernel rebuilds (UTS banner/build timestamp in the
+zImage); and `platform_check_image` still validates only volume 0 of the rootfs UBI.
 
 ---
 
@@ -148,25 +208,28 @@ describes the MediaTek v1 hardware. This board is the HiSilicon luofu v2 design.
 
 ---
 
-## The Linux 6.18 kernel series (patches 001-021)
+## The Linux 6.18 kernel series (patches 001-023)
 
-The target tree carries the **21-patch** series, and the upstream **review form** now covers
-the same 21 patches. Both copies are included, by design:
+The target tree carries the **23-patch** series, and the upstream **review form** covers the
+same 23 patches. Both copies are included, by design:
 
 - [`target-skeleton/target/linux/hisilicon/patches-6.18/`](target-skeleton/target/linux/hisilicon/patches-6.18/) -
-  all 21 plain diffs that OpenWrt's patch application consumes (this is what the recorded
+  all 23 plain diffs that OpenWrt's patch application consumes (this is what the recorded
   kernel compile evidence used);
-- [`upstream/series-6.18/`](upstream/series-6.18/) - the **review form** of patches 001-021:
+- [`upstream/series-6.18/`](upstream/series-6.18/) - the **review form** of patches 001-023:
   cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, a
   repeatable validation record and raw logs, plus a commit-ready `git am` copy.
   The readable overview is its [README](upstream/series-6.18/README.md).
 
-The review form is not a merge list: `020` (PIE ring engine + GEMAC front end) and `021`
-(read-only LSW baseline probe) are included as **draft / do-not-merge** patches documenting
-the measured-inventory follow-ups. `020` is an arm-gated data-path draft whose engine has
-never run (its RX completion decode is still [U]); `021` is a read-only probe of a block our
-own driver still does not program. Both are host-compiled and never booted; the
-ready-for-review split and the do-not-merge reasoning are in the series
+The review form is not a merge list: `020` (PIE ring engine + GEMAC front end), `021`
+(read-only LSW baseline probe), `022` (gated LSW qid-map write path) and `023` (GEMAC netdev
+readiness) are included as **draft / do-not-merge** patches documenting the measured-inventory
+and connectivity follow-ups. `020` is an arm-gated data-path draft whose engine has never run
+(its RX completion decode is still [U]); `021` is a read-only probe of a block our own driver
+still does not program; `022` implements the first reviewed switch writes behind explicit
+attended gates; `023` makes the GEMAC netdev conditional on both the PIE engine and the
+verified egress map. All four are host-compiled and never booted; the ready-for-review split
+and the do-not-merge reasoning are in the series
 [README](upstream/series-6.18/README.md) and
 [01-commit-messages.md](upstream/series-6.18/01-commit-messages.md).
 
@@ -193,29 +256,31 @@ ready-for-review split and the do-not-merge reasoning are in the series
 | 0019 | clk: hisilicon: add the Luofu CRG clock tree | gate parents on real input clocks; two PLLs + two muxes as **read-only** clocks; seven required input clocks | ready for review |
 | 0020 | net: ethernet: hisilicon: add the Luofu PIE datapath and GEMAC front end | extends `015`'s PIE driver into a draft ring engine (coherent descriptor rings for the measured two active RX/TX channels, recovered v250 channel/IRQ init, mask/unmask + NAPI RX path, TX producer with poll-only completion, read-back verification that tears down on mismatch) and `009`'s GEMAC into a draft phylink/netdev front end; the data path arms only behind the kernel-command-line opt-in `luofu_pie.arm=1` and refuses before the first register write otherwise | review-form draft; do not merge |
 | 0021 | net: ethernet: hisilicon: add the Luofu switch read-only baseline probe | extends `016` to the measured 17-window model (two engine DDR windows validated, never mapped), the CRG powered-state gate (gate word bits + four active-low reset lines), a 30-word W1 register baseline and a word-for-word read-only check of both qid maps; contains no `writel()`, registers no netdev, always fails closed | review-form draft; do not merge |
+| 0022 | net: ethernet: hisilicon: add the gated Luofu LSW write path | extends `021` with the attended W3/W4/W5 steps behind `luofu_lsw.arm`/`luofu_lsw.qidmap`: gate clocks + resets with a read-only snapshot (W3), then a pre-write conformance gate, the reviewed W2 qid-map write set and a full read-back with restore-on-mismatch (W4/W5); adds `luofu-switch.h` with `luofu_switch_probed()`/`luofu_switch_ready()` and the measured hardware port number (`hisilicon,port` 9-12) in the port model; no new Kconfig symbol | review-form draft; do not merge |
+| 0023 | net: ethernet: hisilicon: gate the Luofu GEMAC netdev on the LSW egress map | registers the GEMAC netdev only when `luofu_pie_armed()` **and** `luofu_switch_ready()`; switches phylink to `PHYLINK_NETDEV` so the resolve work drives the carrier; takes the netdev address from the DT MAC properties with a random locally-administered fallback; `LUOFU_GMAC` now depends on `LUOFU_SWITCH`; the only MAC writes remain the measured 1 Gbps link-up/down words | review-form draft; do not merge |
 
 Series facts (all host-only; evidence in [`upstream/series-6.18/validation/`](upstream/series-6.18/validation/)):
 
-- 21/21 apply in order to pristine `linux-6.18.60` with `patch(1)` (82 file-patch events,
+- 23/23 apply in order to pristine `linux-6.18.60` with `patch(1)` (90 file-patch events,
   0 failed hunks, 0 rejects, 0 `.rej`) **and with `git am`** (clean work tree; the two
   resulting trees are identical, 0 rejects, 0 fuzz). Three hunks apply with an offset: the
   pre-existing two in `0008`, plus a 6-line offset for `021` after `020` edits the same
   Kconfig file.
-- `checkpatch.pl --no-tree`: **0 errors, 53 warnings** (default and strict), plus 6 strict
+- `checkpatch.pl --no-tree`: **0 errors, 56 warnings** (default and strict), plus 6 strict
   CHECKs - review items such as binding split, MAINTAINERS entry and line wrapping, not
-  behavioural defects. The 4 new warnings are the expected per-patch review items for
-  `020`/`021` (one MAINTAINERS and one binding-split warning each).
-- `sha256sum -c` on the recorded `validation/sha256sums.txt`: **42/42 OK** (21 series
-  patches + 21 source patches); series `0020` sha256 `5f3e1e52...`, `0021` `7ed09990...`.
-- The final 001-021 series is what the LSW-init lane compiled in an isolated `openwrt main`
-  clone: `make target/linux/prepare` RC=0 and `make target/linux/compile` RC=0 with
-  **0 warnings / 0 errors** under `CONFIG_WERROR=y`; zImage 3,279,096 B, sha256
-  `96b927d35e2e6c6be9980c7683de20c20a288a5df58ddf08ed7fbbe9bb1e92d3`. The earlier
-  19-patch build gave zImage 3,264,560 B, sha256
-  `4456b0ec74533fa26f3a33e3aeec17776006ba251bcca613aeea5e72967d1237`.
+  behavioural defects. The warnings include the expected per-patch review items for the
+  `020`-`023` drafts.
+- `sha256sum -c` on the recorded `validation/sha256sums.txt`: **46/46 OK** (23 series
+  patches + 23 source patches); series `0022` sha256 `955f85ed...`, `0023` `5da6e5fa...`.
+- The final 001-023 series compiled in an isolated `openwrt main` clone: `make
+  target/linux/prepare` RC=0 (23/23 target patches, 1,223 `patching file` lines, no rejects)
+  and `make target/linux/compile V=s -j16` RC=0 with **0 warnings / 0 errors** under
+  `CONFIG_WERROR=y`; zImage 3,281,376 B, sha256
+  `5903db04928e58214a816a5809f186d579857c8e1c5c0e695cc9035bd68e91ca`. The earlier
+  19-patch build gave zImage 3,264,560 B (`4456b0ec...`).
 - **The booted kernel is not this artifact.** The 2026-11-19 bring-up booted a 6.18.60 build
-  of the same target tree (debug-CRC build); the clean rebuild and the review form remain the
-  host-validated artifacts above.
+  of the same target tree built from patches `001`-`017` (debug-CRC build); neither the boot
+  nor the host-only full-series rebuild is the review-form artifact above.
 - **No submission has been made.** The series is a review artifact, not an upstream-accepted
   change. Its "ready-for-review" split and the owner decisions still required (real
   `Signed-off-by` identity, binding split, folding 0014 into 0004, SMP staging) are listed in
@@ -227,14 +292,14 @@ Series facts (all host-only; evidence in [`upstream/series-6.18/validation/`](up
 
 The OpenWrt target lives in [`target-skeleton/`](target-skeleton/); its
 [README](target-skeleton/README.md) is the per-file status page and host-validation record
-(written before the 2026-11-19 boot). The image chain is:
+(through the 2026-11-19 boot and the host-only full-series rebuild). The image chain is:
 
 ```
 target-skeleton/
 |- dts/                     # draft board DTS (luofu-r116.dts) + loader-match overlay (.dtso)
 |- target/linux/hisilicon/  # OpenWrt target: Makefile, Kconfig, subtarget luofu/
 |   |- luofu/               # target.mk, config-5.10, config-6.18, device profile
-|   |- patches-6.18/        # the 21 kernel patches (001-021)
+|   |- patches-6.18/        # the 23 kernel patches (001-023)
 |   |- image/               # image recipe: luofu.mk, ubinize config, Makefile
 |   |- base-files/          # 02_network, platform.sh (sysupgrade), luofu-mac.sh, boot pair recorder
 |- tools/                   # fip-slice.py, luofu-image.py, ubi-volume-check.py, build-kernel-slice.sh, mocked tests
@@ -254,19 +319,24 @@ What the image chain does, and what it is constrained by:
   byte-for-byte. On 2026-11-19 the loader accepted a FIP slice assembled from our own base
   DTB + loader-match overlay + uImage and booted it (the boot log reports our DTS machine
   model); the per-slot A/B trailer question remains [U].
-- **Rootfs** = squashfs in a static UBI volume; the sysupgrade container carries
-  `CONTROL`, `kernel`, `root`, `fip-manifest.txt` and `INSTALL-STATUS.txt`.
-- **Host build result:** a full `make world -j16` in an isolated `openwrt main` clone
-  (commit `27663a0`, linux-6.18.60) completes RC=0. Earlier lanes built 6,185,262 B
-  (`54652e56...`) and 6,175,022 B (`ea143b03...`) containers. The post-bring-up clean
-  rebuild with the five boot fixes is **6,185,262 B, sha256
-  `e893c388e4ab8be61be0f76cd00b003000516005fef3d20bef5b26ecf853c8b5`** (config
-  `CMDLINE`/`XZ_DEC_ARM` verified; `check-container` PASS; not re-flashed). The image
-  that actually booted is the debug-CRC build (`51baf2ac...`).
+- **Rootfs** = squashfs in a static UBI volume **plus an empty dynamic `rootfs_data` UBI
+  volume** (`vol_size=1MiB`, `vol_flags=autoresize`) that the kernel's first read-write
+  UBIFS mount formats into the persistent overlay - the standard OpenWrt squashfs+UBI layout.
+  The sysupgrade container carries `CONTROL`, `kernel`, `root`, `fip-manifest.txt` and an
+  honest `INSTALL-STATUS.txt` marker.
+- **Host build result:** a full `make world -j16` in isolated `openwrt main` clones
+  (commit `27663a0`, linux-6.18.60) completes RC=0. The post-bring-up clean rebuild (patches
+  001-017, five boot fixes) was 6,185,262 B (`e893c388...`). The **final full-series
+  001-023 rebuild** with the persistent overlay volume is **6,205,742 B, sha256
+  `15dae772984669545f175806cff70216039684e494f6196e0a94b71530026b99`** (kernel slice
+  `6c99aa3d...`, rootfs UBI `81d04951...`, `check-container` PASS; **not flashed and not
+  booted**). The image that actually booted is the 001-017 debug-CRC build (`51baf2ac...`).
 
-> **The published container is marked `NOT FLASHABLE` on purpose.** Nothing in this
-> repository is an install or recovery procedure. The 2026-11-19 bring-up was a manual attended
-> bench procedure on the lab unit, not a documented install path. Do not flash the container.
+> **The published container is marked `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED`
+> on purpose.** The marker records that an earlier build of the recipe booted to userspace and
+> that this exact rebuild has not been flashed. Nothing in this repository is an install or
+> recovery procedure; the 2026-11-19 bring-up was a manual attended bench procedure on the lab
+> unit, not a documented install path. Do not flash the container.
 
 ---
 
@@ -320,7 +390,8 @@ not to blur them:
 The docs were written inside a live research notebook; paths like `~/openwrt-lab*` are the
 author's host build clones (sanitized to `~`), and paths under `build/`, `dumps/` and
 `firmware/` are private lab evidence that is **not** published here. The 2026-11-19 boot
-logs (`build/evidence-firstboot/`) are the same kind of private evidence. See
+logs (`build/evidence-firstboot/`) and the afternoon rebuild evidence
+(`build/linux-kbuild/waves/2026-11-19-overlay-image/`) are the same kind of private evidence. See
 [`docs/README.md`](docs/README.md) for the documentation index and the link conventions.
 
 ---
@@ -367,7 +438,9 @@ git rev-list --objects --all | grep -Ei '\.(o|ko|bin|img|dtb|dtbo|elf|ubi|a|so)$
 # 2) both licenses present
 ls LICENSE-MIT LICENSE-GPL-2.0 NOTICE.md
 
-# 3) the kernel patches apply to pristine linux-6.18.60 (needs that tarball)
+# 3) the review-form series is reproducible from the target patches, and those patches
+#    apply to pristine linux-6.18.60 (needs that tarball)
+python3 upstream/series-6.18/tools/gen-series.py --check
 upstream/series-6.18/tools/run-validation.sh /path/to/linux-6.18.60.tar.xz /tmp/luofu-val
 
 # 4) image-artifact validator (on an image built from the recipe; not shipped here)
@@ -384,11 +457,13 @@ history.
 ## Safety and legal
 
 - **This is not a flashing guide and not a release.** One attended bench bring-up booted a
-  build of this tree to a userspace console on the lab unit (2026-11-19); that is not an
-  install or recovery procedure. There is still no network or persistent overlay, and the
-  clean image was not re-flashed. The published container is marked `NOT FLASHABLE`. If you
-  brick a WR3000 v2.0, recovery is physical (power-off + RESET held through the counter +
-  TFTP) and is not covered here.
+  build of this tree to a userspace console on the lab unit (2026-11-19); that build was
+  patches 001-017 and the session is not an install or recovery procedure. No artifact has
+  ever run a network path, the persistent overlay is host-validated only, and the final
+  full-series 001-023 rebuild was not flashed. The published container is marked
+  `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED`. If you brick a WR3000 v2.0,
+  recovery is physical (power-off + RESET held through the counter + TFTP) and is not covered
+  here.
 - **Do not flash a WR3000 v1 / MediaTek image** (or any image) to this board. The board is
   the HiSilicon luofu v2 design; wrong images are unrecoverable without a physical recovery
   session.
@@ -418,14 +493,17 @@ history.
 - Lab notebook / live research record: **[cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2)**
 - Security research (CVE write-ups, affected versions, disclosure status): **[cudy-wr3000v2-cve](https://github.com/ShibbityShwab/cudy-wr3000v2-cve)**
 - This repository is a curated, fresh-history snapshot of the lab notebook's `opensource/`
-  subtree at commit `12eb48c` (2026-11-19: series 001-021 plus the first-boot bring-up fixes),
-  with the publication policy in [`docs/PUBLISHING.md`](docs/PUBLISHING.md) and provenance in
-  [NOTICE.md](NOTICE.md).
+  subtree at commit `8bb7f2e` (2026-11-19: series `001`-`023`, the persistent
+  `rootfs_data` overlay volume, the connectivity drafts `022`/`023` and the final host-only
+  image), with the publication policy in [`docs/PUBLISHING.md`](docs/PUBLISHING.md) and
+  provenance in [NOTICE.md](NOTICE.md).
 
-> **The honest bottom line:** the target, DTS, 21-patch kernel series (all 21 in review form;
-> `020`/`021` are do-not-merge drafts), image recipe and A/B path are real host-validated
+> **The honest bottom line:** the target, DTS, 23-patch kernel series (all 23 in review form;
+> `020`-`023` are do-not-merge drafts), image recipe and A/B path are real host-validated
 > engineering, and on 2026-11-19 an attended bring-up booted our 6.18.60 kernel and our
 > OpenWrt rootfs to a userspace console - console only, with no network and a tmpfs overlay.
-> The remaining gates are the network data path, a persistent overlay, an A/B sysupgrade run,
-> repeated-boot stability and the Wi-Fi source question. Treat it as a well-documented starting
-> point for an upstream port, not as a firmware.
+> A later host-only rebuild from the full series adds the persistent overlay volume and the
+> gated connectivity code, but none of that has run on hardware. The remaining gates are the
+> network data path (RX completion decode + TX egress binding), the overlay/SMP/018-023 set,
+> an A/B sysupgrade run, repeated-boot stability and the Wi-Fi source question. Treat it as a
+> well-documented starting point for an upstream port, not as a firmware.

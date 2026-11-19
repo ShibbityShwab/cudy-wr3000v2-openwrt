@@ -1,30 +1,31 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at commit
-`12eb48c` (2026-11-19: kernel-patch series `001`-`021`, all 21 patches in the upstream
-review form, plus the first-boot bring-up fixes and the 2026-11-19 attended hardware session).
-The live status of the work is the lab notebook's `STATUS.md`; the honest summary of what is
-host-validated and what the one attended hardware boot did - and did **not** - prove is in
-[`../README.md`](../README.md). Read [`PUBLISHING.md`](PUBLISHING.md) for the curation
-rules, the license split, the sanitization performed and the 2026-11-19 sync.
+`8bb7f2e` (2026-11-19: kernel-patch series `001`-`023`, all 23 patches in the upstream review
+form, the persistent `rootfs_data` overlay volume, the connectivity drafts `022`/`023` and the
+final host-only image rebuild, on top of the first-boot bring-up fixes and the 2026-11-19
+attended hardware session). The live status of the work is the lab notebook's `STATUS.md`; the
+honest summary of what is host-validated and what the one attended hardware boot did - and did
+**not** - prove is in [`../README.md`](../README.md). Read [`PUBLISHING.md`](PUBLISHING.md) for
+the curation rules, the license split, the sanitization performed and the 2026-11-19 sync.
 
 ## Documents
 
 | File | What it is | Status |
 | --- | --- | --- |
-| [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan — three [U] rows closed by the 2026-11-18 read-only inventory; sections 5.5/5.6 updated by the 2026-11-19 attended boot (first-install path executed; boot-argument question closed) | design proposal (host-validated drafts + one attended boot; not accepted upstream) |
+| [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan — three [U] rows closed by the 2026-11-18 read-only inventory; sections 5.1/5.3/5.4/5.5/5.6 updated by the 2026-11-19 attended boot and afternoon rebuild (first-install path executed; boot-argument question closed; per-slot empty dynamic `rootfs_data` UBI overlay volume designed) | design proposal (host-validated drafts + one attended boot; not accepted upstream) |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; sections that are superseded are marked as such | phase plan / history |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
 | [SELECTOR-0x21.md](SELECTOR-0x21.md) | reconstruction of the stock A/B boot-selector contract (env `bootflag`, SYSCTRL record cell, the project's `0x21` bench marker) | RE specification, host-only |
 | [TRAILER-FORMAT.md](TRAILER-FORMAT.md) | byte-level format of the FIP trailer the stock loader requires (base DTB, 96-byte descriptor, gate magic, DTBO match rule) — curated copy; canonical copy sits next to the tool | decoded format, structurally validated |
 | [MISC-SOC-BLOCKS.md](MISC-SOC-BLOCKS.md) | RE specification for the misc SoC blocks: factory MAC/efuse, RNG, LED/PMU PWM, CRG clock parents, SYSCTRL/SYSENV — with the 2026-11-18 measured CRG/SYSCTRL corrections | RE specification + measured read-only baseline |
-| [LSW-SPEC.md](LSW-SPEC.md) | the internal LAN switch (LSW) RE specification: layering, register map, port model — with the measured live windows, W1 register baseline, qid maps A/B and the derived D1b W2 write set | RE specification + measured read-only baseline; no driver has written the switch |
-| [PIE-DATAPATH.md](PIE-DATAPATH.md) | the PIE/GEMAC packet data-path RE specification: layering, registers, rings — with the measured live channel/ring state and the token corrections it forced | RE specification + measured read-only baseline; the engine has never been armed by our driver |
+| [LSW-SPEC.md](LSW-SPEC.md) | the internal LAN switch (LSW) RE specification: layering, register map, port model — with the measured live windows, W1 register baseline, qid maps A/B and the derived D1b W2 write set, plus the patch-022 gated W3/W4/W5 write-step design | RE specification + measured read-only baseline; the gated write path is host-compiled only and **no driver has written the switch** |
+| [PIE-DATAPATH.md](PIE-DATAPATH.md) | the PIE/GEMAC packet data-path RE specification: layering, registers, rings — with the measured live channel/ring state and the token corrections it forced, plus the patch-023 netdev readiness contract (PIE armed **and** LSW egress map verified) | RE specification + measured read-only baseline; the engine has never been armed by our driver, and the RX completion decode and TX egress binding are still [U] |
 | [SMP-RE.md](SMP-RE.md) | decoding of the vendor CPU1 release sequence plus the staged SMP bring-up plan and its unmeasured items — the live pen word confirms the decode on the vendor boot | RE specification, CPU1 never released |
 | [INVENTORY-2026-11-18.md](INVENTORY-2026-11-18.md) | analysis of the first attended read-only silicon inventory: live post-overlay DT windows, the queue/flow DDR base, PIE channel/ring state, LSW W1 baseline and qid tables A/B, CRG `clk_summary`, SYSCTRL cells, the 16 expectation-token corrections and what stays [U] | measured record, read-only: 600/600 reads OK, one stock boot, zero writes |
 | [BENCH-READONLY-INVENTORY.md](BENCH-READONLY-INVENTORY.md) | the attended read-only register/table inventory procedure for the stock vendor system: safety contract and gates, static allowlist, evidence format, mock tests, limitations, repeat-run steps | procedure + first run complete (600/600 reads, no writes); repeats need the same attended gates |
 | [REMAINING-DRIVERS.md](REMAINING-DRIVERS.md) | evidence survey and port plan for the drivers still missing (Wi-Fi, switch, PIE, GEMAC data path, PCIe, …) | plan |
-| [SKELETON-SMOKE.md](SKELETON-SMOKE.md) | the full validation session log: every build, apply, binding check, image and mocked-test result the project recorded for the target layer, through the 2026-11-18 PIE-datapath (`020`) and LSW-init (`021`) sessions, plus the **2026-11-19 attended hardware bring-up** (first boot of our kernel + rootfs to a userspace console; the five fixes) | validation record + boot record |
+| [SKELETON-SMOKE.md](SKELETON-SMOKE.md) | the full validation session log: every build, apply, binding check, image and mocked-test result the project recorded for the target layer, through the 2026-11-18 PIE-datapath (`020`) and LSW-init (`021`) sessions, the **2026-11-19 attended hardware bring-up** (first boot of our kernel + rootfs to a userspace console; the five fixes), the **afternoon host-only full-series rebuild** (persistent overlay volume; image facts) and the **connectivity session** (`022`/`023`) | validation record + boot record + host-only rebuild record |
 | [REVERSAL-REPORT.md](REVERSAL-REPORT.md) | the consolidated bench-reversal report (two tracks: the bench reversal and the upstream preparation) | synthesis, host-only |
 | [PUBLISHING.md](PUBLISHING.md) | what this curated repository contains, what is excluded, history/license/sanitization policy, verification commands | meta |
 
@@ -65,8 +66,9 @@ Additional status pages:
 - `~/openwrt-lab*` paths were the author's host build clones and were sanitized to `~`.
   `build/`, `dumps/`, `firmware/`, `rootfs-*/` are private local evidence and are **not**
   published in this repository. The 2026-11-19 boot evidence
-  (`build/evidence-firstboot/`: UART logs, `SUCCESS.md`) is the same kind of private lab
-  evidence; the prose record is in [`../README.md`](../README.md) and
+  (`build/evidence-firstboot/`: UART logs, `SUCCESS.md`) and the afternoon rebuild evidence
+  (`build/linux-kbuild/waves/2026-11-19-overlay-image/`, `.../2026-11-19-net-connect/`) are the
+  same kind of private lab evidence; the prose record is in [`../README.md`](../README.md) and
   [SKELETON-SMOKE.md](SKELETON-SMOKE.md).
 - Statements in the copied documents that the old `opensource/` tree is "NOT READY to
   publish" (a vendor-`.o` history purge) describe the **old repository's history**. This
