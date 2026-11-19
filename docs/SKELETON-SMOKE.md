@@ -23,13 +23,22 @@ products it records are the kernel compile product, a structurally validated ker
 slice and the two driver objects linked into that kernel - no rootfs, no sysupgrade
 container, no install image and no boot.
 
-> **Update 2026-11-19:** later sections of this page record (a) the first **attended hardware
-> boot** of this target - a 6.18.60 kernel + OpenWrt rootfs built from it reached a userspace
-> console on the WR3000 v2 (console only: no network, tmpfs overlay; built from patches
-> `001`-`017`), (b) the **afternoon host-only full-series rebuild** (patches `001`-`023`,
-> persistent `rootfs_data` overlay volume, image hashes; never flashed) and (c) the
-> **connectivity session** behind the `022`/`023` gates. The "nothing has been booted"
-> statements above describe the 2026-11-18 host-only state at the time they were written.
+> **Curated copy and update note (synced 2026-11-19).** This validation log is reproduced from
+> the project's lab notebook at series `001`-`026`. Later sections of this page record (a) the
+> first **attended hardware boot** of this target - a 6.18.60 kernel + OpenWrt rootfs built from
+> it reached a userspace console on the WR3000 v2 (console only: no network, tmpfs overlay;
+> built from patches `001`-`017`), (b) the **afternoon host-only full-series rebuild**
+> (patches `001`-`023`, persistent `rootfs_data` overlay volume, image hashes; never flashed),
+> (c) the **connectivity session** behind the `022`/`023` gates, (d) the **LSW egress** session
+> (patch `025`), (e) the **bdinfo-MAC nvmem** session (patch `026`) and (f) the **PIE
+> completion-decode** session (patch `024`). After this snapshot the notebook rebuilt the final
+> **`001`-`026`** image once more with the shared `hisilicon,port` DTS properties (image
+> 6,205,742 B sha256 `26dde6fe...`; kernel slice 3,307,134 B; rootfs UBI 2,883,584 B with
+> `squashfs` + dynamic `rootfs_data`; harnesses 144/144, 100/100, 103/103 and 82/82;
+> `check-container` PASS; **never flashed or booted**) - that last rebuild is summarised in the
+> top-level [README](../README.md), not in this snapshot's session log. The "nothing has been
+> booted" statements above describe the 2026-11-18 host-only state at the time they were written.
+> Absolute host paths were sanitized to `~`.
 
 ## Environment
 
@@ -3097,7 +3106,9 @@ set, plus the GEMAC/PIE netdev readiness contract, so an attended boot can reach
     link would have looked dead to userspace (ETHERNET-BRINGUP-FRAMING.md section 2 species B);
   - netdev address from `of_get_mac_address()` (standard `mac-address`/`local-mac-address`/nvmem
     properties) with a logged random locally-administered fallback; the bdinfo factory MAC has no
-    nvmem representation yet, so a DHCP test sets it from userspace (attended step);
+    nvmem representation yet at this point - **superseded later the same day by the
+    bdinfo-MAC-nvmem session, which wires it as an nvmem cell; see the last session record** - so
+    a DHCP test sets it from userspace (attended step);
   - link-up log line with interface/speed/duplex; the only MAC register writes remain the measured
     1 Gbps link-up/link-down words.
 - **shared.patch** (this directory): board DTS enables the `lsw`, `pie` and `gmac1`-`gmac4` nodes
@@ -3210,3 +3221,383 @@ Not proven / unattended-untested:
 `07-dt-validate.out`, `08-config-idempotence.log` + regenerated configs/symbol lists,
 `09-pristine-apply.log` + patch hashes, `10-static-checks.log`, `11-checkpatch-final.log`,
 `base-shared/` + `base-kernel/` snapshots (sha256), `patches-new/` and `shared-work/`.
+
+
+---
+
+## 2026-11-19 (LSW egress session): R1/R3/R5 probe-configuration write stage (patch 025)
+
+Host-only session (no SSH/telnet/TFTP/UART/flash; the router was not touched). It decodes the
+switch egress path needed for TX frames one level further and implements the R1/R3/R5
+probe-configuration write set as a third attended gate. **Nothing in this section has executed on
+the board; the image has not been rebuilt from 025 and no register has been written.**
+
+### What was added
+
+- `luofu-switch.c` / `luofu-switch-regs.h` (patch 025): the attended W4 stage,
+  `luofu_lsw.egress=1` (requires `luofu_lsw.arm=1`). It snapshots the R1/R3/R5 target words,
+  refuses before the first write unless the EQM indirect interface is idle, every target word
+  reads stable across two samples, and `fam+0x504` low14 equals the computed cell count
+  `(queue_size / cell_size) & ~7` (= 0x2000 on this board); it then programs the nine dp/ips/eqm
+  words in the vendor order, reads every one back against a value computed from the pre-write
+  snapshot, restores the found state on the first mismatch (also in `remove()`), and leaves
+  `luofu_switch_ready()` false until **both** this stage and the qid map are verified. R4/`fam`
+  is read-only; the EQM queue tables remain excluded (contents [U]).
+- The decoding added to `LSW-SPEC.md`: the R1/R3/R5 derivations (7.7), the EQM indirect
+  command word (7.5), the `port_bitmap` u64 cell-order decode (6.3; the queue-allocation port
+  bitmap {4..12, 32, 40..43}, which reproduces the measured qid map) and the TX-frame egress
+  split (7.8): per frame the vendor writes no LSW register; the 32-byte PIE descriptor carries
+  the port/vport word pair plus a per-port queue handle that is zero in this build; the
+  qid-to-egress EQM tables are programmed at init and their contents are still [U].
+
+### Gate matrix after patch 025 (all paths fail closed)
+
+| boot parameters | LSW driver (021/022/025) | GEMAC netdevs (023) |
+| --- | --- | --- |
+| none (normal boot) | read-only baseline validate + refuse, no write | no netdev |
+| `luofu_lsw.arm=1` | W3: power, verify powered state, snapshot, refuse; no LSW register write | no netdev |
+| `luofu_lsw.arm=1 luofu_lsw.egress=1` | W3 + W4: conformance, R1/R3/R5 write + readback; then qid map absent -> restore found state, power down, refuse | no netdev |
+| `luofu_lsw.arm=1 luofu_lsw.qidmap=1` | W3 + W5 qid map; then the probe config is missing -> restore, power down, refuse (new in 025) | no netdev |
+| `luofu_lsw.arm=1 luofu_lsw.egress=1 luofu_lsw.qidmap=1` | W3 + W4 + W5, both verified -> `luofu_switch_ready()` true | requires `luofu_pie.arm=1` too |
+| `luofu_lsw.egress=1` or `qidmap=1` without `arm=1` | explicit `-EINVAL` refusal (new in 025) | no netdev |
+
+### Attended test sequence (recovery card armed; one variable per boot)
+
+1. **W3 only (unchanged from the connectivity session):** boot with `luofu_lsw.arm=1`.
+   Expect the ATTENDED WRITE PATH warning, the powered-state line, 30 `W3 snapshot:` lines,
+   the qid-table non-zero counts, then the refusal line. No LSW register is written.
+2. **W4 only:** boot with `luofu_lsw.arm=1 luofu_lsw.egress=1` (PIE and qidmap gates off).
+   Expect first the W3 output, then
+   `luofu_lsw.egress=1: programming the R1/R3/R5 probe configuration (W4) with pre-write
+   conformance and readback verification`, then either
+   `W4 probe configuration programmed and verified: dp+0x1c=0x18000 dp+0x64=0x1 eqm+0x18=0x80001cc0
+   eqm+0x38=0x7f0 eqm+0x40=0x80000000 eqm+0xa4=0x1fc0 ips+0x08=0x2a ips+0x10=0x... (fam+0x504=0x2000
+   read-only)` followed by the qid-map-absent refusal and the power-down, **or** a
+   `fam+0x504 low14 reads ... but ... derived against the computed cell count 0x2000` refusal.
+   The second case means the loader did not leave the block in the measured state: that is the
+   useful evidence of the boot - stop there, record the value, do not force the gate.
+   Also capture: `dmesg | grep luofu-switch`, the W3 snapshot lines, and that the console/CPU
+   survived the write. Power-cycle between W4 variants.
+3. **W4 + W5:** boot with `luofu_lsw.arm=1 luofu_lsw.egress=1 luofu_lsw.qidmap=1`. Expect the
+   W4 success line, then `luofu_lsw.qidmap=1: ...`, the qid-map conformance pass, the
+   `W2 qid map programmed and verified ...` line and
+   `connectivity path armed: R1/R3/R5 probe configuration and the W2 qid maps are programmed and
+   verified; the GEMAC netdev front end may register`. Only this combination reaches READY.
+4. **Data path attempt:** add `luofu_pie.arm=1`. Expect the PIE arm logs and four GEMAC netdev
+   registrations (eth0..eth3 in DT order; the bench cable is eth2 by the measured MAC<->PHY
+   mapping). Bring the link up, then test `/sys/class/net/eth2/carrier`, `ethtool eth2`, static
+   address + ARP/ping between two wired ports. **Expected open failure:** no frame forwards until
+   the EQM queue tables (row E1) and the per-frame TX egress selection are solved; the test
+   records where it stops (netdev up? carrier? TX doorbell? no RX?). Do not treat a registered
+   netdev as proof of forwarding.
+5. Rollback is the physical RESET+TFTP card; the driver also restores the found words and powers
+   the block down on every refusal path, but that is not a substitute for the recovery card.
+
+### What this proves and what it does not
+
+Proven (host-side): the 001-025 chain (25 patches; `024` from the PIE lane, sha256 recorded at
+validation time) applies to pristine 6.18.60 (25/25, 0 rejects), the full kernel compiles with
+WERROR and no warnings from the changed files, `W=1` is clean for them, and patch 025 passes
+checkpatch with 0 errors (one commit-message style note, as every pure-diff patch in this
+series). Patch 025 is file-disjoint from 024. The pre-write conformance/readback/restore logic and the gate composition are code
+and can be reviewed; the R1/R3/R5 expectations are the measured 2026-11-18 values.
+
+Not proven: that the write set does what the vendor expects (no hardware run), that the block
+survives it, that a TX frame reaches a MAC port, and what the per-frame egress selection is.
+The EQM queue tables that the vendor programs at init (tables 16/32/34/35/37/38, table 19) are
+still [U] and are not written by any patch; a registered netdev after the attended run must not
+be read as a working link.
+
+### Evidence (local-only, gitignored)
+
+`build/linux-kbuild/waves/2026-11-19-lsw-egress/`: `work/` (patch sources and base snapshots),
+`validation/series-tree-final` (pristine 6.18.60 + 001-025), `validation/compile-tree` (isolated
+copy of the compiled OpenWrt kernel build dir + patch 025), and `validation/logs/` with the
+series apply log, `40-checkpatch-025.log` and `61-compile-vmlinux-final.log`. The annotated
+vendor disassembly and the decode notes are in `hi_lsw_dp.annotated.dis`, `hi_kpie.annotated.dis`
+and `notes/`.
+## 2026-11-19 (bdinfo-MAC-nvmem session): factory MAC exposed to the kernel netdev layer
+
+**Status: HOST-ONLY. The board DTS now exposes the plaintext `bdinfo+0xde00` factory MAC as an
+MTD nvmem cell and the GEMAC driver consumes it; the LAN/WAN interface map is implemented behind
+a netdev-presence guard. NOTHING HAS BOOTED and no MTD nvmem read has run on hardware.**
+
+### What changed
+
+- **Board DTS** (`target-skeleton/dts/luofu-r116.dts`, a direct lane write; it is not in
+  `shared.patch`): the `bdinfo` partition gains `read-only;` and a `nvmem-layout` child
+  (`compatible = "fixed-layout"`) holding one `mac-base` cell `mac@de00 { reg = <0xde00 0x6>;
+  #nvmem-cell-cells = <1>; }` - the plaintext factory MAC from MISC-SOC-BLOCKS.md section 1.1.
+  The four live GEMAC nodes consume it with `nvmem-cells = <&bdinfo_mac N>` +
+  `nvmem-cell-names = "mac-address"`: gmac1..gmac3 (LAN) use N=0, gmac4 (WAN) uses N=1 - the
+  vendor userspace rule LAN = base, WAN = base+1 (rootfs-2.4.15/etc/board.d/02_network:25-29).
+  A long comment in the DTS records the per-port-offset plan and the LSW port correlation
+  (gmac1..4 = switch MAC ports 9..12; LSW-SPEC.md 6.1).
+- **Patch 026** (`026-net-gmac-bdinfo-mac-nvmem.patch`, new): the MAC source is read before the
+  netdev is allocated; `-EPROBE_DEFER` from a not-yet-registered nvmem provider now defers the
+  GEMAC probe (fail-closed, no random identity invented), every other error keeps the logged
+  random locally-administered fallback, and the driver installs the standard
+  `ndo_set_mac_address = eth_mac_addr` / `ndo_validate_addr = eth_validate_addr` callbacks so
+  the existing userspace provisioner can still apply addresses through netifd. No register
+  write, no MTD write, no new write path.
+- **Base-files**: new `lib/functions/luofu-netdev.sh` records the vendor LAN/WAN interface map
+  (WAN = eth3, LAN = eth2 eth1 eth0) **only when the four expected GEMAC netdevs exist**, with a
+  tested placeholder path that logs the missing devices and invents no netifd config; it carries
+  the `TODO(netdevs)` for making the map unconditional once the netdevs stop being
+  attended-gated. `etc/board.d/02_network` calls it before the unchanged factory-MAC
+  provisioning (`luofu-mac.sh` still sourced, still called).
+- **Host test** `tools/test-mac-nvmem.sh` (new, 96 assertions): board.d/helper/patch wiring
+  statics, a synthetic `bdinfo` image read exactly like `mtd_nvmem_reg_read()` (decoys outside
+  `+0xde00`, erased/all-zero fail-safe cases, kernel 48-bit vs userspace 24-bit add wrap,
+  per-node offsets parsed from the DTS), cpp+dtc compile + decompiled-DTB phandle checks
+  (`--kernel <tree>`), and mocked `/sys/class/net` interface-map scenarios; it also re-runs the
+  pre-existing 103-assertion provisioner test.
+
+### Why no target-local nvmem driver
+
+- Vanilla 6.18.60 already registers an nvmem provider for **every** MTD device/partition
+  (`mtd_nvmem_add()` in `drivers/mtd/mtdcore.c`: `config.reg_read = mtd_nvmem_reg_read` ->
+  `mtd_read()`, `config.read_only = true`, `config.root_only = true`), parses the
+  `nvmem-layout` container and resolves `#nvmem-cell-cells` arguments
+  (`of_nvmem_cell_get()` in `drivers/nvmem/core.c`). The MTD partition gets its OF node from
+  the partition parser (`mtdpart.c: child->dev.of_node = part->of_node`); `read-only` on the
+  partition clears `MTD_WRITEABLE` (`partitions/ofpart_core.c`).
+- The `mac-base` cell post-processing (`nvmem_layout_parse_mac_base()`, raw read ->
+  `eth_addr_add()`) is **not** in vanilla 6.18.60: it arrives through OpenWrt's generic carried
+  backports of upstream commits, `target/linux/generic/pending-6.18/
+  804-nvmem-core-support-mac-base-fixed-layout-cells.patch` and
+  `809-01-nvmem-core-generalize-mac-base-cells-handling.patch`. Without them the cell would
+  read raw bytes and the WAN +1 offset would not be applied - a stated dependency.
+- Consumer path: `of_get_mac_address()` (`net/core/of_net.c`) -> `of_get_mac_address_nvmem()`
+  -> `of_nvmem_cell_get(np, "mac-address")`; `nvmem_get_mac_address()`
+  (`net/ethernet/eth.c`) requires exactly 6 bytes and `is_valid_ether_addr()`. Kernel
+  `eth_addr_add()` is a 48-bit add; the userspace `macaddr_add()` masks to the low 24 bits.
+  The two agree for every base the provisioner accepts (it rejects `...:ff:ff:ff`, the only
+  divergent case). If the nvmem provider is not registered yet, nvmem core returns
+  `-EPROBE_DEFER` (`drivers/nvmem/core.c`), which patch 026 now honours.
+- Read-only is therefore enforced twice (mtdcore's nvmem `read_only`/`root_only` config plus the
+  partition flag) and the failure modes are fail-safe: DTB without the partition -> phandle
+  unresolved -> `-ENOENT` -> GEMAC random fallback; provider late -> `-EPROBE_DEFER` -> probe
+  deferred (no invented identity); erased/zero/invalid bytes -> `is_valid_ether_addr()` rejects
+  -> random fallback; userspace bdinfo read failure -> the existing logged random pair.
+
+### Validation (isolated clone `~/openwrt-lab-macnvmem`; no device)
+
+- **Pristine apply order:** the **final series 001-026** (024/025 landed from their lanes
+  during this session) applies in numeric order to pristine `linux-6.18.60` with
+  `patch -p1 -N`: **26 patches, 100 files patched, 0 failed hunks, 0 `.rej`/`.orig`,
+  RC=0**. (An earlier run of 001-023+026 and one of 001-023+025+026 were also clean; 026's
+  context survives 024's edits to `luofu-gmac.c`/its YAML.)
+- **OpenWrt pipeline (this lane's series, 001-023+026):** `make target/linux/prepare`
+  **RC=0** (1,225 `patching file` lines, patch 026 applied; the one `Kconfig.orig` is GNU
+  patch's default backup for patch 021's known 6-line-offset hunk, not a reject);
+  `make target/linux/compile V=s -j16` **RC=0, 0 errors, 0 compiler warnings under
+  `CONFIG_WERROR=y`** (1,418 s wall, full rebuild from the pristine tarball); zImage
+  **3,281,744 B**, sha256
+  `8443c8c0c41a31a335188e1e547d6f82f5d33b61d945b4bd770d315eeac83f81`; the built `.config`
+  has `CONFIG_WERROR=y`, `CONFIG_MTD=y`, `CONFIG_NVMEM=y`, `CONFIG_NVMEM_LAYOUTS=y`.
+- **Full final series 001-026:** `make target/linux/prepare` **RC=0** (1,233 `patching file`
+  lines, 0 rejected hunks, 0 `.rej`); the compile then **fails in patch 024** at
+  `drivers/net/ethernet/hisilicon/luofu-pie.c:1060`: `error: 'GRO_DROP' undeclared` (that
+  identifier does not exist in 6.18) - a pie-decode-lane defect, not this lane's. Everything
+  else up to that point compiled cleanly, including `luofu-gmac.o` (024+026 combined) and
+  `luofu-switch.o` (025); a targeted rebuild of `luofu-gmac.o` in the final prepared tree is
+  RC=0. **The 001-026 image build must wait for the pie-decode lane to fix `luofu-pie.c`.**
+- **Patch 026 context refresh:** after 024 landed, 026's original hunks applied with offsets and
+  one fuzz-2 hunk. 026 was therefore re-diffed against the post-024 tree: applying 001-025 then
+  the refreshed 026 is a **clean apply with no fuzz/offset**, and the resulting
+  `luofu-gmac.c`/`hisilicon,luofu-gmac.yaml` are **byte-identical** to the content the
+  001-023+026 full build compiled (`cmp`).
+- **Binding:** `dt_binding_check` RC=0 for the changed
+  `hisilicon,luofu-gmac.yaml` (example compiled; optional `yamllint` unavailable - same
+  limitation as every previous session; one pre-existing unrelated realtek YAML warning).
+- **Board DTS:** the patched kernel's own dtc compiles it with **zero warnings**
+  (**11,996 B**, sha256 `e9c1649f...`; baseline before this session was 11,571 B /
+  `7fd33522...`); `dt-validate` returns RC=0 with the same **5 pre-existing diagnostics**
+  (two SP804 timer properties, two UART clock-names) and **no diagnostic** for the bdinfo,
+  nvmem-layout, mac-base or GEMAC nodes.
+- **checkpatch:** `--no-tree -f` **0 errors / 0 warnings / 0 checks** on the modified GEMAC
+  driver and its YAML.
+- **Host tests:** `tools/test-mac-nvmem.sh` **96/96 pass** (with the compiled-DTS checks);
+  the pre-existing `tools/test-mac-provisioning.sh` still **103/103 pass**.
+- **Config:** no `config-6.18` change and no new symbol; `CONFIG_NVMEM=y` /
+  `CONFIG_NVMEM_LAYOUTS=y` were already present (the MTD nvmem provider and the fixed-layout
+  container are stock), and the mac-base post-processing is a generic Makefile-carried
+  backport, not a symbol.
+- **Write-set audit:** patch 026 adds no writable nvmem provider, no `mtd_write`/`mtd_erase`
+  path and no MAC register write; the nvmem read path is mainline `mtd_read()` through
+  `mtd_nvmem_reg_read()`.
+
+### What is proven / what is not
+
+**Proven host-only:** the series applies and the full kernel compiles warning-free with the new
+code; the binding and the board DTS validate; the wiring is exactly the documented one
+(read-only bdinfo partition, one 6-byte mac-base cell at +0xde00, LAN offsets 0 and WAN offset
+1), checked statically, on the raw DTS, on the compiled DTB and through a read-path mock; the
+userspace map is guarded and backward compatible; every failure mode of the new path is either
+a logged random fallback or a deferral, never an invented identity.
+
+**Not proven / needs the board [U]:** the MTD nvmem read itself (no boot has ever reached this
+code); whether the FMC/MTD partition appears with the expected `bdinfo` label and size under our
+kernel; the provider-vs-GEMAC probe ordering and therefore whether the `-EPROBE_DEFER` branch is
+taken; that the read bytes are the unit's factory MAC (the 0xde00 layout is from the local dump,
+not from this boot path); the netdev naming order (eth0..eth3); the userspace `macaddr`
+application through `ndo_set_mac_address`; and whether the guarded interface map activates on an
+attended boot - `board.d` runs once per board.json, so a first boot without the gated netdevs
+needs `/etc/board.json` regenerated (and the gated netdevs present) for the map to be recorded.
+
+### Attended boot must test (recovery door armed; physical RESET+TFTP is the only recovery)
+
+1. **Kernel nvmem read:** boot with `luofu_pie.arm=1 luofu_lsw.arm=1 luofu_lsw.qidmap=1` (the
+   four GEMAC netdevs then register). Expect no `no usable MAC address in the devicetree`
+   warning for eth0..eth3; if the warning appears, record its `%pe` reason - `EINVAL` means the
+   cell read 6 bytes but `is_valid_ether_addr()` rejected them (erased/corrupt bdinfo or the
+   mac-base backport missing), `ENOENT` means the phandle/wiring is absent, `EPROBE_DEFER`
+   would have deferred probe instead. Compare `ip link` MACs with the userspace `lan_mac` /
+   `wan_mac` from board.json: LAN must equal the base copy, WAN = base+1.
+2. **Provider ordering:** check dmesg for the deferral message
+   `MAC-address nvmem provider is not ready`; its presence (and later netdev registration)
+   proves the deferred path, its absence proves the provider won the probe race.
+3. **Interface map:** if the board.json from a previous boot is kept, the guarded map is absent;
+   with the gated netdevs present, remove `/etc/board.json` (or force board_detect) and reboot
+   to re-run board.d, then check `/etc/config/network` has the vendor `wan` device `eth3` and
+   the `lan` device list `eth2 eth1 eth0`, and that the lan/wan `macaddr` values are the
+   factory base / base+1.
+4. **Fail-safe:** if any step misbehaves, do not "repair" factory bytes; the driver falls back
+   to a logged random MAC and the userspace helper to a random pair. Record the logs; the
+   bdinfo partition must never be written.
+
+### Evidence (local-only, gitignored)
+
+`build/linux-kbuild/waves/2026-11-19-mac-nvmem/`: `01-dt-binding-check.log`,
+`02-board-dts-baseline.dtb` + `02-board-dts-new.dtb` + dtc stderr, `03-dt-validate-*.out`,
+`04-pristine-apply.log`, `05-checkpatch.log`, `06-test-mac-nvmem.log`,
+`07-test-mac-provisioning.log`, the patch 026 copy, the OpenWrt prepare/compile logs, and
+`EVIDENCE-SHA256SUMS.txt`.
+## 2026-11-19 (PIE completion-decode session): RX completion + normal TX descriptor (patch 024)
+
+**Lane:** task-56, agent `pie-decode`. Host-only: no device, UART, TFTP, flash or bench tool was
+used and nothing was booted. The vendor `hi_kpie.ko` v250 functions were disassembled read-only
+(`hi_pie_rx_get_desc`, `hi_pie_drv_rx_recv`, `hi_net_rx_proc`, `hi_pie_tx_send`,
+`hi_pie_tx_set_desc` + its type-0 helper); no vendor binary is copied. The decode is documented
+in [PIE-DATAPATH.md](PIE-DATAPATH.md) sections 5.2 and 6 and in
+[../target-skeleton/docs/incoming/pie-decode/SUMMARY.md](../target-skeleton/docs/incoming/pie-decode/SUMMARY.md).
+
+### What the patch implements
+
+- **RX**: `luofu_pie_rx_poll` decodes each v250 completion - u16 frame length at +0, 7-bit
+  status/error at +8 (0 = no error), port/vport from the u32 at +16 (or the packed +23/+24 fields
+  for the no-status path), tag class at +10 bits 5:4. Error frames, implausible lengths and
+  unknown ports are dropped and counted; valid frames are unmapped, `skb_put()` to the decoded
+  length, given their protocol via `eth_type_trans()` and delivered with `napi_gro_receive()` to
+  the net_device that registered the completed internal-switch port
+  (`luofu_pie_rx_register()`, called by the GEMAC front end around open/stop with the DT
+  `hisilicon,port` 8..12). The slot is re-armed with a fresh coherent buffer
+  (`size + 128`, then `skb_reserve(128)`, the vendor addbuf shape) and the recovered RX
+  write/"sf" pointer values are written. No checksum or VLAN offload is claimed
+  (`CHECKSUM_NONE`; the in-frame 802.1Q tag is preserved) because the two summary flag classes
+  are recovered as bit positions only.
+- **TX**: the full recovered v250 normal non-TSO descriptor is written (u16 length; valid/normal
+  flags + class selector byte 0x74; DMA address; `port` + `1<<port` tag; type-0 control words
+  0x30/0x20/0x01/0x10) and the doorbell is the masked ring index of the next free descriptor,
+  matching the vendor `(last produced index + 1) & ring mask`. TX completion reclaim uses the
+  ring-index read pointer (poll-only, no TX IRQ). The producer stays one linear descriptor per
+  frame; the vendor fragment/TSO descriptor variants are decoded at branch level only and are not
+  written.
+- **GEMAC**: reads the required `hisilicon,port` (the vendor `port` cell, 8..12), refuses probe
+  without it, forwards transmit tagged with it and registers/unregisters the RX port around
+  `ndo_open/stop`. `luofu_pie.arm=1`, the fail-closed probe, the read-back verification and the
+  halt path are unchanged; nothing outside the existing arm path writes a PIE register.
+
+### Validation (isolated clones, host-only)
+
+- **Pristine apply order:** all **24 patches apply in order** to pristine `linux-6.18.60` with
+  `patch -p1 -N`: **0 failed hunks, 0 `.rej`**; the only `.orig` files are the same three
+  pre-existing fuzzy-offset backups (patches 008/021) that a 001-023 baseline produces.
+- **OpenWrt prepare:** `make target/linux/prepare V=s` **RC=0**, **1,228 `patching file`
+  lines**, patch `024` applied in order after `023`; 0 `.rej` in the extracted tree and the five
+  patched files are byte-identical to the generated sources.
+- **Full kernel compile (001-024):** `make target/linux/compile V=s -j16` **RC=0**, **0 errors /
+  0 compiler warnings** in the whole log under `CONFIG_WERROR=y` (the only "warning" line is the
+  pre-existing OpenWrt "configuration is out of sync" notice, present in every lane log; the 37
+  `WARNING: modpost: missing MODULE_DESCRIPTION()` lines are the pre-existing baseline). zImage
+  **3,281,400 B**, sha256
+  `f4a736cf2e0ed220c7e99fca1590913504395a2001947b66ccc8f1986e788583`; `luofu-pie.o`,
+  `luofu-gmac.o` and both YAMLs are byte-identical to the generated sources.
+- **TEXT_OFFSET contract:** unchanged - `arch/arm/boot/compressed/.head.o.cmd` carries
+  `-DTEXT_OFFSET=0x00608000`; `System.map` has `_text = stext = 0xc0608000`,
+  `swapper_pg_dir = 0xc0604000`; `luofu_pie_rx_register`, `luofu_pie_rx_unregister`,
+  `luofu_pie_xmit`, `luofu_gmac_probe` and `phylink_create` are in `System.map`.
+- **Config:** two consecutive `make kernel_oldconfig` runs are RC=0 and the kernel `.config` is
+  **byte-identical** (sha256 `4a17f17ad6a4e19a06027992c2c3442ec88d2ee2557f739c403f4bb02b4a17b6`);
+  the regenerated target fragment `config-6.18` is sha256
+  `d1af1b2a9411b5529ddef6d5ab1852059aca594eacb5de7f24adb0e35e87665b`, **byte-identical to the
+  001-023 lane's regenerated artifact** - patch 024 adds no Kconfig symbol; the committed
+  hand-maintained `config-6.18` (hash `2982d663...`) is untouched by the patch.
+- **Bindings:** `dt_binding_check` **RC=0** for `hisilicon,luofu-gmac.yaml` (new required
+  `hisilicon,port`) and `hisilicon,luofu-pie.yaml` (description only); the processed schema
+  contains both. The known `yamllint`-missing step is skipped (every previous session has the
+  same limitation).
+- **Board DTS:** the final post-shared.patch board DTS (committed DTS including the parallel 026
+  nvmem nodes + `hisilicon,port` on the five MAC nodes) compiles with the patched kernel's
+  headers/cpp and its own dtc to **12,076 B**, sha256
+  `5386badebc26754e01d5e585bb2632d44583797afc49bcd947f4acb0a35c085b`, **zero cpp and dtc stderr
+  bytes**; `fdtget` reads `hisilicon,port` = 8/9/10/11/12 from the five MAC nodes. `dt-validate`
+  of the final 001-026 tree's processed schema is **RC=0** with only the five pre-existing
+  baseline diagnostics (SP804 timer `compatible` length, two UART `clock-names` on each of two
+  UARTs); **no diagnostic names the PIE or GEMAC nodes**.
+- **Cross-lane 001-026 chain** (patches `024` + the parallel lanes' `025` LSW egress and `026`
+  bdinfo MAC nvmem): all **26 patches apply to pristine 6.18.60 in order with 0 rejected hunks**
+  (`026` still applies on top of the `024` GEMAC edits because the shared header context line was
+  preserved), and the combined prepared tree compiles **RC=0, 0 errors / 0 compiler warnings**
+  with zImage 3,282,656 B sha256
+  `346fb1f629dbd5b59308fb267d090afcf046d3ea26fba81713b2dbc9d1de77bc`. The separate fully-clean
+  `001-026` run in `~/openwrt-lab-pie-decode-full` confirms it from a fresh
+  kernel extraction: `make target/linux/prepare` RC=0 (1,233 `patching file` lines, 0 `.rej`)
+  and `make target/linux/compile` RC=0 with 0 errors / 0 compiler warnings (37 pre-existing
+  modpost warnings), zImage 3,282,528 B sha256
+  `08b7674749a0c155285a89fd35fa2433c2c97ce48ee5a1773cb3541365544c67`, `_text = stext = 0xc0608000`.
+- **`checkpatch.pl --no-tree -f`:** **0 errors / 0 warnings / 0 checks** on the 1,644-line PIE
+  driver, the 35-line PIE header, the 463-line GEMAC driver and both YAMLs (119/130 lines).
+- **Static safety checks:** no forbidden addresses (RC misc `0x10161000`, CA `0x400392f0`, ACP
+  cells), no `devmem`/`/dev/mem`/raw MMIO helpers; every PIE register write is inside the
+  arm-only functions reached after the `luofu_pie_arm_gate` check; the GEMAC writes remain the
+  measured link-up/link-down words.
+
+### What this proves and what it does not
+
+Proven (host-only): the decode is a transcription of the vendor v250 code paths (every cited
+value is read or written by the named function); the series applies/prepares/compiles with
+WERROR and no warnings; the load contract and config are unchanged; bindings and board DTS
+validate; checkpatch is clean; nothing new is reachable without `luofu_pie.arm=1`.
+
+Not proven - **any hardware behaviour**: no PIE register has ever been written from our side; the
+engine has never accepted one of these RX completions or TX descriptors; the completion length,
+status, port fields and the two flag classes have never been observed on a live frame; the
+descriptor port tag and type-0 control words have never been accepted by the engine; the LSW-side
+egress queue handle is still [U]; the RX/TX pointer words are assumed ring indices ([I]); the
+checksum bits remain semantically unknown (`CHECKSUM_NONE` stays); ACP coherency is still
+unsettled. No packet can be claimed to reach a wire. The previous session's statement that the
+attended ping test should "fail until the RX decode is implemented" is now superseded by this
+patch, but the test still has to be run.
+
+### Attended checks needed (recovery armed, UART read-only)
+
+1. Arm `luofu_pie.arm=1` (+ the LSW gates) and confirm the arm log, ring readbacks and no AHB
+   hang.
+2. Send one known frame and capture the RX completion words: length must match, the port must
+   equal the MAC's `hisilicon,port`, and the tag-class bit must track a tagged vs untagged frame.
+   Do not adopt `CHECKSUM_UNNECESSARY` before a known-good/known-bad checksum capture.
+3. Send one frame out and confirm the TX read pointer advances and the switch counters show it on
+   the intended port; then send more than one ring of frames to validate the ring-index wrap and
+   reclaim arithmetic.
+4. Confirm `hisilicon,port` 8..12 maps to the switch port that receives the TX frame and that RX
+   completions report the same port number.
+5. Any wedge: physical RESET+TFTP only; patch 024 adds no reset path.
+
+### Evidence (local-only, gitignored)
+
+The isolated clones `~/openwrt-lab-pie-decode/` and `...-full/`; the shared
+clone and `openwrt-lab-selectorfix-img` were not modified. Disassembly regeneration commands are
+the ones in PIE-DATAPATH.md section 13.2; the full evidence map is
+`target-skeleton/docs/incoming/pie-decode/SUMMARY.md`.
