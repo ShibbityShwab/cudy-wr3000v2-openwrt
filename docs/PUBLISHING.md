@@ -9,12 +9,14 @@ material was sanitized, and how to verify the publication claims.
 
 - Source tree: the research lab notebook's `opensource/` subtree
   ([cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2) at its `opensource`
-  submodule), **commit `8bb7f2e`** ("upstream: finalize 23-patch series validation logs and
-  net staging docs", 2026-11-19; kernel-patch series `001`-`023` and the upstream review form
-  for 001-023, 23 patches validated). It adds the final host-only full-series image work
-  (persistent `rootfs_data` overlay volume, connectivity drafts `022`/`023`) on top of the
-  previous curated snapshots at source commits `12eb48c` (2026-11-19: first-boot bring-up
-  machinery, series 001-021) and `9d5005c` (2026-11-18: 21-patch review form).
+  submodule), **commit `7475fc5`** ("upstream: extend review-form series to 001-026 and
+  revalidate", 2026-11-19; kernel-patch series `001`-`026` and the upstream review form for
+  001-026, 26 patches validated). It adds the final `024`-`026` follow-ups (PIE RX
+  completion/TX descriptor decode, gated LSW W4 egress/init stage, read-only bdinfo-MAC nvmem)
+  on top of the previous curated snapshots at source commits `8bb7f2e` (2026-11-19: 23-patch
+  review form, persistent `rootfs_data` overlay volume, connectivity drafts `022`/`023`),
+  `12eb48c` (2026-11-19: first-boot bring-up machinery, series 001-021) and `9d5005c`
+  (2026-11-18: 21-patch review form).
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -46,7 +48,20 @@ material was sanitized, and how to verify the publication claims.
       README and `target-skeleton/README.md` so snapshot-time statements are not read as
       current. The 2026-11-19 CPU-count correction the curated copy previously carried locally
       is now in the source tree itself (commit `4030e86`), so this sync has no such
-      divergence.
+      divergence;
+  (i) the fourth sync from source commit `7475fc5` (2026-11-19) brings the final review-form
+      state: kernel patches `024` (PIE RX completion + normal non-TSO TX descriptor decode and
+      delivery), `025` (gated LSW W4 R1/R3/R5 egress/init write stage) and `026` (read-only
+      bdinfo-MAC MTD nvmem source + guarded LAN/WAN board.d map), the corresponding board DTS
+      `hisilicon,port`/nvmem wiring, `luofu-netdev.sh`, `test-mac-nvmem.sh`, the
+      LSW-SPEC/PIE-DATAPATH/MISC-SOC-BLOCKS/TARGET-DESIGN/SKELETON-SMOKE updates, the
+      `pie-decode`/`lsw-egress`/`mac-nvmem` port-note records (converted from incoming
+      packages to durable integration records), and the regenerated 26-patch review form
+      (cover letter, mapping, MAINTAINERS, rationale, validation logs and hashes). The same
+      curation rules as the earlier syncs apply; the curated README additionally records the
+      final host-only `001`-`026` image rebuild (6,205,742 B, sha256 `26dde6fe...`) from the
+      lab notebook's status/ledger, which post-dates this source snapshot and is not part of
+      its session log.
 
 ## What is included (and why)
 
@@ -54,8 +69,8 @@ material was sanitized, and how to verify the publication claims.
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
 | `docs/` (14 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report and the 2026-11-19 boot + host-only full-series rebuild records |
-| `target-skeleton/` | the schematic OpenWrt target, board DTS, 23 kernel patches (001–023), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume), base-files and tools — the actual deliverable |
-| `upstream/series-6.18/` | the 23-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`023` are carried as do-not-merge drafts |
+| `target-skeleton/` | the schematic OpenWrt target, board DTS, 26 kernel patches (001–026), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume), base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder), tools and mocked host tests — the actual deliverable |
+| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts (group 4: PIE completion / LSW egress / MAC nvmem) |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 
@@ -110,6 +125,35 @@ The intermediate source commit `12eb48c` had also added one Python bytecode cach
 this repository's `.gitignore` excludes build products and caches in any case, and the curated
 tree contains no caches.
 
+A fourth curated sync brought this repository to source commit `7475fc5` (2026-11-19), the
+final review-form state:
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/target/linux/hisilicon/patches-6.18/024-...`, `025-...`, `026-...` | **new** group-4 do-not-merge drafts: PIE RX completion + normal non-TSO TX descriptor decode/delivery (024), gated LSW W4 egress/init write stage (025), read-only bdinfo-MAC MTD nvmem + guarded LAN/WAN board.d map (026) |
+| `target-skeleton/dts/luofu-r116.dts` | required `hisilicon,port` (8..12) on the five MAC nodes, read-only `bdinfo` partition with a `fixed-layout`/`mac-base` cell at `+0xde00`, `nvmem-cells` on gmac1-4 |
+| `target-skeleton/target/linux/hisilicon/base-files/lib/functions/luofu-netdev.sh` | **new** guarded LAN/WAN interface map (activates only when all four GEMAC netdevs exist) |
+| `target-skeleton/target/linux/hisilicon/base-files/etc/board.d/02_network` | calls the guarded map before the unchanged factory-MAC provisioning |
+| `target-skeleton/tools/test-mac-nvmem.sh` | **new** host test for the nvmem wiring + interface map (82/82 assertions without a kernel tree, 96/96 with the compiled-DTS checks); SPDX changed to MIT per the license split |
+| `target-skeleton/docs/port-notes/pie-decode`, `lsw-egress`, `mac-nvmem`/`SUMMARY.md` | **new** durable lane records (converted from incoming packages; absolute host paths sanitized to `~`) |
+| `docs/PIE-DATAPATH.md`, `docs/LSW-SPEC.md`, `docs/MISC-SOC-BLOCKS.md`, `docs/TARGET-DESIGN.md`, `docs/SKELETON-SMOKE.md` | recovered v250 RX completion/TX descriptor tables and flows; W4 egress stage, EQM indirect command word, `port_bitmap` and the TX-egress split; kernel-side bdinfo-MAC nvmem plan (§1.4a); open question 5 kernel half; the 024/025/026 sessions |
+| `target-skeleton/README.md`, `docs/README.md`, `README.md`, `NOTICE.md`, this page | status, group-4 gate plan and the final host-only `001`-`026` image facts |
+| `upstream/series-6.18/` | regenerated 26-patch review form: `0024`-`0026` messages + patches, updated cover letter/mapping/MAINTAINERS/rationale/validation, raw logs re-run (26/26 apply with `patch(1)` and `git am`, 0 rejects, 0 checkpatch errors / 58 warnings, 52/52 hashes) |
+
+The fourth sync also carries the repository's **final host-side artifact**: the full-series
+`001`-`026` sysupgrade image, **6,205,742 B**, sha256
+`26dde6fe14b3b3c9b9141efce019cd3e0d0993b41d09ea644e68d480ed420bb0`, with kernel slice
+3,307,134 B carrying the shared `hisilicon,port` properties and a 2,883,584 B rootfs UBI
+holding the static `squashfs` volume plus the empty dynamic `rootfs_data` overlay volume;
+`check-container` PASS and host harnesses 144/144 (first-install), 100/100 (A/B install),
+103/103 (factory-MAC provisioning) and 82/82 (MAC nvmem, without the compiled-DTS checks). It
+supersedes the third sync's `15dae772...` image and the intermediate `aa642862...` build. The
+container remains marked `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED`: **nothing has
+been flashed or booted** since the `001`-`017` bring-up, and no network path, SMP release,
+persistent overlay or A/B sysupgrade has ever run. The final image facts come from the lab
+notebook's dated ledger/STATUS (they post-date the pinned `7475fc5` source snapshot), and the
+rebuild evidence stays private lab evidence; this repository records the facts, not the logs.
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -120,7 +164,7 @@ tree contains no caches.
 | extracted vendor DTBs/DTBOs and DTS dumps | vendor-derived binary content; our own DTS is included instead |
 | NAND/rootfs/U-Boot dumps, register dumps, `dumps/` | local evidence, large, and partly vendor-derived |
 | build trees, toolchains, kernel/tarball caches, `build/` | build artifacts; reproducible by the reader from the recipe |
-| Python bytecode caches and UART/boot evidence logs | build/evidence artifacts from the lab; the intermediate source commit `12eb48c` had a `__pycache__/*.pyc` file that is deliberately not synced (the source tree removed it in `4030e86`), and the 2026-11-19 boot/rebuild logs stay private lab evidence described only in prose |
+| Python bytecode caches and UART/boot evidence logs | build/evidence artifacts from the lab; the intermediate source commit `12eb48c` had a `__pycache__/*.pyc` file that is deliberately not synced (the source tree removed it in `4030e86`), and the 2026-11-19 boot/rebuild logs - including the final `001`-`026` image rebuild - stay private lab evidence described only in prose |
 | per-unit identifiers (MAC/serial/PIN/efuse/`secret`/UUID values) | privacy and responsible disclosure; the docs name the offset instead of printing the value |
 | credentials, keys, tokens, Lab/bench secrets | never published (and never committed to the source tree either) |
 | the `lab/` programs and vendor-module analysis fixtures | out of scope for the OpenWrt port repo; the relevant specifications are in `docs/` |
@@ -161,7 +205,7 @@ gh api repos/ShibbityShwab/cudy-wr3000v2-openwrt --jq '{private, default_branch,
 | --- | --- |
 | Documentation (`README.md`, `NOTICE.md`, `docs/`, `target-skeleton/README.md`, `target-skeleton/docs/`) | **MIT** (`LICENSE-MIT`) |
 | Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | **MIT** (`LICENSE-MIT`; SPDX `MIT` header in each file) |
-| Kernel code: patches 001–023, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
+| Kernel code: patches 001–026, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
 
 The GPL-2.0-only choice is deliberate provenance: the drivers were derived by documenting the
 interface of the vendor's GPL-declared binaries (see [NOTICE.md](../NOTICE.md)). The MIT/GPL
@@ -192,7 +236,8 @@ tree.
 
 The copied documents are **snapshots** written inside the lab notebook between 2026-11-18 and
 2026-11-19 (with the attended bring-up session, the host-only full-series rebuild and the
-connectivity session appended to `SKELETON-SMOKE.md` in the second and third syncs, and
+connectivity session appended to `SKELETON-SMOKE.md` in the second and third syncs, the
+LSW-egress, bdinfo-MAC-nvmem and PIE-completion sessions added in the fourth sync, and
 TARGET-DESIGN.md sections 5.1/5.3/5.5/5.6 updated). Some of
 them describe the *old* `opensource/` repository as "not publishable" because ten vendor
 `.o` files were removed from its HEAD but remained in its history. **That statement does not
@@ -234,7 +279,8 @@ and it will be removed promptly; corrections are welcome.
 
 One attended bench bring-up (2026-11-19) booted a build of this tree (patches `001`-`017`) to
 a userspace console; that is the only hardware result and it is not an install or recovery
-procedure. The later host-only full-series rebuild (persistent `rootfs_data` overlay volume and
-the connectivity drafts) was never flashed or booted either, so the repository remains curated
-research material, not a firmware release; see the safety and legal section of
-[`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).
+procedure. The later host-only full-series rebuilds - the `001`-`023` image with the
+persistent `rootfs_data` overlay volume and the final `001`-`026` image with the PIE
+completion, LSW egress and bdinfo-MAC nvmem follow-ups - were never flashed or booted either, so
+the repository remains curated research material, not a firmware release; see the safety and
+legal section of [`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).
