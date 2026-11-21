@@ -6,7 +6,7 @@ recovery guide**, and they operate on the vendor stock firmware's root telnet sh
 
 | Tool | What it does | Safety |
 | --- | --- | --- |
-| `stock-telnet-install.sh` | fail-closed sysupgrade installer over the stock telnet shell: splits the image, serves/uploads the members, verifies the uploaded hashes, writes the **inactive** pair, verifies the read-back slot hash, verifies the active pair is unchanged, moves the selector, reboots and checks our image answers | `--inspect` is read-only; `--apply` requires `--attended --recovery-armed` and refuses if the bench-link/recovery checks fail. Verified end-to-end on 2026-11-21 (image `7421bb7a`): active pair untouched, selector `0x11` verified, our 6.18 image booted with 2 CPUs |
+| `stock-telnet-install.sh` | fail-closed sysupgrade installer over the stock telnet shell: splits the image, serves/uploads the members, verifies the uploaded hashes, writes **pair b only** (inactive; its baked cmdline expects rootfsb), verifies the read-back slot hash and the active pair unchanged, sets/reads back the env `bootflag` with the selector, reboots and checks our image answers | `--inspect` is read-only; `--apply` requires `--attended --recovery-armed`, refuses env/cell disagreement, and **refuses active-pair flashes** (stock running from rootfsb or env `bootflag=b`) with the two-stage instructions (guard commit `f188360`). Verified end-to-end on 2026-11-22 (W22 image `50023446`, two-stage install after recovery, 15-min soak PASS) and earlier with the 2026-11-21 images |
 | `telnet-exec.py` | minimal helper that runs command lines over the stock root telnet shell (plain socket, no auth material, an `__ALL_DONE__` sentinel bounds the read) | read-only helper; the installer is the only caller |
 
 What is **not** in this repository: the bench helpers the installer calls
@@ -26,6 +26,7 @@ License: **MIT** (see `../LICENSE-MIT`). In the notebook these tools carry a GPL
 SPDX header; they are the project's own host tooling, published here under MIT per the
 repository's content-triggered license split (see `../NOTICE.md`).
 
-Verification record: `target-skeleton/RELEASE-NOTES.md` ("Install path status") and
+Verification record: `target-skeleton/RELEASE-NOTES.md` ("Install path status" and the curated
+W22/M1b addendum), `docs/INSTALL-RECOVERY-LESSONS.md` (two-stage pair rule) and
 `target-skeleton/docs/incoming/feature-inventory/UPDATE-2026-11-21.md` ("Follow-up:
 automated install tool is now verified").
