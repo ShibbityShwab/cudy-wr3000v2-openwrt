@@ -1,20 +1,27 @@
 # cudy-wr3000v2-openwrt
 
-> **Bench-verified 2-CPU baseline on a single unit; NOT a public or flashable release.**
-> The 6.18 target image built from this tree boots on the Cudy WR3000 v2.0 and was verified
-> on **2026-11-21**: 2 CPUs, wired LAN through the documented CPU-copy mirror workaround,
-> SSH, a persistent UBIFS overlay, a 15-minute soak with 0 failures and reboot persistence
-> (canonical image `974e6ca6`). The release-critical SMP fix is the board-DTS loader
-> hand-off contract (DTS-only - the kernel release implementation was correct all along).
-> The **release line** is **51 target patches** (62 L0 patch files: 001-058 + 062-065, minus
-> 11 bench-only SMP diagnostics); the upstream **review form** stays at **26 patches**
-> (001-026: 19 merge-intent plus seven fail-closed data-path drafts marked do-not-merge).
-> Two attended bench sessions are recorded: the 2026-11-19 first userspace boot (patches
-> 001-017, console only) and the 2026-11-21 canonical 2-CPU verification. Everything else is
-> host-validated only, and this repository contains **no install or recovery instructions**.
-> Milestones: [release status](target-skeleton/RELEASE-NOTES.md) ·
+> **Bench-verified 2-CPU baseline plus the stock board features on one unit; NOT a public
+> or flashable release.** The 6.18 target image built from this tree boots on the Cudy WR3000
+> v2.0 and was verified on **2026-11-21**: 2 CPUs, wired LAN through the documented CPU-copy
+> mirror workaround, SSH, a persistent UBIFS overlay, a 15-minute soak with 0 failures and
+> reboot persistence (canonical image `974e6ca6`), then the stock board_id=3 features -
+> six writable `oem:green:*` LEDs, `event0` gpio-keys-polled (reset/WPS) and
+> `watchdog0` via sysfs (image `7f270b8c`) - and a quiet image `7421bb7a`
+> with the periodic mirror/heartbeat dmesg spam removed. The release-critical SMP fix is the
+> board-DTS loader hand-off contract; the board DTS also needed the base-DTB `pad-dtb`
+> 8-byte-alignment step. The **release line** is **51 target patches** (62 L0 patch files:
+> 001-058 + 062-065, minus 11 bench-only SMP diagnostics); the upstream **review form** stays
+> at **26 patches**. Thermal is **unsupported** (temperature register reads 0, vendor DT
+> disables the sensor) and Wi-Fi is **unsupported on 6.18** (vendor-binary driver only).
+> Three bench phases are recorded: the 2026-11-19 first userspace boot (patches 001-017,
+> console only), the 2026-11-21 canonical 2-CPU verification, and the 2026-11-21 board-feature
+> and quiet-image verification. Everything else is host-validated only, and this repository
+> contains **no install or recovery instructions**. Milestones:
+> [release status](target-skeleton/RELEASE-NOTES.md) ·
 > [release line](upstream/series-6.18/05-release-line.md) ·
-> [SMP root cause](docs/SMP-RE.md).
+> [SMP root cause](docs/SMP-RE.md) ·
+> [feature inventory](target-skeleton/docs/incoming/feature-inventory/SUMMARY.md) ·
+> [Wi-Fi recon](target-skeleton/docs/incoming/wifi-recon/SUMMARY.md).
 
 An upstream-style **OpenWrt / Linux bring-up for the Cudy WR3000 v2.0** - a HiSilicon
 **Hi5671Y "luofu"** (board R116) router that ships a vendor OpenWrt 22.03.6 / Linux 5.10.201
@@ -25,7 +32,8 @@ publish**: the Linux 6.18 release line (51 target patches) and its upstream revi
 patches: 19 merge-intent plus seven fail-closed data-path drafts marked do-not-merge), an
 OpenWrt target skeleton and board DTS with the loader hand-off nodes, an image/install recipe
 (with the standard squashfs + `rootfs_data` overlay UBI layout), reverse-engineering
-specifications and measured read-only silicon inventory, and an honest status report.
+specifications, measured read-only silicon inventory, the retained read-only device feature
+inventory and Wi-Fi feasibility reports, and an honest status report.
 It is a curated snapshot of the lab notebook
 [**cudy-wr3000v2**](https://github.com/ShibbityShwab/cudy-wr3000v2) with fresh git history; the
 security findings from the same research live in the separate
@@ -44,22 +52,23 @@ reverse-engineered code.
 | Area | Host-validated (evidence in this repository) | Hardware status |
 | --- | --- | --- |
 | Target/subtarget metadata | `make defconfig` + `make target/linux/prepare` RC=0 on `openwrt main` `27663a0` (linux-6.18.60); generated `CONFIG_TARGET_hisilicon_luofu_DEVICE_cudy_wr3000-v2=y` | the target tree built the kernel and machine DTB used by both attended sessions (U-Boot `Image Name: Linux-6.18.60`; boot-log machine model `Cudy WR3000 v2.0 (HiSilicon luofu R116)`) |
-| Release line (51 patches) | **51/51** include patches apply in manifest order to pristine linux-6.18.60 with `patch(1)` (146 file events, 3 offset hunks, **0 fuzz, 0 rejects**) and **strict `git apply` is clean**; the L0 stack (62 files, 001-058 + 062-065) applies 62/62. Validated in this repository's layout with `upstream/series-6.18/tools/check-release-line.sh` | the canonical image `974e6ca6` was built from the L0 stack (001-058 + the 062-065 grouping, then numbered 001-061) plus the loader hand-off DTS fix and verified on the unit; the release line is its publication classification |
+| Release line (51 patches) | **51/51** include patches apply in manifest order to pristine linux-6.18.60 with `patch(1)` (146 file events, 3 offset hunks, **0 fuzz, 0 rejects**) and **strict `git apply` is clean**; the L0 stack (62 files, 001-058 + 062-065) applies 62/62. Validated in this repository's layout with `upstream/series-6.18/tools/check-release-line.sh` | the bench images `974e6ca6` (2026-11-21), `7f270b8c` (board features) and `7421bb7a` (quiet) were built from the L0 stack (001-058 + the 062-065 grouping, then numbered 001-061) plus the loader hand-off DTS fix and verified on the unit; the release line is their publication classification. The 2026-11-21 board-feature pass refreshed the 054/056 hashes (`dev_dbg` quieting; manifest sha256 `4da8b960...`) and the validator now also exercises the base-DTB `pad-dtb` step |
 | Upstream review form (001-026) | 26/26 apply in order with `patch(1)` and `git am` (identical trees); checkpatch 0 errors / 58 warnings / 6 strict CHECKs; raw logs in [validation](upstream/series-6.18/validation/) | the review form is not a merge list and has no upstream review; patches 020-026 are group-4 RFC drafts |
 | Kernel compile | full linux-6.18.60 compile of the 001-026 series RC=0 under `CONFIG_WERROR=y`, 0 errors / 0 compiler warnings (37 pre-existing `modpost` warnings only); zImage 3,282,528 B (`08b76747...`); load/entry `0x80608000` unchanged (`_text = stext = 0xc0608000`) | the bench images load that kernel at `0x80608000`; the compile evidence is host-only |
-| Board DTS + loader hand-off | DTS compiles with the kernel's own dtc, zero warnings; bindings `dt_binding_check` RC=0; the release-critical contract compiles to DTB **12,296 B sha256 `50daf3d0...`** and carries `/aliases/console` plus `/reserved-memory/flashinfo@80600000` (`reg = <0x80600000 0x4000>`, `atag-offset = <0x1000>`) and `enable-method = "hisilicon,luofu-smp"` | the loader accepted the DTB and completed its hand-off staging (2026-11-21), which is what makes CPU1 come up |
+| Board DTS + loader hand-off | DTS compiles with the kernel's own dtc, zero warnings; bindings `dt_binding_check` RC=0; the release-critical contract plus the stock board_id=3 LED/keys nodes compiles to DTB **13,041 B sha256 `49fe5c47...`**; its totalsize is not 8-byte aligned, so the image build runs `Build/luofu-pad-dtb` (pads to **13,048 B**, TRAILER-FORMAT section 11). It carries `/aliases/console` plus `/reserved-memory/flashinfo@80600000` (`reg = <0x80600000 0x4000>`, `atag-offset = <0x1000>`) and `enable-method = "hisilicon,luofu-smp"` | the loader accepted the DTB and completed its hand-off staging (2026-11-21), which is what makes CPU1 come up |
 | SMP (patch 018 + DTS contract) | platsmp driver compiles; vendor release sequence decoded and documented; the fix is DTS-only and the diagnostics are excluded from the release line | **2 CPUs verified** on the canonical image (CPU1 mpidr `80000001`, `Brought up 1 node, 2 CPUs`, /proc/cpuinfo 2, soak + reboot) |
+| Board features (LEDs / keys / watchdog) | stock board_id=3 overlay nodes in the board DTS (gpio-keys-polled reset GPIO22 / WPS GPIO23 active-low 20 ms; six `oem:green:*` LEDs GPIO24/25/3/2/0/1; target config `LEDS_GPIO` / `INPUT(+EVDEV/KEYBOARD)` / `KEYBOARD_GPIO_POLLED` / `WATCHDOG_SYSFS`, `INPUT_HISI_POWERKEY` off) | **verified on image `7f270b8c`**: six writable `/sys/class/leds/oem:green:*` devices, `/dev/input/event0` = gpio-keys-polled, `watchdog0` sysfs (identity HiSilicon luofu watchdog, timeout 30 s, not armed by us); physical LED light/button press still needs human confirmation |
 | Wired LAN (bench workaround) | the W3-W20 gated path (patches 054-058) is host-compiled and documented; **no native switch forwarding** | **works via the documented CPU-copy mirror workaround**: `luofu_switch.cpu_mirror=1 mirror_dst=4` + PIE port-0 copy delivery `luofu_pie.cpucopy_deliver=1 cpucopy_port=11`; host ping 20/20 0% loss, SSH; native CFE-equivalent L2/VLAN forwarding is a separate project |
 | Persistent overlay | two-volume squashfs + `rootfs_data` UBI layout in the image recipe; semantic UBI-volume verifier | `/dev/ubi0_1 on /overlay type ubifs (rw)`, files survive a reboot (canonical image) |
 | Storage / FMC SPI-NAND | FMC driver + binding compile; contract documented | SPI-NAND (ESMT 128 MiB, 17 partitions) and UBI rootfs mounted on every boot |
 | A/B install path | `platform_do_upgrade` runs against mocked MTD/sysfs/ubiformat: first-install **144/144**, A/B **100/100** (with the real built container); factory-MAC **103/103**; MAC-nvmem **82/82** (96/96 with compiled-DTS checks) | the fail-closed sequence was executed **manually** on 2026-11-19 (inactive pair only, read-backs, semantic UBI verify, selector last); `platform_do_upgrade` itself has never run on a device and the loader env re-stamp remains open |
 | FIP trailer generator | reproduces both recorded vendor containers byte-for-byte; fail-closed on every decoded loader check; a novel generated trailer has never been booted | a FIP kernel slice assembled with this tooling booted from the inactive slot (2026-11-19); per-slot A/B trailer handling still [U] |
 | Silicon inventory (2026-11-18) | first attended **read-only** inventory: 600/600 planned register/table reads OK (476 LSW + 108 PIE + 13 CRG + 3 SYSCTRL), 0 failed batches | no write, no reboot: one boot, read-only; no traffic/behaviour claim |
-| CRG / watchdog / thermal / pinctrl / PCIe / restart (004-014, 019) | compile + binding checks pass; drivers are built-in in the target config | the bench boots registered FMC/SPI-NAND, UBI rootfs, watchdog, thermal and restart drivers; pinctrl/PCIe were not exercised; clock rates remain read-only |
+| CRG / watchdog / thermal / pinctrl / PCIe / restart (004-014, 019) | compile + binding checks pass; drivers are built-in in the target config | the bench boots registered FMC/SPI-NAND, UBI rootfs, restart and watchdog drivers (`watchdog0` sysfs verified, timeout 30 s, not armed by us); **thermal is unsupported** - the temperature register reads 0, the vendor DT disables the sensor and the zone returns `-ENODATA`; pinctrl/PCIe were not exercised; clock rates remain read-only |
 | MDIO + PHY (007, 008) | complete driver ports, compile clean | bus/PHY never enumerated |
-| Factory-MAC provisioning | userspace bdinfo derivation + validation (103/103 mocked); kernel-side read-only nvmem path (patch 026, host-only) | no MAC read from a real unit through the netdev path; the guarded LAN/WAN map is host-only |
-| Wi-Fi (Hi5622V100) | reverse-engineering specification only; no open driver | vendor binary stack; GPL section 3 source request sent 2026-10-01, **no reply held** |
-| **On-device validation** | - | **two attended sessions**: 2026-11-19 first userspace boot (patches 001-017, console only); 2026-11-21 canonical `974e6ca6` verified (2 CPUs, bench LAN, SSH, ubifs overlay, 15-min soak 0 failures, reboot persistent) |
+| Factory-MAC provisioning | userspace bdinfo derivation + validation (103/103 mocked); kernel-side read-only nvmem path (patch 026, host-only) | no MAC read from a real unit through the netdev path; the guarded LAN/WAN map is host-only. **MAC plan corrected:** eth0/eth1/eth2 sharing the LAN base MAC and eth3 = base+1 is the vendor rule (`board.d`/`99_fixwan`), not a defect - the earlier "duplicate MAC" blocker is withdrawn |
+| Wi-Fi (Hi5622V100) | reverse-engineering/feasibility record only - the vendor stack is a closed cfg80211 full-MAC driver (not mac80211), no source and no mainline/OpenWrt 6.18 driver exists ([recon](target-skeleton/docs/incoming/wifi-recon/SUMMARY.md)) | vendor binary stack; **Wi-Fi is declared unsupported on the 6.18 target (option C)**; the vendor 5.10 kernel + modules remains the only Wi-Fi-capable system; GPL section 3 source request sent 2026-10-01, **no reply held** |
+| **On-device validation** | - | **three bench phases**: 2026-11-19 first userspace boot (patches 001-017, console only); 2026-11-21 canonical `974e6ca6` (2 CPUs, bench LAN, SSH, ubifs overlay, 15-min soak 0 failures, reboot persistent); 2026-11-21 board-feature image `7f270b8c` (2 CPUs, six LEDs, `event0`, `watchdog0`, ping 0% loss) and quiet image `7421bb7a` (periodic W17/W19/heartbeat dmesg spam removed) |
 
 The one-line summary: the **release line is real, host-validated and bench-verified on one
 unit**, but this is research engineering, not a firmware release: no install path has run on a
@@ -68,7 +77,7 @@ upstream-reviewed.
 
 ---
 
-## Bench-verified 2-CPU baseline (2026-11-21)
+## Bench-verified baselines (2026-11-21)
 
 Image **974e6ca6** (`6,226,222 B`,
 sha256 `974e6ca63f6e86418761bc0f135e438f07d0e6ef909c61bb0339f00c5596c508`): patches
@@ -84,6 +93,41 @@ no probe tokens. Installed manually from the stock system and verified on the un
 - **stability**: 15-minute continuous-ping soak, 0 failures; no Oops/panic/BUG/WARNING (the
   only `panic` text is the literal `panic=0` cmdline);
 - **persistent across reboot**: fresh boot, rootfsb, pair b recorded, 2 CPUs again.
+
+### Board-feature and quiet baselines (2026-11-21)
+
+The same 2-CPU/network/SSH/overlay line was extended with the stock **board_id=3** overlay
+features and verified on the unit:
+
+- **image `7f270b8c` (board features)** - six `oem:green:*` LEDs writable through
+  `/sys/class/leds/*/brightness` (active-low map: status=GPIO24, wan=25, lan=3,
+  internet=2, wifi=0, wifi5g=1); `event0` = `gpio-keys-polled` (reset GPIO22 /
+  WPS GPIO23, active-low, 20 ms, `KEY_RESTART`/`KEY_WPS_BUTTON`); `watchdog0`
+  via sysfs (identity HiSilicon luofu watchdog, timeout 30 s, state active - not armed by
+  us); 2 CPUs online 0-1, ping 0% loss. Physical LED light and button presses still need one
+  human confirmation. [V]
+- **image `7421bb7a` (quiet)** - patches 054/056 quieted from `dev_warn`/`dev_info`
+  to `dev_dbg` and the heartbeat interval raised 5 s -> 60 s; measured at ~52 s uptime the
+  quiet image has **471** dmesg lines with W17=0, W19=3 (boot only), HB=1 versus **876** lines
+  with W17=162, W19=165, HB=61 on the previous image. Remaining pie-trace lines are boot-capped
+  diagnostics; a clean boot log can now be captured for the remaining [U] items. [V]
+- **thermal is unsupported on this board** - the tvsensor temperature register at
+  `0x14900500+0x24` reads `0x00000000` (block otherwise zero except `+0x10=3`), the
+  vendor formula turns raw 0 into -368000 mC (<= `THERMAL_TEMP_INVALID`) and the thermal
+  core returns `-ENODATA`; the vendor DT disables the sensor and no enable/trim sequence is
+  decoded. The driver/zone stays bound but reports no data; thermal telemetry is **not a
+  release claim**. [U]/[X]
+
+**Base-DTB padding is a build requirement (pad-dtb).** The new LED/keys DTS compiles to a
+**13,041 B** base DTB whose FDT totalsize is not 8-byte aligned. The stock U-Boot `bootfip`
+reads the overlay-container gate word as a 32-bit load at `base_dtb + totalsize`; the
+unaligned load data-aborted (r1=`0x83200040`), reset the CPU and the loader fell back to
+the stock pair. The image recipe therefore runs **`Build/luofu-pad-dtb`**
+([target-skeleton/tools/pad-dtb.py](target-skeleton/tools/pad-dtb.py)) before `append-dtb`:
+it pads to an 8-byte boundary, folds the padding into the FDT totalsize and asserts
+`len(dtb) == totalsize` and `totalsize % 8 == 0`. Measured: 13,041 B -> **13,048 B**,
+after which the image boots. Full measurement: [docs/TRAILER-FORMAT.md](docs/TRAILER-FORMAT.md)
+section 11.
 
 ### The SMP fix is DTS-only (release-critical)
 
@@ -124,18 +168,25 @@ Built-in cmdline (`CONFIG_CMDLINE_FORCE`, `luofu/config-6.18`):
 
     ubi.mtd=rootfsb ubi.block=0,0 root=/dev/ubiblock0_0 rootfstype=squashfs
     rootwait console=ttyS0,115200 earlycon noinitrd cma=0 maxcpus=2 nr_cpus=2
-    additional_cpus=1
+    additional_cpus=1 luofu_switch.arm=1 luofu_switch.egress=1
+    luofu_switch.qidmap=1 luofu_switch.eps=1 luofu_switch.qminit=1 luofu_switch.pfe=1
+    luofu_switch.ifc=1 luofu_switch.ext=1 luofu_switch.cpu_mirror=1
+    luofu_switch.mirror_dst=4 luofu_pie.arm=1 luofu_pie.rxcfg=1
+    luofu_pie.accepterr=1 luofu_pie.cpucopy_deliver=1 luofu_pie.cpucopy_port=11
+    luofu_gmac.macregs=1 oops=panic panic=0
 
-Canonical attended module gates (all default off; no `luofu_smp_*` tokens):
-`luofu_switch.arm=1 egress=1 qidmap=1 eps=1 qminit=1 pfe=1 ifc=1 ext=1`,
-`luofu_pie.arm=1 rxcfg=1 accepterr=1 cpucopy_deliver=1 cpucopy_port=11`,
-`luofu_gmac.macregs=1`, `luofu_switch.cpu_mirror=1 mirror_dst=4`. The diagnostic
-readout gates (`rxdiag`, `rxstroke`, `rxtrace`, `dump`, `scan`,
+Since the board-feature pass the canonical attended module gates and `oops=panic panic=0`
+are **baked into `CONFIG_CMDLINE`** (the `974e6ca6` baseline predates that and passed the
+same gates as attended parameters; the `7f270b8c`/`7421bb7a` baselines embed them). The config also
+sets `CONFIG_DEVMEM=y` / `CONFIG_STRICT_DEVMEM=n` and the board-feature symbols
+(`LEDS_GPIO`, `INPUT`/`INPUT_EVDEV`/`INPUT_KEYBOARD`, `KEYBOARD_GPIO_POLLED`,
+`WATCHDOG_SYSFS`; `INPUT_HISI_POWERKEY` off). No `luofu_smp_*` tokens are used.
+The diagnostic readout gates (`rxdiag`, `rxstroke`, `rxtrace`, `dump`, `scan`,
 `pagedump`) are optional and not canonical.
 
 ---
 
-## The two attended bench sessions
+## The attended bench work
 
 ### 2026-11-19: first boot to userspace (console only, patches 001-017)
 
@@ -186,7 +237,36 @@ now):
   stock DTB nodes. First 2-CPU image `d61c09e6`; canonical post-fix image
   `974e6ca6` passed the soak and reboot checks (the false hang is retracted above).
 
-### Where the two sessions are recorded
+### 2026-11-21: board features, the DTS padding bug and the quiet image
+
+- **Stock board_id=3 features (image `7f270b8c`).** The same single-source DTS gained the
+  vendor overlay's gpio-keys-polled (reset GPIO22 / WPS GPIO23, active-low, 20 ms) and six
+  `oem:green:*` gpio-leds (GPIO24/25/3/2/0/1); the target config enabled
+  `LEDS_GPIO`, the input stack and `WATCHDOG_SYSFS`. On hardware this gives six writable
+  LEDs, `event0` and `watchdog0` sysfs, with 2 CPUs and ping 0% loss. [V]
+- **Un-aligned base-DTB bug found and fixed.** The new nodes pushed the compiled base DTB to
+  13,041 B with an unaligned FDT totalsize; the stock U-Boot `bootfip` gate-word load
+  data-aborted and the loader fell back to the stock pair. The fix is the image-build step
+  `Build/luofu-pad-dtb` (`tools/pad-dtb.py`), which pads the DTB to 13,048 B / an 8-byte
+  totalsize and folds the padding into the FDT total; the image then boots. [V]
+- **Quiet image `7421bb7a`.** Patches 054/056 were quieted to `dev_dbg` and the
+  heartbeat interval raised 5 s -> 60 s; the periodic W17/W19/HB dmesg spam dropped from
+  876 to 471 lines at ~52 s uptime (W17 162 -> 0, W19 165 -> 3 boot-only, HB 61 -> 1) so a
+  clean boot log can be captured for the remaining [U] items. [V]
+- **Thermal root-caused as unsupported.** The tvsensor temp register at
+  `0x14900500+0x24` reads 0, the vendor formula maps raw 0 to an invalid temperature and
+  the thermal core returns `-ENODATA`; the vendor DT disables the sensor and no enable/trim
+  sequence is decoded. Decision: record thermal as unsupported, not a bring-up target. [U]/[X]
+- **MAC plan withdrawn as a blocker.** eth0/eth1/eth2 sharing the LAN base MAC and eth3 =
+  base+1 is the vendor rule (`board.d` / `99_fixwan`), not a defect; the feature
+  inventory's duplicate-MAC concern is withdrawn (curated note in
+  [the inventory](target-skeleton/docs/incoming/feature-inventory/SUMMARY.md)). [V]
+- **Upstream refresh.** DTS-0001 was regenerated for the new board nodes (sha256
+  `8ee4b8e71...`; 1,329-line board DTS), 054/056 hashes were refreshed (manifest sha256
+  `4da8b960...`) and the validator now exercises the pad-dtb step; the review form stays
+  26 patches with 0 errors / 58 warnings. [V]
+
+### Where the bench work is recorded
 
 The console/soak/reboot logs are private lab evidence under the notebook's gitignored
 `build/` tree (for example `2026-11-21-soak-2cpu.log`,
@@ -202,6 +282,8 @@ The console/soak/reboot logs are private lab evidence under the notebook's gitig
 | image | stack | size | status |
 | --- | --- | --- | --- |
 | **`974e6ca6`** (canonical) | L0 (001-058 + 062-065) + loader hand-off DTS fix + canonical cmdline | 6,226,222 B | **bench-verified 2-CPU baseline** on 2026-11-21 (network via the bench workaround, SSH, overlay, soak, reboot) |
+| **`7f270b8c`** (board features) | L0 + DTS fix + stock board_id=3 LED/keys nodes + pad-dtb + board config | - | bench-verified: 2 CPUs, six LEDs, `event0`, `watchdog0`, ping 0% loss (2026-11-21) |
+| **`7421bb7a`** (quiet, current) | `7f270b8c` line with W17/W19 `dev_dbg` and heartbeat 5 s -> 60 s | - | bench-verified: same features with the periodic dmesg spam removed (2026-11-21) |
 | `af777742` | 001-058 canonical stack | - | bench-verified LAN + SSH + overlay (2026-11-20), before the SMP fix |
 | `d61c09e6` | first DTS-fix 2-CPU image | - | first 2 CPUs; superseded by `974e6ca6` |
 | `39424b94` | 001-057 | - | first working LAN + SSH (2026-11-20) |
@@ -212,7 +294,8 @@ The console/soak/reboot logs are private lab evidence under the notebook's gitig
 
 The `26dde6fe` / `15dae772` builds belong to the earlier host-only generation (the
 repository's previous curated snapshot); they were never flashed and are kept in the history of
-this page only for provenance. The canonical bench baseline is `974e6ca6`.
+this page only for provenance. The current bench baseline is **`7421bb7a`** (board features +
+quiet dmesg on the `974e6ca6` 2-CPU/SMP/network line).
 
 > **The install path is still unproven.** The 2026-11-19 bring-up was a manual attended bench
 > procedure on the lab unit, not a documented install path; the canonical image is likewise
@@ -239,7 +322,10 @@ stack), and the repository publishes two artefacts built from the same sources:
    (51/51 `patch(1)` RC=0, strict `git apply` clean, loader hand-off DTS contract
    compiled and checked; raw log in
    [`validation/release-line/`](upstream/series-6.18/validation/release-line/)). The
-   overview is [05-release-line.md](upstream/series-6.18/05-release-line.md).
+   overview is [05-release-line.md](upstream/series-6.18/05-release-line.md). The 2026-11-21
+   board-feature pass refreshed the 054/056 hashes (`dev_warn`/`dev_info` -> `dev_dbg`;
+   manifest sha256 `4da8b960...`) and the validator now also exercises the base-DTB
+   `pad-dtb` step (13,041 B -> 13,048 B).
 2. **The upstream review form** - the 26 kernel patches 001-026 in commit-ready
    `format-patch` style, with cover letter, per-patch messages, MAINTAINERS proposal,
    tree/order rationale and repeatable validation. The readable overview is its
@@ -295,7 +381,11 @@ Series facts (all host-only; evidence in
   strict CHECKs - review items such as binding split, MAINTAINERS entry and line wrapping,
   not behavioural defects.
 - `sha256sum -c upstream/series-6.18/validation/sha256sums.txt` from the series
-  directory: **89/89 OK** (26 review-form patches + 62 L0 target patches + DTS-0001).
+  directory: **89/89 OK** (26 review-form patches + 62 L0 target patches + DTS-0001; hashes
+  refreshed for 054/056 on 2026-11-21).
+- The 2026-11-21 board-feature refresh quieted patches 054/056 (`dev_dbg`; manifest sha256
+  `4da8b960...`) and refreshed DTS-0001; the review-form content itself is unchanged
+  (26/26 apply, 0 errors / 58 warnings).
 - The final 001-026 series compiled in an isolated `openwrt main` clone:
   `make target/linux/prepare` RC=0 and `make target/linux/compile` RC=0 with
   **0 errors / 0 compiler warnings** under `CONFIG_WERROR=y`; zImage 3,282,528 B,
@@ -312,11 +402,15 @@ Series facts (all host-only; evidence in
 board DTS, so the loader hand-off nodes are published as the explicit DTS-series entry
 DTS-0001,
 [`dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch`](upstream/series-6.18/dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch)
-(sha256 `73d93769...`). It adds `arch/arm/boot/dts/hisilicon/luofu-r116.dts`
-(byte-identical to the single-source target DTS) and the `dtb-$(CONFIG_ARCH_LUOFU)`
-Makefile entry; it is the companion of kernel patch 0018 and is documented in
-[06-dts-series-dependency.md](upstream/series-6.18/06-dts-series-dependency.md). It is a draft,
-TODO-heavy board DTS: only the loader hand-off nodes are final.
+(sha256 `8ee4b8e71...`, refreshed 2026-11-21 with the stock board_id=3 LED/keys
+nodes). It adds `arch/arm/boot/dts/hisilicon/luofu-r116.dts` (1,329 lines; byte-identical
+to the single-source target DTS, including the gpio-keys-polled and six gpio-leds nodes) and
+the `dtb-$(CONFIG_ARCH_LUOFU)` Makefile entry; it is the companion of kernel patch 0018 and
+is documented in [06-dts-series-dependency.md](upstream/series-6.18/06-dts-series-dependency.md).
+The DTS series must also state the **base-DTB padding requirement** (the compiled DTB is
+13,041 B with an unaligned totalsize, so the image build must run `Build/luofu-pad-dtb`;
+see [TRAILER-FORMAT.md](docs/TRAILER-FORMAT.md) section 11). It is a draft, TODO-heavy board DTS:
+only the loader hand-off nodes and the measured board feature nodes are final.
 
 ---
 
@@ -355,8 +449,10 @@ image chain is:
     |   |- base-files/          # 02_network, platform.sh (sysupgrade), luofu-mac.sh,
     |                           # luofu-netdev.sh, boot-pair recorder, heartbeat
     |- tools/                   # fip-slice.py, luofu-image.py, ubi-volume-check.py,
-    |                           # build-kernel-slice.sh, mocked tests
+    |                           # pad-dtb.py, build-kernel-slice.sh, mocked tests
     |- docs/port-notes/         # durable per-lane integration records
+    |- docs/incoming/           # retained read-only reports: device feature inventory,
+    |                           # Wi-Fi recon (curated notes explain superseded rows)
 
 What the image chain does, and what it is constrained by:
 
@@ -381,11 +477,22 @@ What the image chain does, and what it is constrained by:
   squashfs+UBI layout. The sysupgrade container carries `CONTROL`, `kernel`,
   `root`, `fip-manifest.txt` and an honest `INSTALL-STATUS.txt` marker.
 - **Device controls:** boot-pair recorder (`luofu-pair-record`) and a userspace
-  heartbeat (`heartbeat`) are installed in `base-files`; the canonical module gates
-  are listed above.
+  heartbeat (`heartbeat`, 60 s) are installed in `base-files`; the canonical module gates
+  are baked into the built-in cmdline (listed above).
+- **Board controls (DT + target config):** gpio-keys-polled (reset/WPS) and six
+  `oem:green:*` gpio-leds nodes live in the single-source DTS; the target config enables
+  `LEDS_GPIO`, `INPUT`/`INPUT_EVDEV`/`INPUT_KEYBOARD`, `KEYBOARD_GPIO_POLLED` and
+  `WATCHDOG_SYSFS` (`INPUT_HISI_POWERKEY` off). Verified on image `7f270b8c`; thermal
+  remains unsupported.
+- **Base-DTB padding (image-build step):** the compiled base DTB must have an 8-byte-aligned
+  FDT totalsize for the stock loader's gate-word load. `Build/luofu-pad-dtb`
+  ([tools/pad-dtb.py](target-skeleton/tools/pad-dtb.py)) pads it before `append-dtb`, folds the
+  padding into the totalsize and asserts `len(dtb) == totalsize` and `% 8 == 0`; measured
+  13,041 B -> 13,048 B ([TRAILER-FORMAT.md](docs/TRAILER-FORMAT.md) section 11).
 
 The earlier host-only image generation (001-026 etc.) is superseded by the bench-verified
-canonical image; the recipe itself is unchanged in kind, and the container marker
+canonical and board-feature images; the recipe now also carries the pad-dtb step and the
+board-feature config. The container marker
 `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` records that the install path has
 not run.
 
@@ -455,6 +562,9 @@ is not MMIO-replayable; the CPU-copy mirror is the bench solution, not an upstre
 The full write campaign, the EQM qid-to-egress selection and multi-port/WAN behaviour remain
 attended work ([docs/LSW-SPEC.md](docs/LSW-SPEC.md),
 [target-skeleton/docs/port-notes/lsw-egress/SUMMARY.md](target-skeleton/docs/port-notes/lsw-egress/SUMMARY.md)).
+On the quiet image `7421bb7a` the periodic W17/W19/heartbeat dmesg spam is gone (W17 162 -> 0,
+W19 165 -> 3 boot-only, HB 61 -> 1 at ~52 s uptime), so a clean boot log can now be captured
+for the remaining [U] items.
 
 ---
 
@@ -492,7 +602,8 @@ The attended-session logs, the UART captures and the canonical-image soak/reboot
     |- ROADMAP-OPENWRT.md      # phase plan and milestones (marked where superseded)
     |- GPL-REQUEST.md          # GPLv2 section 3 source-request record (provenance; unanswered)
     |- SELECTOR-0x21.md        # A/B boot-selector contract reconstruction
-    |- TRAILER-FORMAT.md       # FIP trailer byte format (copy; canonical next to the tool)
+    |- TRAILER-FORMAT.md       # FIP trailer byte format (copy; canonical next to the tool);
+    |                          # section 11 = base-DTB 8-byte totalsize alignment (pad-dtb)
     |- MISC-SOC-BLOCKS.md      # efuse/MAC, RNG, PWM, SYSCTRL/SYSENV RE
     |- INVENTORY-2026-11-18.md # measured read-only silicon inventory (600/600 reads)
     |- BENCH-READONLY-INVENTORY.md # attended read-only inventory procedure + gates
@@ -500,7 +611,7 @@ The attended-session logs, the UART captures and the canonical-image soak/reboot
     |- PIE-DATAPATH.md         # packet-engine/GEMAC data-path RE specification
     |- SMP-RE.md               # CPU1 release/SMP RE + final resolution (sections 21-24)
     |- REMAINING-DRIVERS.md    # remaining-driver evidence survey and port plans
-    |- SKELETON-SMOKE.md       # full validation session log, incl. both attended sessions
+    |- SKELETON-SMOKE.md       # full validation session log, incl. the attended bench sessions
     |- REVERSAL-REPORT.md      # consolidated bench-reversal report (from the lab notebook)
     |- PUBLISHING.md           # what is in this curated repo, what is excluded, and why
     |- README.md               # documentation index + link conventions
@@ -509,6 +620,7 @@ The attended-session logs, the UART captures and the canonical-image soak/reboot
     |- docs/port-notes/        # durable lane records (clk, fmc, lsw, net, pie, pie-decode,
     |                          # lsw-egress, mac-nvmem, pcie, pinctrl, restart, smp, smp-decode,
     |                          # qm-decode, firstinstall, overlay, thermal, ...)
+    |- docs/incoming/           # retained read-only reports: device feature inventory, Wi-Fi recon
     upstream/series-6.18/      # review form (001-026) + release line + DTS-0001 + raw logs
     |- 05-release-line.md      # the 51-patch release line, canonical config, bench evidence
     |- 06-dts-series-dependency.md # DTS-0001 dependency of kernel patch 0018
@@ -551,13 +663,14 @@ of this repository or its history.
 
 ## Safety and legal
 
-- **This is not a flashing guide and not a release.** Two attended bench sessions are recorded:
-  2026-11-19 first userspace boot (patches 001-017, console only, no network) and 2026-11-21
+- **This is not a flashing guide and not a release.** Three bench phases are recorded:
+  2026-11-19 first userspace boot (patches 001-017, console only, no network); 2026-11-21
   canonical 2-CPU image `974e6ca6` (bench LAN through the CPU-copy workaround, SSH,
-  persistent overlay, 15-min soak, reboot). Neither session is an install or recovery
-  procedure; the install path (`platform_do_upgrade`, the loader env re-stamp) has never
-  run on a device. If you brick a WR3000 v2.0, recovery is physical (power-off + RESET held
-  through the counter + TFTP) and is not covered here.
+  persistent overlay, 15-min soak, reboot); and 2026-11-21 board-feature image `7f270b8c` /
+  quiet image `7421bb7a` (LEDs/keys/watchdog, dmesg spam removed). None is an install or
+  recovery procedure; the install path (`platform_do_upgrade`, the loader env re-stamp) has
+  never run on a device. If you brick a WR3000 v2.0, recovery is physical (power-off + RESET
+  held through the counter + TFTP) and is not covered here.
 - **Do not flash a WR3000 v1 / MediaTek image** (or any image) to this board. The board is
   the HiSilicon luofu v2 design; wrong images are unrecoverable without a physical recovery
   session.
@@ -567,16 +680,17 @@ of this repository or its history.
 - **Provenance is GPL-compatible reverse engineering, not "clean-room".** The drivers are
   derived from documented reverse engineering (disassembly, register traces, decoded vendor
   device trees) of the vendor's GPL-declared binaries. No vendor code, binary, blob or
-  extracted DTB is redistributed here. The Wi-Fi stack remains vendor-only and its firmware
-  is closed.
+  extracted DTB is redistributed here. The Wi-Fi stack remains vendor-only, its firmware is
+  closed, and Wi-Fi is declared **unsupported on the 6.18 target** (the vendor 5.10 stack is
+  the only Wi-Fi-capable system). Thermal telemetry is likewise unsupported on this board.
 - **GPL source request:** the vendor ships 58 modules declaring `license=GPL` with no
   published source. A GPLv2 section 3 request was sent to the vendor on 2026-10-01; no reply
   or receipt is held (record: [docs/GPL-REQUEST.md](docs/GPL-REQUEST.md)). That record is
   kept for provenance, not as a project gate.
 - **Radio regulation:** calibration values, power tables and `txpower` must stay inside
   the regulatory limits of the country of operation. Nothing here instructs otherwise.
-- **No warranty.** Host-validated engineering plus two attended bench sessions on one unit;
-  use at your own risk.
+- **No warranty.** Host-validated engineering plus three bench phases on one unit; use at your
+  own risk.
 - Cudy and HiSilicon are trademarks of their respective owners; this project is independent
   and not affiliated with either company.
 
@@ -587,19 +701,23 @@ of this repository or its history.
 - Lab notebook / live research record: **[cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2)**
 - Security research (CVE write-ups, affected versions, disclosure status): **[cudy-wr3000v2-cve](https://github.com/ShibbityShwab/cudy-wr3000v2-cve)**
 - This repository is a curated, fresh-history snapshot of the lab notebook's `opensource/`
-  subtree at the **2026-11-21 release-line consolidation** (source submodule commit
-  `a6b46a9` on notebook parent `a66a14f`): the 51-patch release line, the
-  DTS-only loader hand-off SMP fix, DTS-0001, the canonical 2-CPU image `974e6ca6`, the
-  26-patch review form and the updated engineering docs. Publication policy:
+  subtree at the **2026-11-21 board-feature refresh** (source submodule commit `f136cf3` on
+  notebook parent `ab0d3cb`): the 51-patch release line, the DTS-only loader hand-off SMP
+  fix plus the stock board_id=3 LED/keys nodes, the base-DTB `pad-dtb` build requirement,
+  DTS-0001 (refreshed), the 26-patch review form, the bench baselines `974e6ca6` /
+  `7f270b8c` / `7421bb7a`, the retained read-only device feature inventory and Wi-Fi
+  feasibility reports, and the updated engineering docs. Publication policy:
   [docs/PUBLISHING.md](docs/PUBLISHING.md); provenance: [NOTICE.md](NOTICE.md).
 
-> **The honest bottom line:** this is real, host-validated and now bench-verified engineering
-> on one unit. The 6.18 target boots with 2 CPUs, storage, SSH and a persistent overlay, and
-> the bench LAN works through a documented, explicitly gated CPU-copy mirror workaround on the
-> canonical image `974e6ca6`. Those results supersede the earlier "host-only, never
-> booted" state of this repository - but they do **not** make it a release: the install path
-> has never run on a device, native switch forwarding is a separate unresolved project,
-> Wi-Fi is vendor-only, per-driver silicon validation is partial, and no upstream submission
-> exists. The 26-patch review form is a set of drafts/RFCs, not merge-ready kernel code. Treat
-> the repository as a well-documented, honest starting point for an upstream port - and treat
-> the private lab evidence as the evidence of record.
+> **The honest bottom line:** this is real, host-validated and bench-verified engineering on
+> one unit. The 6.18 target boots with 2 CPUs, storage, SSH, a persistent overlay and - on the
+> board-feature images `7f270b8c`/`7421bb7a` - six LEDs, gpio-keys-polled and watchdog
+> sysfs, with the bench LAN through a documented, explicitly gated CPU-copy mirror workaround.
+> The base-DTB `pad-dtb` alignment bug was found on hardware and is now a guarded build step.
+> Those results supersede the earlier "host-only, never booted" state of this repository - but
+> they do **not** make it a release: the install path has never run on a device, native switch
+> forwarding is a separate unresolved project, Wi-Fi is vendor-only and unsupported on 6.18,
+> thermal is unsupported on this board, per-driver silicon validation is partial, and no
+> upstream submission exists. The 26-patch review form is a set of drafts/RFCs, not merge-ready
+> kernel code. Treat the repository as a well-documented, honest starting point for an upstream
+> port - and treat the private lab evidence as the evidence of record.
