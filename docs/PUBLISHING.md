@@ -17,6 +17,10 @@ material was sanitized, and how to verify the publication claims.
   review form, persistent `rootfs_data` overlay volume, connectivity drafts `022`/`023`),
   `12eb48c` (2026-11-19: first-boot bring-up machinery, series 001-021) and `9d5005c`
   (2026-11-18: 21-patch review form).
+  The **fifth sync (2026-11-21)** moves the pin to the release-line consolidation:
+  `opensource` submodule commit `a6b46a9` (notebook parent `a66a14f`), which adds the
+  51-patch release line, the DTS-only loader hand-off SMP fix, DTS-0001, the canonical
+  2-CPU image `974e6ca6` and the updated docs - see the fifth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -68,9 +72,9 @@ material was sanitized, and how to verify the publication claims.
 | Content | Why it is published |
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
-| `docs/` (14 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report and the 2026-11-19 boot + host-only full-series rebuild records |
-| `target-skeleton/` | the schematic OpenWrt target, board DTS, 26 kernel patches (001–026), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume), base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder), tools and mocked host tests — the actual deliverable |
-| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts (group 4: PIE completion / LSW egress / MAC nvmem) |
+| `docs/` (15 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report and the 2026-11-19 boot + host-only full-series rebuild records |
+| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume), base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools and mocked host tests — the actual deliverable |
+| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude, `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator with `validation/release-line/` raw logs |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 
@@ -154,6 +158,60 @@ persistent overlay or A/B sysupgrade has ever run. The final image facts come fr
 notebook's dated ledger/STATUS (they post-date the pinned `7475fc5` source snapshot), and the
 rebuild evidence stays private lab evidence; this repository records the facts, not the logs.
 
+## The fifth sync (2026-11-21): the 6.18 release line and the bench-verified 2-CPU baseline
+
+Source pin: **`a6b46a9`**, the notebook's `opensource` submodule at the 6.18 release-line
+consolidation (notebook parent `a66a14f`; release-line commits `c7ffeeb`,
+`2052b7e`, `9e17d5c`, `5a1b5b3`, and the 2026-11-20 net/bench patches `027`-`058`). It
+post-dates the fourth snapshot by two days of bench work. The curated copies are still
+byte-identical to the source apart from the curation rules listed above, plus the
+repository-layout adaptation of the new release-line checker.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/target/linux/hisilicon/patches-6.18/` | 36 new patch files: `027`-`058` (bench/network campaign, canonical config, boot-pair recorder, SMP diagnostics) and the renumbered SMP diagnostics `062`-`065` - the L0 stack is now **62 files, 001-058 + 062-065** |
+| `target-skeleton/dts/luofu-r116.dts` | the release-critical **loader hand-off contract**: stock `/aliases/console` and `/reserved-memory/flashinfo@80600000` (`compatible = "hsan,flashinfo_reserved"`, `reg = <0x80600000 0x4000>`, `atag-offset = <0x1000>`) - the DTS-only SMP fix |
+| `target-skeleton/target/linux/hisilicon/luofu/config-6.18` | canonical command line (`maxcpus=2 nr_cpus=2 additional_cpus=1`) and the canonical bench configuration |
+| `target-skeleton/.../base-files/` | boot-pair recorder (`luofu-pair-record` plus rc.d links; fixes the vendor-slot reboot fallback) and a userspace heartbeat |
+| `target-skeleton/RELEASE-NOTES.md` | **new**: the one-page 2026-11-21 release status (verified baseline, DTS-only SMP fix, canonical configuration, what works and what is not claimed) |
+| `target-skeleton/README.md`, `target-skeleton/docs/port-notes/` | 2026-11-21 status block; new/updated lane records `smp-decode` (the final SMP diagnosis), `qm-decode`, `firstinstall`, `overlay`, `net` |
+| `docs/` | `TARGET-SKELETON.md` added; TARGET-DESIGN / ROADMAP-OPENWRT / LSW-SPEC / PIE-DATAPATH / MISC-SOC-BLOCKS / SMP-RE / SKELETON-SMOKE / TRAILER-FORMAT updated - including SMP-RE sections 21-24 (the final root cause) and the W3-W20 bench record |
+| `upstream/series-6.18/` | the review form revalidated for the 0018 DTS dependency (26/26 apply, checkpatch 0 errors / 58 warnings); **new release line**: `release-line/manifest.tsv` (62 patches: 51 include, 11 exclude), `INCLUDED.txt`, `EXCLUDED.txt`; **new docs** `05-release-line.md` and `06-dts-series-dependency.md`; **new DTS-series entry** `dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch`; **new tools** `check-release-line.sh` (layout-adapted) and `gen-dts-series-patch.py`; refreshed `validation/` logs plus `validation/release-line/`; sha256sums regenerated - **89/89** entries |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | current status, the fifth-sync provenance and the updated publication claims |
+
+Curation rules applied to this sync (the same split as before): absolute host paths sanitized
+to `~`; the project SSH key is referred to generically; no incoming/lane-private staging
+packages are copied; the host-only tools added or touched here (`check-release-line.sh`,
+`gen-dts-series-patch.py`) carry the **MIT** SPDX header per the license split, while the
+kernel patch series, DTS and `base-files/` stay GPL-2.0-only; the release-line checker locates
+`target-skeleton/` in either the curated or the notebook layout, and its `sha256sums` comment
+names this repository's paths; the validation logs are copied verbatim apart from those path
+adaptations.
+
+### What this sync changes about the repository's honest status
+
+The previous snapshot said the only hardware result was the 2026-11-19 userspace boot of a
+patches `001`-`017` build. That is now **history, not the current status**: a second attended
+session (2026-11-20/21) brought up the wired LAN (documented CPU-copy mirror workaround), SSH
+and the persistent overlay, and then solved SMP (DTS-only loader hand-off fix). The canonical
+image **`974e6ca6`** is bench-verified with 2 CPUs, LAN, SSH, a ubifs overlay, a 15-minute soak
+with 0 failures and reboot persistence. It is still **not** a flashable/public release: the
+install path has never run on a device, Wi-Fi and native switch forwarding remain absent, and
+nothing is upstream-reviewed. The earlier "only hardware result" wording in the sections above
+is left in place as history.
+
+### Checks run for this sync (2026-11-21)
+
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 patches, no drift);
+- `(cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt)` - **89/89 OK**;
+- `upstream/series-6.18/tools/check-release-line.sh <linux-6.18.60.tar.xz> <workdir>` -
+  **PASS**: 51/51 include patches apply with `patch(1)` RC=0 (146 file events, 3 offset
+  hunks, 0 fuzz, 0 rejects), strict `git apply` clean, the board DTS compiles to DTB
+  12,296 B sha256 `50daf3d0...` with the loader hand-off contract, and DTS-0001 applies
+  with its board DTS byte-identical to the target DTS;
+- repository hygiene: no binary objects in the tree or history, no credentials/keys, no
+  per-unit identifiers (the same scans as before).
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -205,7 +263,7 @@ gh api repos/ShibbityShwab/cudy-wr3000v2-openwrt --jq '{private, default_branch,
 | --- | --- |
 | Documentation (`README.md`, `NOTICE.md`, `docs/`, `target-skeleton/README.md`, `target-skeleton/docs/`) | **MIT** (`LICENSE-MIT`) |
 | Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | **MIT** (`LICENSE-MIT`; SPDX `MIT` header in each file) |
-| Kernel code: patches 001–026, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
+| Kernel code: the target patch stack (001-058 + 062-065), DTS-0001, draft DTS/DTBO, OpenWrt target, image recipe, `base-files/` | **GPL-2.0-only** (`LICENSE-GPL-2.0`; SPDX header in each file) |
 
 The GPL-2.0-only choice is deliberate provenance: the drivers were derived by documenting the
 interface of the vendor's GPL-declared binaries (see [NOTICE.md](../NOTICE.md)). The MIT/GPL
@@ -277,10 +335,14 @@ and it will be removed promptly; corrections are welcome.
 
 ## Scope reminder
 
-One attended bench bring-up (2026-11-19) booted a build of this tree (patches `001`-`017`) to
-a userspace console; that is the only hardware result and it is not an install or recovery
-procedure. The later host-only full-series rebuilds - the `001`-`023` image with the
-persistent `rootfs_data` overlay volume and the final `001`-`026` image with the PIE
-completion, LSW egress and bdinfo-MAC nvmem follow-ups - were never flashed or booted either, so
-the repository remains curated research material, not a firmware release; see the safety and
-legal section of [`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).
+Two attended bench sessions are recorded. The 2026-11-19 session booted a build of this tree
+(patches `001`-`017`) to a userspace console - console only, no network, tmpfs overlay - and
+was the first hardware result. The 2026-11-21 session ran the canonical image `974e6ca6` built
+from the L0 stack (001-058 + 062-065; numbered 001-061 at the time) plus the DTS loader hand-off fix: 2 CPUs, LAN through the documented
+CPU-copy mirror workaround, SSH, persistent ubifs overlay, 15-minute soak with 0 failures and
+reboot persistence. The intermediate host-only full-series rebuilds (001-023 with the
+persistent `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and
+bdinfo-MAC nvmem follow-ups) were never flashed or booted. Neither bench session is an install
+or recovery procedure and the install path has never run on a device, so the repository
+remains curated research material, not a firmware release; see the safety and legal section of
+[`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).

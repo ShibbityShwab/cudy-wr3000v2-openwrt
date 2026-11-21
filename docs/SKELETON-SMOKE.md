@@ -23,22 +23,15 @@ products it records are the kernel compile product, a structurally validated ker
 slice and the two driver objects linked into that kernel - no rootfs, no sysupgrade
 container, no install image and no boot.
 
-> **Curated copy and update note (synced 2026-11-19).** This validation log is reproduced from
-> the project's lab notebook at series `001`-`026`. Later sections of this page record (a) the
-> first **attended hardware boot** of this target - a 6.18.60 kernel + OpenWrt rootfs built from
-> it reached a userspace console on the WR3000 v2 (console only: no network, tmpfs overlay;
-> built from patches `001`-`017`), (b) the **afternoon host-only full-series rebuild**
-> (patches `001`-`023`, persistent `rootfs_data` overlay volume, image hashes; never flashed),
-> (c) the **connectivity session** behind the `022`/`023` gates, (d) the **LSW egress** session
-> (patch `025`), (e) the **bdinfo-MAC nvmem** session (patch `026`) and (f) the **PIE
-> completion-decode** session (patch `024`). After this snapshot the notebook rebuilt the final
-> **`001`-`026`** image once more with the shared `hisilicon,port` DTS properties (image
-> 6,205,742 B sha256 `26dde6fe...`; kernel slice 3,307,134 B; rootfs UBI 2,883,584 B with
-> `squashfs` + dynamic `rootfs_data`; harnesses 144/144, 100/100, 103/103 and 82/82;
-> `check-container` PASS; **never flashed or booted**) - that last rebuild is summarised in the
-> top-level [README](../README.md), not in this snapshot's session log. The "nothing has been
-> booted" statements above describe the 2026-11-18 host-only state at the time they were written.
-> Absolute host paths were sanitized to `~`.
+> **Curated copy and update note (synced 2026-11-21).** This validation log is reproduced
+> from the project's lab notebook at the 6.18 release line (51 target patches plus the DTS
+> loader hand-off fix; the upstream review form stays 001-026). Sessions appended after the
+> previous snapshot record the SMP hand-off root-cause work and the DTS fix (2026-11-20/21),
+> the canonical 2-CPU baseline image `974e6ca6` with its soak and reboot verification, and
+> the release-line validation. The "nothing has been booted" statements in the early
+> 2026-11-18 sections describe the host-only state at the time they were written; the
+> current baseline is summarised in [../target-skeleton/RELEASE-NOTES.md](../target-skeleton/RELEASE-NOTES.md)
+> and the top-level [README](../README.md). Absolute host paths were sanitized to `~`.
 
 ## Environment
 
@@ -2580,8 +2573,8 @@ hardware test.**
   in 018-023 has ever executed on hardware.**
 - Boot safety of the newly enabled nodes: the DTS now enables the LSW/PIE/GEMAC nodes
   (12 `status = "okay"` nodes in the board DTS), but the drivers still fail closed on a
-  default boot - LSW probe refuses (`-EOPNOTSUPP`) unless `luofu_lsw.arm=1` (and writes the
-  W2 qid maps only with `luofu_lsw.qidmap=1`), PIE stays unarmed without `luofu_pie.arm=1`,
+  default boot - LSW probe refuses (`-EOPNOTSUPP`) unless `luofu_switch.arm=1` (and writes the
+  W2 qid maps only with `luofu_switch.qidmap=1`), PIE stays unarmed without `luofu_pie.arm=1`,
   and GEMAC refuses/defer until PIE is armed and the LSW qid map is ready, before any
   ioremap/clk/reset. The default `CONFIG_CMDLINE` carries none of those parameters, so the
   next boot should only log refusals - [U] until it is booted.
@@ -3081,11 +3074,11 @@ set, plus the GEMAC/PIE netdev readiness contract, so an attended boot can reach
   - default (no parameters) is unchanged read-only behaviour: validate the 17 windows, the CRG
     clocks/resets, the port model, the 30-word measured baseline and the two qid maps, then refuse
     with `-EOPNOTSUPP` without writing;
-  - `luofu_lsw.arm=1` = the attended **W3** step: enable the two CRG gate clocks, release the four
+  - `luofu_switch.arm=1` = the attended **W3** step: enable the two CRG gate clocks, release the four
     CRG reset lines (documented C1/C2 rows of LSW-SPEC 7.7), re-check the powered state read-only
     through the CRG syscon and the reset API, then snapshot the 30 baseline words and both qid
     tables *read-only* and refuse - **no LSW register is written in this step**;
-  - `luofu_lsw.arm=1 luofu_lsw.qidmap=1` = the attended **W4/W5** step: first a pre-write
+  - `luofu_switch.arm=1 luofu_switch.qidmap=1` = the attended **W4/W5** step: first a pre-write
     conformance gate (every qid-map word outside the derived allocation model must read zero,
     i.e. the block must be in the measured state the model was derived against), then program the
     W2 write set Q1/Q2 - table A ports 4-12 and table B ports 40-43, 13 rows x 8 slots, value
@@ -3120,9 +3113,9 @@ set, plus the GEMAC/PIE netdev readiness contract, so an attended boot can reach
 | boot parameter | LSW driver | PIE driver | GEMAC netdevs |
 | --- | --- | --- | --- |
 | none (normal boot) | read-only validate + refuse | gate closed, validate + refuse, no register write | PIE refused -> no netdev |
-| `luofu_lsw.arm=1` | W3 power/snapshot, no LSW register write, still refuses | unchanged | no netdev (no egress map) |
-| `luofu_lsw.arm=1 luofu_lsw.qidmap=1` | W3 + W4/W5 qid-map write + readback, READY | unchanged | still refuses until PIE is armed |
-| `luofu_pie.arm=1 luofu_lsw.arm=1 luofu_lsw.qidmap=1` | READY | arms rings/interrupts | netdevs register (eth0..eth3 in DT order); carrier driven by phylink |
+| `luofu_switch.arm=1` | W3 power/snapshot, no LSW register write, still refuses | unchanged | no netdev (no egress map) |
+| `luofu_switch.arm=1 luofu_switch.qidmap=1` | W3 + W4/W5 qid-map write + readback, READY | unchanged | still refuses until PIE is armed |
+| `luofu_pie.arm=1 luofu_switch.arm=1 luofu_switch.qidmap=1` | READY | arms rings/interrupts | netdevs register (eth0..eth3 in DT order); carrier driven by phylink |
 
 The existing `luofu_pie.arm=1` semantics are untouched.
 
@@ -3193,12 +3186,12 @@ Not proven / unattended-untested:
 
 ### Attended boot sequence (first hardware execution; recovery door armed)
 
-1. **W3 only:** boot with `luofu_lsw.arm=1` (PIE gate left off). Expect:
-   `luofu-switch: luofu_lsw.arm=1: ATTENDED WRITE PATH ...`, powered-state line, 30
+1. **W3 only:** boot with `luofu_switch.arm=1` (PIE gate left off). Expect:
+   `luofu-switch: luofu_switch.arm=1: ATTENDED WRITE PATH ...`, powered-state line, 30
    `W3 snapshot:` lines, the two qid-table non-zero counts, then
    `W3 power/read step done; ... refusing to arm the data path`. Record the snapshot; the block is
    powered down on the failure path. This is the first own-kernel CRG write on the switch block.
-2. **W4/W5:** boot with `luofu_lsw.arm=1 luofu_lsw.qidmap=1`. Expect the conformance gate to pass
+2. **W4/W5:** boot with `luofu_switch.arm=1 luofu_switch.qidmap=1`. Expect the conformance gate to pass
    (all unpopulated words zero), then
    `W2 qid map programmed and verified: 72 table-A words ... + 128 table-B words ...` and
    `connectivity path armed ...`. If it refuses, the pre-write mismatch is the evidence and no
@@ -3235,7 +3228,7 @@ the board; the image has not been rebuilt from 025 and no register has been writ
 ### What was added
 
 - `luofu-switch.c` / `luofu-switch-regs.h` (patch 025): the attended W4 stage,
-  `luofu_lsw.egress=1` (requires `luofu_lsw.arm=1`). It snapshots the R1/R3/R5 target words,
+  `luofu_switch.egress=1` (requires `luofu_switch.arm=1`). It snapshots the R1/R3/R5 target words,
   refuses before the first write unless the EQM indirect interface is idle, every target word
   reads stable across two samples, and `fam+0x504` low14 equals the computed cell count
   `(queue_size / cell_size) & ~7` (= 0x2000 on this board); it then programs the nine dp/ips/eqm
@@ -3255,20 +3248,20 @@ the board; the image has not been rebuilt from 025 and no register has been writ
 | boot parameters | LSW driver (021/022/025) | GEMAC netdevs (023) |
 | --- | --- | --- |
 | none (normal boot) | read-only baseline validate + refuse, no write | no netdev |
-| `luofu_lsw.arm=1` | W3: power, verify powered state, snapshot, refuse; no LSW register write | no netdev |
-| `luofu_lsw.arm=1 luofu_lsw.egress=1` | W3 + W4: conformance, R1/R3/R5 write + readback; then qid map absent -> restore found state, power down, refuse | no netdev |
-| `luofu_lsw.arm=1 luofu_lsw.qidmap=1` | W3 + W5 qid map; then the probe config is missing -> restore, power down, refuse (new in 025) | no netdev |
-| `luofu_lsw.arm=1 luofu_lsw.egress=1 luofu_lsw.qidmap=1` | W3 + W4 + W5, both verified -> `luofu_switch_ready()` true | requires `luofu_pie.arm=1` too |
-| `luofu_lsw.egress=1` or `qidmap=1` without `arm=1` | explicit `-EINVAL` refusal (new in 025) | no netdev |
+| `luofu_switch.arm=1` | W3: power, verify powered state, snapshot, refuse; no LSW register write | no netdev |
+| `luofu_switch.arm=1 luofu_switch.egress=1` | W3 + W4: conformance, R1/R3/R5 write + readback; then qid map absent -> restore found state, power down, refuse | no netdev |
+| `luofu_switch.arm=1 luofu_switch.qidmap=1` | W3 + W5 qid map; then the probe config is missing -> restore, power down, refuse (new in 025) | no netdev |
+| `luofu_switch.arm=1 luofu_switch.egress=1 luofu_switch.qidmap=1` | W3 + W4 + W5, both verified -> `luofu_switch_ready()` true | requires `luofu_pie.arm=1` too |
+| `luofu_switch.egress=1` or `qidmap=1` without `arm=1` | explicit `-EINVAL` refusal (new in 025) | no netdev |
 
 ### Attended test sequence (recovery card armed; one variable per boot)
 
-1. **W3 only (unchanged from the connectivity session):** boot with `luofu_lsw.arm=1`.
+1. **W3 only (unchanged from the connectivity session):** boot with `luofu_switch.arm=1`.
    Expect the ATTENDED WRITE PATH warning, the powered-state line, 30 `W3 snapshot:` lines,
    the qid-table non-zero counts, then the refusal line. No LSW register is written.
-2. **W4 only:** boot with `luofu_lsw.arm=1 luofu_lsw.egress=1` (PIE and qidmap gates off).
+2. **W4 only:** boot with `luofu_switch.arm=1 luofu_switch.egress=1` (PIE and qidmap gates off).
    Expect first the W3 output, then
-   `luofu_lsw.egress=1: programming the R1/R3/R5 probe configuration (W4) with pre-write
+   `luofu_switch.egress=1: programming the R1/R3/R5 probe configuration (W4) with pre-write
    conformance and readback verification`, then either
    `W4 probe configuration programmed and verified: dp+0x1c=0x18000 dp+0x64=0x1 eqm+0x18=0x80001cc0
    eqm+0x38=0x7f0 eqm+0x40=0x80000000 eqm+0xa4=0x1fc0 ips+0x08=0x2a ips+0x10=0x... (fam+0x504=0x2000
@@ -3278,8 +3271,8 @@ the board; the image has not been rebuilt from 025 and no register has been writ
    useful evidence of the boot - stop there, record the value, do not force the gate.
    Also capture: `dmesg | grep luofu-switch`, the W3 snapshot lines, and that the console/CPU
    survived the write. Power-cycle between W4 variants.
-3. **W4 + W5:** boot with `luofu_lsw.arm=1 luofu_lsw.egress=1 luofu_lsw.qidmap=1`. Expect the
-   W4 success line, then `luofu_lsw.qidmap=1: ...`, the qid-map conformance pass, the
+3. **W4 + W5:** boot with `luofu_switch.arm=1 luofu_switch.egress=1 luofu_switch.qidmap=1`. Expect the
+   W4 success line, then `luofu_switch.qidmap=1: ...`, the qid-map conformance pass, the
    `W2 qid map programmed and verified ...` line and
    `connectivity path armed: R1/R3/R5 probe configuration and the W2 qid maps are programmed and
    verified; the GEMAC netdev front end may register`. Only this combination reaches READY.
@@ -3448,7 +3441,7 @@ needs `/etc/board.json` regenerated (and the gated netdevs present) for the map 
 
 ### Attended boot must test (recovery door armed; physical RESET+TFTP is the only recovery)
 
-1. **Kernel nvmem read:** boot with `luofu_pie.arm=1 luofu_lsw.arm=1 luofu_lsw.qidmap=1` (the
+1. **Kernel nvmem read:** boot with `luofu_pie.arm=1 luofu_switch.arm=1 luofu_switch.qidmap=1` (the
    four GEMAC netdevs then register). Expect no `no usable MAC address in the devicetree`
    warning for eth0..eth3; if the warning appears, record its `%pe` reason - `EINVAL` means the
    cell read 6 bytes but `is_valid_ether_addr()` rejected them (erased/corrupt bdinfo or the
@@ -3481,7 +3474,7 @@ used and nothing was booted. The vendor `hi_kpie.ko` v250 functions were disasse
 (`hi_pie_rx_get_desc`, `hi_pie_drv_rx_recv`, `hi_net_rx_proc`, `hi_pie_tx_send`,
 `hi_pie_tx_set_desc` + its type-0 helper); no vendor binary is copied. The decode is documented
 in [PIE-DATAPATH.md](PIE-DATAPATH.md) sections 5.2 and 6 and in
-[../target-skeleton/docs/incoming/pie-decode/SUMMARY.md](../target-skeleton/docs/incoming/pie-decode/SUMMARY.md).
+[../target-skeleton/docs/port-notes/pie-decode/SUMMARY.md](../target-skeleton/docs/port-notes/pie-decode/SUMMARY.md).
 
 ### What the patch implements
 
@@ -3600,4 +3593,1176 @@ patch, but the test still has to be run.
 The isolated clones `~/openwrt-lab-pie-decode/` and `...-full/`; the shared
 clone and `openwrt-lab-selectorfix-img` were not modified. Disassembly regeneration commands are
 the ones in PIE-DATAPATH.md section 13.2; the full evidence map is
-`target-skeleton/docs/incoming/pie-decode/SUMMARY.md`.
+`target-skeleton/docs/port-notes/pie-decode/SUMMARY.md`.
+
+## 2026-11-19 (LSW QM/EQM session): EQM queue-manager init write stage (patch 032)
+
+Decode/implementation lane. This session itself had no device access of any kind (no SSH, TFTP,
+flash or UART); the hardware result below was produced by the bench lane on image 14791958 and is
+recorded here with its console evidence. Nothing was reflashed by this lane. Publication remains
+NOT READY.
+
+### What changed
+
+- `luofu-switch.c` / `luofu-switch-regs.h` (patch 032): a fifth attended write gate,
+  `luofu_switch.qminit=1` (requires `arm=1 egress=1 qidmap=1 eps=1`), implementing the recovered
+  EQM queue-manager init tables 19/32/35/17/16/34 for the nine wired queue groups (ports 4..12,
+  qids 1..72, profiles {0..7,17,18}) - 169 entries / 845 words. The stage snapshots every entry
+  (two reads, required stable), requires the EQM indirect interface idle, computes the expected
+  content from the snapshot plus the vendor formulas, writes through the decoded indirect engine,
+  reads the entries back on a per-word verification mask, and restores the verified entries on
+  the first mismatch (also in `remove()`). The decoded indirect protocol is index/table/write/
+  start in `eqm+0x48` with bit29 error and at most five data words per operation.
+- **Tiered verification policy (two bench rounds, 2026-11-19):** the engine accepts every write
+  but implements only part of each record as readable, so verification only claims what the bench
+  has proven. **STRICT (fail closed):** table 32 slot priorities, table 35 word 0 bytes 1-2 and
+  table 17 words 1..3 - all read back exactly on hardware. **DIAG (acknowledged + logged):**
+  tables 16 and 34 (not reached on the bench yet). **ACK:** write-only table 19 (`hi_queue_init`
+  is its only user; the EQM table accessors are module-local, so no vendor reader exists).
+  Bench evidence: table 19 wrote 0xffffffff and read 0x3fff 0x3e8 0x3fff 0x1ffffff 0x0 (per-word
+  field-width masks, write did take effect); table 17 wrote 0xbb8 to word 0 and read 0, while
+  words 1..3 read back exactly (register mapping correct). Restore restores only bench-proven
+  entries; table 19 and tables 16/34 are left as written and reported (a read view cannot restore
+  a record), with the block powered down on refusal. The mismatch log prints the bench-proven
+  mask, the snapshot value and the whole 5-word read view.
+- Patch 032 also corrects patch 025's EQM indirect error-bit decode (measured idle word
+  0x41100012 has bit29 clear; the driver header had recorded bit5) and wires the W6 EPS
+  channel-map snapshot into driver state so a later failure and `remove()` restore it too.
+- Readiness is now complete-write-set based: `luofu_switch_ready()` is only true when W3+W4+W5+W6+W7
+  are all programmed and verified. The GEMAC front end therefore cannot register a netdev on a
+  partial data path; its refusal message names the whole gate chain.
+- Recovery/decoding evidence for the write values: the pinned `hi_lsw_dp.ko` fixture (no vendor
+  binary added to the tree): `hi_queue_init@0x507c`, the helpers at 0x20f8/0x2184/0x22ec/0x223c/
+  0x24d0/0x2b40/0x31d4, `hi_eqm_write_tab@0x1cdc`, `hi_eqm_read_tab@0x1e18` and the build-time
+  queue-group table at `.data+0xd0`. The measured idle register state (`eqm+0x48 = 0x41100012`,
+  `eqm+0x5c = 0xbb8`) independently corroborates the command-word decode and the table-17
+  profile shape: the vendor's last queue-init write was table 17, index 18, first data word 3000.
+
+### Bench results (2026-11-19, three hardware rounds) and the fix
+
+Command line (all rounds): `... luofu_switch.arm=1 luofu_switch.egress=1 luofu_switch.qidmap=1
+luofu_pie.arm=1 luofu_switch.eps=1 luofu_switch.qminit=1`. Every run passed W3-W6 and reached W7.
+
+- *Round 1 (image 14791958):* W7 snapshot passed, then the strict table-19 readback failed and the
+  stage refused fail-closed:
+  ```
+  [2.355537] W7 snapshot: 169 EQM table entries (845 words) read and stable, indirect interface idle (eqm+0x48 0x0)
+  [2.369773] EQM readback mismatch at table 19 entry 0 word 0: read 0x3fff, expected 0xffffffff; restoring the pre-write snapshot
+  [2.384940] probe with driver luofu-switch failed with error -5
+  ```
+  Decode proved **table 19 is write-only in the vendor code** (the `hi_queue_init` write is its
+  only user; the EQM table accessors are module-local to `hi_lsw_dp`), so its readback can never
+  verify the record.  Fixed by acknowledging table 19 and comparing the other tables on their
+  vendor-read fields.
+- *Round 2 (image 5d2c5476):* the table-19 acknowledge path worked, and its read view - all-zero
+  in the fresh-block snapshot - became `0x3fff 0x3e8 0x3fff 0x1ffffff 0x0` after writing
+  `0xffffffff 0xffffc3e8 0xffffffff 0xffffffff 0xffffffff`: the write took effect and the read
+  view is per-word field-width masked.  Verification then **passed every table-32 and table-35
+  entry** and failed on table 17:
+  ```
+  [2.730787] W7: table 19 entry 0 is write-only in the vendor code: command acknowledged, read view 0x3fff 0x3e8 0x3fff 0x1ffffff 0x0 (not compared)
+  [2.747459] EQM readback mismatch at table 17 entry 17 word 0: read 0x0, expected 0xbb8 (vendor-read field mask 0x1fff), snapshot 0x0, read view 0x0 0x10000000 0xffff0bb8 0x2000bb8 0x0; restoring the verified entries
+  [2.786938] probe with driver luofu-switch failed with error -5
+  ```
+  Words 1..3 of that record read back **exactly at their own indices** (the data-register mapping is
+  not shifted), while words 0 and 4 read 0 although written: the engine does not implement those
+  two words as readable.  The GEMAC netdevs again refused to register.
+- *Fix (patch 032 revision 3, sha256 in the lane SUMMARY):* verification is tiered and only
+  bench-proven fields fail closed - **STRICT** = table 32 slot priorities, table 35 word 0 bytes
+  1-2, table 17 words 1..3 (all read back exactly on hardware); **DIAG** = tables 16 and 34 (not
+  reached on the bench yet: writes command-acknowledged, read views logged, to be promoted once a
+  run shows which words are readable); **ACK** = write-only table 19.  Restore now restores only
+  the bench-proven entries; table 19 and tables 16/34 are deliberately left as written (their read
+  views cannot be trusted to restore a record), the probe powers the block down and refuses
+  readiness, and the restore log states the restored/skipped counts.  The mismatch log prints the
+  bench-proven mask, the snapshot value and the whole 5-word read view.  The next attended boot is
+  the first one that can run the complete write set and then test traffic.
+
+### Gate matrix after patch 032 (all paths fail closed; default boot unchanged)
+
+| boot parameters | switch driver | GEMAC netdevs |
+| --- | --- | --- |
+| none | read-only baseline/probe/refusal; no write | none |
+| `arm=1` | W3 power + snapshot; refuse; no LSW register write | none |
+| `arm=1 egress=1` | W3+W4 verified; then qid map absent -> restore, power down, refuse | none |
+| `arm=1 egress=1 qidmap=1` | W3+W4+W5 verified; then eps absent -> restore, refuse | none |
+| `arm=1 egress=1 qidmap=1 eps=1` | W3-W6 verified; then qminit absent -> restore, refuse | none |
+| `arm=1 egress=1 qidmap=1 eps=1 qminit=1` | W3-W7 all verified -> `luofu_switch_ready()` true | requires `luofu_pie.arm=1` too |
+| any write gate without `arm=1` | explicit -EINVAL refusal | none |
+
+### Validation (isolated clone under build/linux-kbuild/waves/2026-11-19-qm-decode/; shared clone and openwrt-lab-selectorfix-img untouched)
+
+- **Patch/series:** patch 032 revision 3 is generated from the 001-031 tree; `001`-`034` applies
+  with 0 failed hunks and 0 `.rej`/`.orig` (`series-apply-001-034`, 34/34 patches), and the
+  resulting drivers are byte-identical to the lane work tree.
+- **prepare/compile:** isolated reflink clone of the OpenWrt lab under the wave directory with the
+  fixed 032 and the lane-033/034 patches added, `make target/linux/prepare` RC=0 and
+  `make target/linux/compile` RC=0 with `CONFIG_WERROR=y` and zero `warning:`/`error:` lines in
+  the build log (log hashes in the lane SUMMARY).
+- **checkpatch:** 0 errors, 0 checks, the one expected "missing commit description" warning that
+  every pure unified diff in this series produces.
+- **DTS/binding/config:** patch 032 changes no devicetree, binding or Kconfig/config symbol, so the
+  earlier `dt_binding_check`/board-DTS/config-idempotence results stand unchanged.
+- **Executed on hardware:** three attended boots on 2026-11-19 (images 14791958 and 5d2c5476 for
+  W7), each refused fail-closed as designed; see the bench results above.
+
+### What this proves and what it does not
+
+Proven on hardware (2026-11-19, images 14791958 / 5d2c5476): the W3-W6 write set runs and
+verifies on the real block; the EQM indirect interface performs the W7 845-word pre-write
+snapshot (stable, idle) and the engine acknowledges every W7 write; the table-32 and table-35
+vendor-read fields verify on silicon; table 17 words 1..3 read back exactly (the write/read data
+register mapping is correct, not shifted) while words 0/4 are not readable; the table-19 read
+view is a per-word field-width mask of the written record (fresh block 0x0 -> 0x3fff/0x3e8/...);
+and the fail-closed path (restore of bench-proven entries, power-down, readiness refusal, GEMAC
+refusal) works exactly as designed, including the documented decision to leave the write-only
+table 19 record as written.
+
+Proven host-side: the recovered write set is the vendor's own init write shape for the nine
+populated wired queue groups; the indirect engine protocol is decoded and corroborated by the
+measured idle register state; table 19 is write-only in the vendor code (the bench read view
+0x3fff = low 14 bits of the written 0xffffffff confirmed the readback cannot verify it); the
+five-gate composition, conformance checks, verification masks and restore paths are reviewable
+code; the 001-033 series applies and compiles clean.
+
+Not proven (see LSW-SPEC.md section 7.9): that a fully configured queue manager lets a tagged PIE
+TX descriptor egress, and the RX path. Table 38 (per-qid scheduler state, needs the vendor
+table-manager id) and the ports 40..43 virtual-port class are deliberately excluded; the
+IFC/L2/VLAN tables and the queue/flow DDR layout remain [U]. A successful W7 boot means "the
+recovered write set was accepted/verified", not "forwarding works".
+
+### Attended boot sequence (recovery card armed; physical RESET+TFTP is the only recovery)
+
+This is the first boot that should run the whole chain and then test traffic:
+
+1. **W3 only** (`luofu_switch.arm=1`): expect the W3 snapshot log and the refusal. Confirms the block
+   is still in the measured power state after the previous sessions.
+2. **W3+W4+W5** (`... egress=1 qidmap=1`): expect the R1/R3/R5 and qid-map programmed-and-verified
+   lines and the refusal that names the missing EPS gate.
+3. **W3-W6** (`... eps=1`): expect the W6 line and the refusal that names the missing QM gate.
+4. **W3-W7 + PIE** (`... eps=1 qminit=1` plus `luofu_pie.arm=1`): expect, in order, the W3
+   snapshot line, the W4 line, the W5 line, the W6 line, the W7 snapshot lines (the 169-entry
+   summary, the write-only table-19 pre-write read view, and "indirect interface idle"), the W7
+   verification line ("... programmed: 91 verified on bench-proven vendor-read fields (tables
+   32/35/17), 77 acknowledged with diagnostics (tables 16/34; N differed on a vendor-read field),
+   1 write-only acknowledged (table 19) ...") with up to six diagnostic warnings for tables 16/34,
+   the connectivity-armed line and the GEMAC registration line. The diagnostic read views are the
+   data needed to promote tables 16/34 to fail-closed verification in a follow-up patch - capture
+   the console either way. If a STRICT table still mismatches, the stage restores the bench-proven
+   entries, leaves table 19 and tables 16/34 as written, powers the block down and refuses
+   readiness; the log prints the bench-proven mask, the snapshot value and the full 5-word read
+   view. Then, with the bench link up: `ping` across the wired port while watching the PIE TX read
+   pointer and the switch/EPS drop counters; one variable per boot; power cycle between variants.
+5. Any wedge or hang: physical RESET+TFTP only. There is no in-kernel reset path on this image.
+
+### Evidence (local-only, gitignored)
+
+`build/linux-kbuild/waves/2026-11-19-qm-decode/` holds the disassembly helper, the decoded
+queue-group table dump, the patch/series validation and the isolated clone logs; the full decode
+map, the exact values and the fixture hash are in
+`target-skeleton/docs/incoming/qm-decode/SUMMARY.md`.
+
+
+## 2026-11-20 (LSW PFE session): PFE forwarding-engine base init + W7 tier count (patch 036)
+
+Decode/implementation lane; the hardware results below were produced by the bench lane on images
+75868fe0 (round 3) and are recorded here with their console evidence. Nothing in this lane touched
+the device.
+
+### Round 3 (image 75868fe0): the data path armed but no frame crossed the switch
+
+The revision-3 tiered W7 verification passed on silicon (the success line printed the counters of
+the pre-fix build, see below) and the driver published readiness for the first time:
+
+```
+[2.577673] W7: 169 EQM table entries (845 words) programmed: 0 verified on bench-proven vendor-read fields (tables 32/35/17), 168 acknowledged with diagnostics (tables 16/34; 0 differed on a vendor-read field), 1 write-only acknowledged (table 19); queue ports 9, qids 72, scheduler profiles 10
+[2.607002] connectivity path armed: ... the GEMAC netdev front end may register
+... luofu-gmac: eth0..eth3 registered (PIE TX armed, LSW egress map ready)
+... luofu-gmac eth2: link up: gmii 1000Mbps full-duplex
+... br-lan: port 1(eth2) entered forwarding state
+```
+
+But no frame moved: the host AF_PACKET sniffer saw only its own ARP requests, the PIE RX
+poll/interrupt trace never fired (zero RX poll lines), and the PIE TX descriptors were consumed
+(doorbells accepted, TX read pointer advancing) without a wire frame. The strict-count bug is
+visible in that line: revision 3 counted every masked entry as diagnostic, so it reported
+0 verified / 168 acknowledged although all 91 STRICT entries (9 table-32 + 72 table-35 + 10
+table-17) had passed their bench-proven masks (0 differed). Patch 036 fixes the counter.
+
+### What patch 036 adds: the PFE base init (W8)
+
+The data path is not complete with the DP/EQM/EPS init alone: the vendor probes **hi_lsw_pfe**
+after the DP module and programs the forwarding-engine globals before its CFE/rootif layer is
+usable. Re-decoded from the pinned `hi_lsw_pfe.ko` (52,412 B, sha256
+`12ea9fcb90bef0b77f8ba54b4781f72de4af91b2a24c31d68813878212c49d1a`): `hi_pfe_probe@0x23a4` registers
+the ten PFE windows, enables its clock, pulses resets, then runs `hi_pfe_init@0x2278` ->
+`hi_pfe_pub_init` -> `hi_pfe_opp_init@0x271c` -> mcc -> napt -> `hi_pfe_ifc_init@0x794`. The
+whole direct-register part of that base init is four words:
+
+| write | value |
+| --- | --- |
+| `pe+0x400` | 2 |
+| `pfe_glb+0x2c` | read, write back value & 0xffff (upper 16 bits are the glb-attr field) |
+| `pfe_glb+0x204` | 1 |
+| `opp+0x110` | 0 (after the port qid-map walk) |
+
+Patch 036 (sixth attended gate `luofu_switch.pfe=1`, requires
+`arm=1 egress=1 qidmap=1 eps=1 qminit=1`) snapshots each word, requires it stable across two
+reads, writes the computed value (two vendor constants, one vendor read-modify-write, one zero),
+reads every word back and restores the snapshot on a mismatch (also in `remove()`).
+`luofu_switch_ready()` now requires W3+W4+W5+W6+W7+W8, so the GEMAC front end only registers with
+the PFE base init in place. The IFC default-classification table (`ifc+0x50000`, 16-byte
+entries written by `hi_pfe_ifc_init` through `hi_lsw_write_tab128`) is decoded at the call-shape
+level but deliberately **not** in this stage: its fields are [U] and it needs its own attended
+verification.
+
+### Remaining gap layers (ordered; the next patches' candidates)
+
+1. **IFC default-classification table** (`ifc+0x50000`, 16-byte entries) - the most likely
+   reason a frame has no forwarding decision at all;
+2. **L2/VLAN tables** (`l2`, id 1) and the CFE/rootif contract (`hi_kcfe_pub`, `hi_kcara`,
+   `hi_swa`) - how the vendor software bridge learns and what it programs per flow;
+3. **per-port MAC configuration** - our GEMAC driver writes only the measured 1 Gbps link words;
+   the vendor `hi_mac_hw_config` full write set (MTU, pause, RX/TX enable) has not been compared
+   against it yet, and either direction of the wire could still be disabled there;
+4. NAPT/MCC init words (not needed for plain L2), table 38 / VP class (7.9), and the PIE per-port
+   queue handle (zero in the vendor build; hardware effect [U]).
+
+### Validation (isolated clone under build/linux-kbuild/waves/2026-11-20-r4-armed/; shared clone and openwrt-lab-selectorfix-img untouched)
+
+- **Patch/series:** patch 036 generated from the 001-035 tree; `001`-`036` applies with 0
+  failed hunks and 0 `.rej`/`.orig` (36/36), drivers byte-identical to the lane work tree.
+- **prepare/compile:** isolated reflink clone with patches 035+036 added, `make target/linux/prepare`
+  RC=0 and `make target/linux/compile` RC=0 with `CONFIG_WERROR=y` and zero `warning:`/`error:`
+  lines in the build log (log hashes in the lane SUMMARY).
+- **checkpatch:** 0 errors, 0 checks, the one expected "missing commit description" warning.
+- **DTS/binding/config:** patch 036 changes no devicetree, binding or Kconfig/config symbol.
+
+### Attended sequence for the next run (recovery card armed; physical RESET+TFTP is the only recovery)
+
+Same as the round-3 chain **plus** `luofu_switch.pfe=1`: expect W3 -> W4 -> W5 -> W6 -> W7 (with the
+corrected counters: "91 verified ... 77 acknowledged with diagnostics ... 1 write-only
+acknowledged") -> W8 "PFE forwarding-engine base init programmed and verified" -> connectivity
+armed -> GEMAC registration -> eth2 link up -> br-lan forwarding. Then ping from the host while
+watching the PIE RX poll trace and the switch/EPS drop counters: RX poll lines appearing would prove
+the wire->CPU direction opened; a wire frame (or non-zero egress counters) would prove the CPU->wire
+direction. If nothing moves, the remaining layers above are the ordered candidates.
+
+### Evidence (local-only, gitignored)
+
+`build/linux-kbuild/waves/2026-11-20-r4-armed/` holds the fixture disassemblies, the LSW access
+inventory and the validation logs; the bench console evidence is
+`build/evidence-bench-gates/2026-11-19/uart-r3-armed.log`; the full round-4 record is in
+`target-skeleton/docs/incoming/qm-decode/SUMMARY.md`.
+
+
+## 2026-11-20 round 4 (continue): MAC maximum-frame init (W9, patch 038)
+
+Host-only decode/implementation lane; the hardware result below was produced by the bench lane on
+image 6cb3d908 and is recorded here with its console evidence.
+
+### What the round-4 run proved and what it left open
+
+The W8 PFE base init verified on silicon (W7 counters corrected: "91 verified on bench-proven
+vendor-read fields (tables 32/35/17), 77 acknowledged with diagnostics (tables 16/34; 0 differed),
+1 write-only acknowledged (table 19)"; W8 "PFE forwarding-engine base init programmed and verified
+(pe+0x400=0x2 pfe_glb+0x2c=0x34 pfe_glb+0x204=0x1 opp+0x110=0x0)"; connectivity armed).  GEMAC
+registered, eth2 linked 1 Gbps/Full, br-lan entered forwarding - and **still no frame moved**: zero
+PIE RX poll lines, no box-originated frames on the wire, PIE TX descriptors consumed.  W8 is
+necessary but not sufficient.
+
+### Patch 038 (W9): the MAC maximum-frame register
+
+The vendor MAC driver's per-port hardware config was never reproduced by our GEMAC front end.
+Decoded from the pinned `hi_kmac.ko`: `hi_mac_hw_mtu@0x38c` reads register **0x100**,
+replaces its **low 14 bits with (MTU + 4)** and writes the word back (plain base+offset MMIO via
+`hi_reg_hw_read@0x41b8`/`hi_reg_hw_write@0x41c4`); `hi_mac_change_mtu@0x428c` calls it on MTU
+changes.  The MAC counts `rx_overmax_pkt`/`tx_overmax_pkt`, so frames longer than this
+limit are dropped in **both** directions - a zero/reset max-frame value would explain the observed
+"link up, nothing moves" symptom exactly.
+
+Patch 038 adds the seventh gate `luofu_gmac.hwinit=1`: when the accepted attended path is
+reached (PIE armed, LSW data path complete) the GEMAC driver refuses to register a netdev unless
+W9 is armed, snapshots register 0x100, requires it stable across two reads, computes
+`(pre & ~GENMASK(13,0)) | ((mtu + 4) & GENMASK(13,0))`, writes it, reads it back, restores the
+snapshot on a mismatch, and re-runs it from `ndo_change_mtu`.  Only that one MAC register is
+touched; the rest of the vendor config (0x14/0x18/0x1c and the 0x40 read-modify) overlaps the
+measured link words our driver already writes.  The write shape is [V]; field semantics beyond
+"low 14 bits = frame limit" are [U].
+
+### Remaining gap layers (ordered)
+
+1. **IFC default-classification table** (`ifc+0x50000`, 16-byte entries from
+   `hi_pfe_ifc_init`) - decoded call shape only: each entry embeds an id from the vendor's
+   software table-manager allocation (`hi_tab_mgr_alloc_hash`), so the allocator's id sequence
+   must be decoded before the payloads can be reproduced;
+2. L2/VLAN tables + the CFE/rootif contract (`hi_kcfe_pub`, `hi_kcara`, `hi_swa`);
+3. remaining MAC config words (0x14/0x18/0x1c, 0x40 read-modify), NAPT/MCC init, table 38 / VP
+   class, and the PIE per-port queue handle.
+
+### Validation and next attended step
+
+The 001-038 series applies (38/38, 0 rej) and the isolated clone prepare/compile runs with
+`CONFIG_WERROR=y` and zero `warning:`/`error:` lines; checkpatch 0 errors (log hashes in the
+lane SUMMARY).  The next attended boot runs the full seven-gate chain including
+`luofu_gmac.hwinit=1` and then pings: the W9 line ("MAC maximum-frame register programmed and
+verified (0x100 = 0x5e0, mtu 1500 + 4, snapshot ...)") plus a wire frame or PIE RX poll lines would
+show the wire reopened in one or both directions; otherwise the ordered gap list above is the path.
+
+
+## 2026-11-20 round 4b: W9 value bug, traffic-triggered reset, W9 diag/write split (patch 040)
+
+The round-4b runs produced two findings and one safety redesign:
+
+1. **W9 wrote 1504 instead of 1518.**  The bench read W9 back as `0x334005e0` against the found
+   default `0x334005ee`: the vendor helper stores (arg + 4) and the argument is the frame length
+   without FCS (MTU + 14), so the correct value is MTU + 18 = 1518.  Patch 038 wrote MTU + 4, 14
+   bytes short - every full-size frame would have been over-max in both directions.
+2. **The traffic test reset the box on the W9 images.**  Image a6b57361 (2 CPUs, early_probe) and
+   image 45d248ff (stable 1-CPU, no early_probe) both booted, armed all seven gates including W9,
+   linked eth2 and then reset/fell back to stock during/after the traffic test; the six-gate image
+   6cb3d908 (no W9) survived the same test.  So the reset correlates with W9 plus traffic, not with
+   boot.  The oops register dump was not captured (the loader fallback reset the box; the kernel has
+   no pstore/ramoops).  `oops=panic panic=0` on the cmdline would halt with a full dump instead.
+3. **Patch 040 makes W9 safe by construction:** read-only diagnostic by default (the 0x100 value is
+   logged on every GEMAC for the stock-vs-ours comparison), write behind a separate
+   `luofu_gmac.hwinitwrite=1` gate that touches only the port in `luofu_gmac.hwinit_port` (default
+   11 = bench eth2), corrected MTU + 18 formula that never lowers a found limit, pre/post value
+   logs, and optional `luofu_gmac.trace=1` xmit instrumentation logging the MAC words around the
+   PIE doorbell to attribute a hang to enqueue vs. engine processing.
+
+Vendor ordering [I]: the only writer of MAC 0x100 is `hi_mac_hw_mtu`, referenced solely from the
+GEMAC ops table and invoked from the MAC config/link callbacks - the vendor sets the length limit as
+part of link configuration, after probe/reset, and it does not enable a TX path (that stays in the
+control word 0x0 our link-up already writes).
+
+## 2026-11-20 round 4c: MAC control decode + doorbell bisection (patch 041)
+
+The diag-safe run (6cf5de37, W9 read-only, trace=1) confirmed the found max-frame 0x334005ee (1518),
+showed reg 0x0 reads back 0 at probe and at TX time, and hung after exactly one descriptor/doorbell
+(hardware-watchdog reset, no oops - a bus hang).  Decoded: the vendor MAC config path
+(`hi_mac_hw_config`) writes 0x18=1 (reset assert), 0x14=speed/duplex code, 0x18=0 (release),
+0x1c=1, and RMWs 0x40 (clear bits 8..15 + bit 24, set bit 24) - no write to 0x0.  The RMW from the
+found 0xc0408 baseline yields 0x10c0008, which is exactly what our link-up writes, so the port-mode
+word is already vendor-consistent; the missing pieces were 0x14/0x18/0x1c.
+
+Patch 041 adds three attended diagnostics: `luofu_pie.nodoorbell=1` (build/publish descriptors but
+never ring the doorbell), `luofu_gmac.macconf=1` (replay the vendor 0x14/0x18/0x1c/0x40 sequence at
+link-up with pre/post logs), and `luofu_gmac.txhalt=1` (stop the TX queue after the first xmit).
+The bisection order: (1) nodoorbell=1+trace=1 run - survives => hang is engine processing after the
+doorbell (not descriptor build/DMA); (2) macconf=1+trace=1+txhalt=1 run - tests whether the missing
+vendor sequence is what makes the engine hang; (3) normal doorbell run to confirm.
+
+## 2026-11-20 round 4d: no-engine-interaction hang, W9 master switch (patch 042)
+
+Image 2d904721 (001-041, seven gates, W9 read-only, trace=0, nodoorbell=1, oops=panic) booted and
+showed four suppressed-doorbell lines (descriptor builds only, no doorbell writes, no post-TX MMIO
+reads), yet the box still hung under the traffic test: last lines are the second eth2 link-up /
+br-lan forwarding at 40.4 s, two xmit attempts and eth3 PHY init at 40.95 s, then silence (no Oops,
+no fallback, physical recovery).  The 001-037 six-gate image survived the same test, so the open
+deltas are the W9 probe-time diag reads + extra ndo_change_mtu op (038/040) and the SMP 039/040-arm
+patches that the 001-037 image predates.
+
+Patch 042 adds `luofu_gmac.w9` as a master switch, default OFF: with `w9=0` the probe performs no
+W9 MMIO and no registration gate, and installs the pre-038 netdev ops table (no change_mtu), so a
+full seven-gate image can run with zero W9 code.  Recommended matrix: idle boot without traffic;
+full 001-042 without the w9 parameter (W9 inert); 001-037 control; 001-037 + SMP 039/040-arm.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4k: all decodable init matches stock; page scan (patch 049)
+
+W13_RXCFG verified pie+0x3404=0x1b04 on silicon and the full W3-W13 chain armed with a stable
+heartbeat, yet RX still never fires.  Every comparable programmable register now matches stock, so
+the remaining class is the vendor CFE runtime flow/port state: hi_kcfe_pub imports only netdev/
+notifier APIs and the table-manager consumers (hi_kcara/hi_swa) cannot load on 6.18.  Patch 049
+adds luofu_switch.scan=1 / luofu_pie.scan=1 read-only page scans (one word per 4 KiB page, non-zero
+pages printed) with the stock devmem command, to locate the missing table pages for the next gated
+replay stage.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4k: all decodable init matches stock; page scan (patch 049)
+
+W13_RXCFG verified pie+0x3404=0x1b04 on silicon and the full W3-W13 chain armed with a stable
+heartbeat, yet RX still never fires.  Every comparable programmable register now matches stock, so
+the remaining class is the vendor CFE runtime flow/port state: hi_kcfe_pub imports only netdev/
+notifier APIs and the table-manager consumers (hi_kcara/hi_swa) cannot load on 6.18.  Patch 049
+adds luofu_switch.scan=1 / luofu_pie.scan=1 read-only page scans (one word per 4 KiB page, non-zero
+pages printed) with the stock devmem command, to locate the missing table pages for the next gated
+replay stage.
+
+## 2026-11-20 round 4l: W14 page map = counters, content-dump next (patch 050)
+
+Fifteen stock non-zero pages are zero/different on ours, but classification shows they are runtime
+counters: every differing offset appears in the vendor fixtures only as a read in the DFX counter
+dump functions (never an init write), the same 0x1b6 appears in five engines, the fam pair reads
+0x2f9/0x2fa, and our values are small running counters; persistent-looking pages already match.
+Patch 050 adds luofu_switch.pagedump=1: 16 words per differing page + controls, double-read 10 ms
+apart, STABLE vs CHANGED labels, for a content-level stock diff before any replay.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4k: all decodable init matches stock; page scan (patch 049)
+
+W13_RXCFG verified pie+0x3404=0x1b04 on silicon and the full W3-W13 chain armed with a stable
+heartbeat, yet RX still never fires.  Every comparable programmable register now matches stock, so
+the remaining class is the vendor CFE runtime flow/port state: hi_kcfe_pub imports only netdev/
+notifier APIs and the table-manager consumers (hi_kcara/hi_swa) cannot load on 6.18.  Patch 049
+adds luofu_switch.scan=1 / luofu_pie.scan=1 read-only page scans (one word per 4 KiB page, non-zero
+pages printed) with the stock devmem command, to locate the missing table pages for the next gated
+replay stage.
+
+## 2026-11-20 round 4l: W14 page map = counters, content-dump next (patch 050)
+
+Fifteen stock non-zero pages are zero/different on ours, but classification shows they are runtime
+counters: every differing offset appears in the vendor fixtures only as a read in the DFX counter
+dump functions (never an init write), the same 0x1b6 appears in five engines, the fam pair reads
+0x2f9/0x2fa, and our values are small running counters; persistent-looking pages already match.
+Patch 050 adds luofu_switch.pagedump=1: 16 words per differing page + controls, double-read 10 ms
+apart, STABLE vs CHANGED labels, for a content-level stock diff before any replay.
+
+## 2026-11-20 round 4m: GEMAC window diff and W16 static config (patch 051)
+
+The GEMAC comparison found six differences in 144 common words.  Decode of hi_kmac classifies
+them: 0x1c is static config (hi_mac_hw_config writes 1; ours 0 because macconf was off), 0x100 is
+the max-frame+pause word (stock 0x33400600 -> 1536; our MTU+18 formula gave 1518; vendor convention
+adds 36 - formula [U], measured [V]), and 0xa4/0xac/0xb0/0xb8 are statistics counters read by
+himac_read_stats (not replayed).  Patch 051 adds luofu_gmac.macregs=1 (fail-closed): snapshot,
+stable-two-reads, write 0x1c=1 and 0x100=low14 0x600, exact readback, restore on mismatch.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4k: all decodable init matches stock; page scan (patch 049)
+
+W13_RXCFG verified pie+0x3404=0x1b04 on silicon and the full W3-W13 chain armed with a stable
+heartbeat, yet RX still never fires.  Every comparable programmable register now matches stock, so
+the remaining class is the vendor CFE runtime flow/port state: hi_kcfe_pub imports only netdev/
+notifier APIs and the table-manager consumers (hi_kcara/hi_swa) cannot load on 6.18.  Patch 049
+adds luofu_switch.scan=1 / luofu_pie.scan=1 read-only page scans (one word per 4 KiB page, non-zero
+pages printed) with the stock devmem command, to locate the missing table pages for the next gated
+replay stage.
+
+## 2026-11-20 round 4l: W14 page map = counters, content-dump next (patch 050)
+
+Fifteen stock non-zero pages are zero/different on ours, but classification shows they are runtime
+counters: every differing offset appears in the vendor fixtures only as a read in the DFX counter
+dump functions (never an init write), the same 0x1b6 appears in five engines, the fam pair reads
+0x2f9/0x2fa, and our values are small running counters; persistent-looking pages already match.
+Patch 050 adds luofu_switch.pagedump=1: 16 words per differing page + controls, double-read 10 ms
+apart, STABLE vs CHANGED labels, for a content-level stock diff before any replay.
+
+## 2026-11-20 round 4m: GEMAC window diff and W16 static config (patch 051)
+
+The GEMAC comparison found six differences in 144 common words.  Decode of hi_kmac classifies
+them: 0x1c is static config (hi_mac_hw_config writes 1; ours 0 because macconf was off), 0x100 is
+the max-frame+pause word (stock 0x33400600 -> 1536; our MTU+18 formula gave 1518; vendor convention
+adds 36 - formula [U], measured [V]), and 0xa4/0xac/0xb0/0xb8 are statistics counters read by
+himac_read_stats (not replayed).  Patch 051 adds luofu_gmac.macregs=1 (fail-closed): snapshot,
+stable-two-reads, write 0x1c=1 and 0x100=low14 0x600, exact readback, restore on mismatch.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4k: all decodable init matches stock; page scan (patch 049)
+
+W13_RXCFG verified pie+0x3404=0x1b04 on silicon and the full W3-W13 chain armed with a stable
+heartbeat, yet RX still never fires.  Every comparable programmable register now matches stock, so
+the remaining class is the vendor CFE runtime flow/port state: hi_kcfe_pub imports only netdev/
+notifier APIs and the table-manager consumers (hi_kcara/hi_swa) cannot load on 6.18.  Patch 049
+adds luofu_switch.scan=1 / luofu_pie.scan=1 read-only page scans (one word per 4 KiB page, non-zero
+pages printed) with the stock devmem command, to locate the missing table pages for the next gated
+replay stage.
+
+## 2026-11-20 round 4l: W14 page map = counters, content-dump next (patch 050)
+
+Fifteen stock non-zero pages are zero/different on ours, but classification shows they are runtime
+counters: every differing offset appears in the vendor fixtures only as a read in the DFX counter
+dump functions (never an init write), the same 0x1b6 appears in five engines, the fam pair reads
+0x2f9/0x2fa, and our values are small running counters; persistent-looking pages already match.
+Patch 050 adds luofu_switch.pagedump=1: 16 words per differing page + controls, double-read 10 ms
+apart, STABLE vs CHANGED labels, for a content-level stock diff before any replay.
+
+## 2026-11-20 round 4m: GEMAC window diff and W16 static config (patch 051)
+
+The GEMAC comparison found six differences in 144 common words.  Decode of hi_kmac classifies
+them: 0x1c is static config (hi_mac_hw_config writes 1; ours 0 because macconf was off), 0x100 is
+the max-frame+pause word (stock 0x33400600 -> 1536; our MTU+18 formula gave 1518; vendor convention
+adds 36 - formula [U], measured [V]), and 0xa4/0xac/0xb0/0xb8 are statistics counters read by
+himac_read_stats (not replayed).  Patch 051 adds luofu_gmac.macregs=1 (fail-closed): snapshot,
+stable-two-reads, write 0x1c=1 and 0x100=low14 0x600, exact readback, restore on mismatch.
+
+## 2026-11-20 round 4e: MAC sequence confirmed, IFC default table decoded (patch 043)
+
+Image f58c516e (heartbeat liveness detector, macconf=1) ran stable through the traffic test; both
+eth2 link-ups logged the vendor MAC config sequence (0x14=0x6, 0x18 reset, 0x1c 0->1, 0x40 RMW result
+0x10c0008) and 0x0 stayed 0, yet traffic was still dead - the MAC is not the missing layer.
+
+Decoded `hi_pfe_ifc_init@0x794` from the pinned hi_lsw_pfe.ko: eight default classifier entries,
+each written through the IFC command/data engine (data 0x138..0x148, command
+`0x120 = 0xc0000000 | (index & 0x7f)`, poll bit31, bit29 error) and a 4-word tab128 entry at
+`ifc+0x50000 + index*16`.  Payloads extracted by emulating the function and hand-checked for
+entries 1-5.  Patch 043 adds the W10 stage (`luofu_switch.ifc=1`, requires arm/egress/qidmap/eps/
+qminit/pfe): idle pre-check, tab128 snapshot/stability/exact-readback/restore, engine descriptors
+acknowledged, fail-closed, readiness W3-W10.  Bench verification: look for the W10 line, then a
+host ARP request followed by a box reply (or PIE RX traces); failure signatures are engine bit29 /
+poll timeout / tab128 readback mismatch, all of which leave the box up but refuse to arm.
+
+## 2026-11-20 round 4g: W10 on silicon, no traffic, read-only state dump (patch 045)
+
+The corrected W10 image (24794d64) programmed and verified the eight IFC default entries and the
+armed path ran with a stable heartbeat, yet no frame crosses in either direction.  All ten stages
+W3-W10 are verified, so the missing state is the vendor runtime forwarding layer
+(`hi_kcfe_lrn_*`, `hi_kcfe_pub`, `hi_kcara`), which cannot load on the 6.18 kernel; the PIE
+`g_api_priv` queue handle is software-only, not a hardware register.
+
+Patch 045 adds `luofu_switch.dump=1`, a read-only dump of the candidate forwarding-state regions
+after the armed path, for a stock-vs-ours diff: ranges where stock is non-zero and ours is zero are
+the next write set.  Attended procedure: capture the `lsw-dump` block on our image, read the same
+window+offset addresses on a stock boot, diff.
+
+## 2026-11-20 round 4h: dump diff, W10 correction, W12 EPS/DP stage (patch 046)
+
+The W11 read-only dump vs a stock devmem read found the missing persistent state and one wrong
+W10 detail: the tab128 entries were written one slot too low (0-based array index instead of the
+vendor idx) and with allocator id 0x1d00 instead of the stock 0x1d01, so the classifier defaults
+were in the wrong slots.  Patch 046 fixes the offsets/payloads and adds the W12 stage
+(`luofu_switch.ext=1`) for the 16 unprogrammed extended EPS words (eps+0xb20/b30/ba0/bb0 blocks,
+stock values) and dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15),
+[U] meaning) - snapshot, stable-two-reads, exact readback, restore, readiness W3-W12.  The defunct
+eqm+0x48..0x70 differences are the indirect command/data registers, not configuration.
+
+Expected bench lines: W12 start line -> `W12: extended EPS/DP runtime words programmed and
+verified: 16 EPS words + dp+0x1c=0x18000` -> armed line including W12.  W10 now prints the
+entry table at the correct offsets; the W11 dump (if enabled) shows ifc+0x50010..0x50080.
+
+## 2026-11-20 round 4i: RX-state comparison (patch 047)
+
+W12 verified on silicon (0a6849ed): LSW state matches stock within the dumped windows, heartbeat
+stable - but no PIE RX interrupt has ever fired.  Patch 047 adds read-only dumps of the PIE RX/TX
+registers (the stock inventory addresses; 0x3404=0x1b04 and 0x3700=0xffff on stock vs our 0 are the
+leading RX-enable candidates) and of the GEMAC windows at link-up for a stock devmem comparison.
+No writes; the next diff decides the gated W13 write set.
+
+## 2026-11-20 round 4j: W13_RXCFG, the most direct RX-enable lead (patch 048)
+
+The PIE dump matched the stock inventory except pie+0x3404 (ours 0, stock 0x1b04), the decoded
+hi_pie_rx_init_chan RX-config word.  Patch 048 adds luofu_pie.rxcfg=1 (required with luofu_pie.arm=1):
+snapshot, stable-two-reads, write stock 0x1b04, exact readback, restore on mismatch, fail-closed;
+it logs the computed 0x3408 bitmap expectation (0 for our rings) and leaves 0x3400/0x340c alone.
+The gmac.dump emission bug from patch 047 is fixed (call was after the macconf early return).
+
+## 2026-11-20 round 4k: all decodable init matches stock; page scan (patch 049)
+
+W13_RXCFG verified pie+0x3404=0x1b04 on silicon and the full W3-W13 chain armed with a stable
+heartbeat, yet RX still never fires.  Every comparable programmable register now matches stock, so
+the remaining class is the vendor CFE runtime flow/port state: hi_kcfe_pub imports only netdev/
+notifier APIs and the table-manager consumers (hi_kcara/hi_swa) cannot load on 6.18.  Patch 049
+adds luofu_switch.scan=1 / luofu_pie.scan=1 read-only page scans (one word per 4 KiB page, non-zero
+pages printed) with the stock devmem command, to locate the missing table pages for the next gated
+replay stage.
+
+## 2026-11-20 round 4l: W14 page map = counters, content-dump next (patch 050)
+
+Fifteen stock non-zero pages are zero/different on ours, but classification shows they are runtime
+counters: every differing offset appears in the vendor fixtures only as a read in the DFX counter
+dump functions (never an init write), the same 0x1b6 appears in five engines, the fam pair reads
+0x2f9/0x2fa, and our values are small running counters; persistent-looking pages already match.
+Patch 050 adds luofu_switch.pagedump=1: 16 words per differing page + controls, double-read 10 ms
+apart, STABLE vs CHANGED labels, for a content-level stock diff before any replay.
+
+## 2026-11-20 round 4m: GEMAC window diff and W16 static config (patch 051)
+
+The GEMAC comparison found six differences in 144 common words.  Decode of hi_kmac classifies
+them: 0x1c is static config (hi_mac_hw_config writes 1; ours 0 because macconf was off), 0x100 is
+the max-frame+pause word (stock 0x33400600 -> 1536; our MTU+18 formula gave 1518; vendor convention
+adds 36 - formula [U], measured [V]), and 0xa4/0xac/0xb0/0xb8 are statistics counters read by
+himac_read_stats (not replayed).  Patch 051 adds luofu_gmac.macregs=1 (fail-closed): snapshot,
+stable-two-reads, write 0x1c=1 and 0x100=low14 0x600, exact readback, restore on mismatch.
+
+## 2026-11-20 round 4s: WORKING DATA PATH (patches 001-057, image 39424b94)
+
+Host ping 50/50 and 25/25 with 0% loss, bidirectional ICMP/ARP on the wire, SSH to OpenWrt 6.18.60,
+br-lan 192.168.1.1/24 up, ubifs overlay rw.  The switch CPU-copy mirror at destination 4 (W19 dwell)
+plus port-0 delivery to eth2 (W20) complete the wire->PIE RX->CPU->kernel->PIE TX->wire loop.  The
+canonical command line and verification matrix are in target-skeleton/README.md.  (2026-11-21
+update: SMP is resolved and the 2-CPU release baseline is verified - see the final section of
+this document and target-skeleton/RELEASE-NOTES.md.)
+
+
+
+## 2026-11-21 FINAL: SMP resolved by the DTS loader hand-off contract; 2-CPU release baseline verified; false hang retracted
+
+This closes the SMP investigation and defines the release baseline.  Nothing in
+this section is a new driver claim: it is the hardware verification of the target
+image and the release-line consolidation.
+
+**Root cause [V].**  The kernel SMP release (patch 018) was correct.  The stock
+U-Boot `bootfip` hand-off staging silently aborted because the board devicetree
+lacked two nodes the stock vendor base DTB carries:
+
+1. `/aliases/console` (resolved to the console UART);
+2. `/reserved-memory/flashinfo@80600000` (`compatible = "hsan,flashinfo_reserved"`,
+   `reg = <0x80600000 0x4000>`, `atag-offset = <0x1000>`; bootfip computes
+   `atag_addr = 0x80601000`).
+
+Without them our UART showed the vendor warning `alias console not found` and the
+staging lines (`alias console=...`, `serialnr->high/low`, `atag_addr`) never
+appeared, so CPU1 never entered the U-Boot pen-poll loop and every kernel release
+had no consumer.  The 060/061 sentinel probes had proved CPU1 never entered our
+stubs; with the DT nodes present U-Boot completes staging, CPU1 consumes the real
+`secondary_startup` pen, and the sentinels stay untouched.  The fix is **DTS-only**
+(committed in `target-skeleton/dts/luofu-r116.dts`, submodule `5a1b5b3`; details
+in `docs/SMP-RE.md` sections 21-24).
+
+**Verified 2-CPU baseline image 974e6ca6 [V].**  `6,226,222 B`, sha256
+`974e6ca63f6e86418761bc0f135e438f07d0e6ef909c61bb0339f00c5596c508` (patches
+001-061 + the DTS hand-off fix + canonical cmdline + DEVMEM/devmem/pair recorder;
+no probe tokens).  Verified: `smp: Brought up 1 node, 2 CPUs`, CPU1 mpidr
+`80000001`, 3987.86 BogoMIPS, `/proc/cpuinfo` = 2, online 0-1; `br-lan`
+192.168.1.1/24, ping 20/20 0% loss; SSH; `/dev/ubi0_1 on /overlay type ubifs (rw)`;
+15-minute continuous-ping soak 0 failures; reboot persistent with pair b recorded.
+Evidence (parent repo, local/gitignored):
+`build/evidence-bench-gates/2026-11-20-{smp-2cpu.log,smp-reboot.log}`,
+`2026-11-21-{soak-2cpu.log,final-reboot-2cpu.log}` and the UART captures.
+
+**Working LAN is the documented bench workaround [V bench]/[I].**  The wire path
+is the switch CPU-copy mirror (eth2/port 11 -> CPU port dst 4) plus PIE port-0
+completion delivery to eth2 (`cpu_mirror=1 mirror_dst=4`, `cpucopy_deliver=1
+cpucopy_port=11`, `accepterr=1`).  The canonical gates are up to patch 058;
+native CFE L2/VLAN forwarding remains a separate project, not a release claim.
+
+**Retraction [V].**  The reported "2-CPU image hung silently after ~23 minutes"
+(2026-11-20) was a **host bench-link outage**: the USB-Ethernet adapter lost
+carrier/IPs overnight, both management IPs failed and the UART capture had ended,
+so the box looked dead.  The UART showed it alive with no Oops/panic/BUG/WARNING
+(the only panic-text hit is the literal `panic=0` cmdline), and after
+`tools/bench-link.sh --apply` the same image completed the verification matrix and
+the soak.  There is no SMP stability bug; the maxcpus=1 (`d101f96b`) and lockdep
+(`18b3cb1d`) images are diagnostics only.
+
+**Release-line classification.**  The release line is L0 (62 patch files:
+001-058 + 062-065, no duplicate numbers) minus the 11 bench-only SMP
+diagnostics (028, 029, 033, 034, 035, 037, 039, 062, 063, 064, 065) =
+**51 patches**; it is defined in `../upstream/series-6.18/05-release-line.md`
+with the per-patch manifest in
+`../upstream/series-6.18/release-line/manifest.tsv`.  The upstream review form
+(26 kernel patches) is unchanged in content, and the loader hand-off DTS
+contract ships as the separate DTS-series entry **DTS-0001**
+(`../upstream/series-6.18/dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch`,
+companion to kernel patch 0018; see
+`../upstream/series-6.18/06-dts-series-dependency.md`).  Host validation
+(2026-11-21, after the 052/053 and numbering cleanup): review form 26/26
+patch(1)+git am RC=0, 0 errors / 58 checkpatch warnings; release line 51/51
+patch(1) RC=0, 0 rejects, 3 offset hunks, **0 fuzz**, strict git apply 51/51;
+L0 62/62 with 0 fuzz and strict-clean; target DTS and DTS-0001 both compile to
+the same 12,296 B DTB sha256
+`50daf3d0d50929aaa3af35fa40fae69a73428fd5b1c5bcc686795e89cb92d8eb` and the two
+hand-off nodes plus the enable-method are present.  The short release status is
+`../target-skeleton/RELEASE-NOTES.md`.

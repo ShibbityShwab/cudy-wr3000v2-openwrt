@@ -5,6 +5,7 @@
 > This docs/ copy is provided for the documentation index; the two copies are identical
 > except for relative links (this copy links to [TARGET-DESIGN.md](TARGET-DESIGN.md) directly).
 
+
 Status: **decoded from local artifacts and stock U-Boot code; generation is
 structurally validated, not hardware-proven.** Last analysis: 2026-11-18
 (offline; no router, UART, TFTP or fire tool was used).
