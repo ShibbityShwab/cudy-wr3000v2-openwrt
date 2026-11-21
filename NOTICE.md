@@ -109,7 +109,7 @@ HiSilicon.
 - **Radio regulation:** any experimentation with power tables, calibration values or
   `txpower` must remain inside the regulatory limits of the country of operation. The
   documentation notes where those limits live; it does not authorise exceeding them.
-- **No warranty.** Host-validated engineering plus one attended bench boot, provided "as is".
+- **No warranty.** Host-validated engineering plus two attended bench sessions on one unit, provided "as is".
 
 ## Publication policy
 
