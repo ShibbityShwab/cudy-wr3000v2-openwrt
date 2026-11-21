@@ -2,13 +2,14 @@
 
 > **Curated copy (synced 2026-11-21).** This is the lab notebook's documentation-only upstream
 > submission package; **nothing has been submitted anywhere** (no account, list subscription or
-> email transport included). It now reflects the **ZERO-blocker** final state: flashinfo
-> compatible-first adopted (boot-tested image `6e9c54d0`, stock loader PASS), current hashes
-> (DTS `381b2e8c...`, DTS-0001 `886f3ad0...`, DTB `62574b11...` / pad `8d79794e...`, release-line
-> manifest `1e00b568...`), and the rerun review form (patch 0021 MMIO-first; 26/26, checkpatch 0
-> errors / 58 warnings). No Tested-by/Reviewed-by is claimed (see `TESTED-BY-POLICY.md`).
-> `MANIFEST.sha256` was **regenerated against this curated tree**; verify with
-> `sha256sum -c MANIFEST.sha256` from inside this directory.
+> email transport included). It reflects the **ZERO-blocker** state: flashinfo compatible pair
+> boot-tested on image `6e9c54d0`; current hashes (DTS `381b2e8c...`, DTS-0001 `886f3ad0...`, DTB
+> `62574b11...` / pad `8d79794e...`); review form 26 patches (patch 0021 MMIO-first; 26/26,
+> checkpatch 0 errors / 58 warnings). **The L2 review form and this package are unchanged by the
+> W22 release-line extension** (patches 059/060 are release-line only; an L2 extension is future
+> work), while the release-line manifest is now `619eb15a...`. No Tested-by/Reviewed-by is claimed
+> (see `TESTED-BY-POLICY.md`). `MANIFEST.sha256` was **regenerated against this curated tree**;
+> verify with `sha256sum -c MANIFEST.sha256` from inside this directory.
 
 **Status: DOCUMENTATION-ONLY PACKAGE / RFC.  Nothing has been submitted
 anywhere.**  This directory is a dry-run hand-off bundle for the owner to review

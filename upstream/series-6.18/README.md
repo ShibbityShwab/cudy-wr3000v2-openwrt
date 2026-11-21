@@ -1,17 +1,18 @@
 # Upstream submission form - luofu 6.18 kernel series
 
-> **Curated copy (synced 2026-11-21; release line 51 patches, review form 001-026).** This page is
-> reproduced from the project's lab notebook (source submodule `5a6309c`, notebook parent
-> `fb93ff1`). Current state: **ZERO documented upstream blockers** - the last one (flashinfo
-> loader hand-off binding) was closed by a hardware boot-test of image **6e9c54d0**, where the stock
-> loader accepted `"hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"` as the first
-> compatible. DTS 681 lines sha256 `381b2e8c...`; DTS-0001 `886f3ad0...` (694 lines); DTB
-> `62574b11...` / pad `8d79794e...`; release-line manifest sha256 `1e00b568...`. Review-form
-> patch 0021 was reordered MMIO-first to match the DTS and the form was rerun (26/26 patch(1)+git
-> `am`, checkpatch 0 errors / 58 warnings). The drafted driver/YAML and reserved-memory-binding
-> documents under `../../docs/incoming/upstream-blockers/` are maintainer-facing RFC material now, not
-> blocker tasks. **Nothing has been submitted upstream.** Install/recovery lessons retained in
-> `../../docs/INSTALL-RECOVERY-LESSONS.md`; E0-b native-forwarding captures under
+> **Curated copy (synced 2026-11-21; release line 53 patches, review form 001-026).** This page is
+> reproduced from the project's lab notebook (source submodule `5a6d29d`, notebook parent
+> `8558465`). **ZERO documented upstream blockers** remain (last: flashinfo compatible pair,
+> boot-tested image `6e9c54d0`). The **release line is now 53 patches** (L0 64 files: 001-060 +
+> 062-065; manifest sha256 `619eb15a...`): **W22 native forwarding** adds patches **059** (PFE
+> NAPT/flow-engine init) and **060** (PIE native exception-class delivery); the canonical command
+> line uses `luofu_switch.naptinit=1` with no mirror tokens, and the CPU-copy mirror patches
+> 054-057 remain as the documented fallback. **W22 is release-line only - the L2 upstream review
+> form/submission is unchanged at 26 patches** (patch 0021 MMIO-first rerun 26/26, checkpatch 0
+> errors / 58 warnings). DTS 681 lines sha256 `381b2e8c...`; DTS-0001 `886f3ad0...`; DTB
+> `62574b11...` / pad `8d79794e...`; details in `04-validation.md` section 29 and
+> `05-release-line.md`. Nothing has been submitted upstream. Install/recovery lessons retained in
+> `../../docs/INSTALL-RECOVERY-LESSONS.md`; native-forwarding docs under
 > `../../docs/incoming/lsw-forwarding/`. Host paths sanitized to `~`; no vendor binaries.
 
 This directory is the **upstream-submission form** of the kernel driver
