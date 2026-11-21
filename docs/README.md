@@ -1,8 +1,8 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at the
-**2026-11-21 final-delta adoption** - source `opensource` submodule commit `691254f`
-(notebook parent `bd4ab3e`): the **51-patch release line** (62 patch files: 001-058 +
+**2026-11-21 final-delta adoption** - source `opensource` submodule commits `691254f`..`a98d8d7`
+(notebook parents `bd4ab3e`..`c957794`; E0-a appendix `a98d8d7`): the **51-patch release line** (62 patch files: 001-058 +
 062-065; the 11 bench-only SMP diagnostics are excluded), the **DTS-only loader hand-off SMP
 fix** plus the stock **board_id=3 LED/keys nodes**, the **conservative comment-only board-DTS
 cleanup plus all four boot-tested deltas** (TWD level-high, MAC-nvmem removal, switch MMIO-first

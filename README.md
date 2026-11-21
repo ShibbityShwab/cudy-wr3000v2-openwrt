@@ -972,8 +972,8 @@ of this repository or its history.
 - Lab notebook / live research record: **[cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2)**
 - Security research (CVE write-ups, affected versions, disclosure status): **[cudy-wr3000v2-cve](https://github.com/ShibbityShwab/cudy-wr3000v2-cve)**
 - This repository is a curated, fresh-history snapshot of the lab notebook's `opensource/`
-  subtree at the **2026-11-21 final-delta adoption** (source submodule commit `691254f` on
-  notebook parent `bd4ab3e`): the 51-patch release line, the DTS-only loader hand-off SMP fix
+  subtree at the **2026-11-21 final-delta adoption** (source submodule commits `691254f`..`a98d8d7` on
+  notebook parents `bd4ab3e`..`c957794`; E0-a appendix `a98d8d7`): the 51-patch release line, the DTS-only loader hand-off SMP fix
   plus the stock board_id=3 LED/keys nodes, the **conservative comment-only board-DTS cleanup
   plus all four boot-tested deltas** (TWD level-high, MAC-nvmem removal, switch MMIO-first
   `reg`/`reg-names`, `cudy,wr3000-v2` first compatible; DTS 681 lines `9d96ac31...`; DTB

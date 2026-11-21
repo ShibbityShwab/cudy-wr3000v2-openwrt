@@ -537,8 +537,8 @@ in tree/history, no host paths and no real MACs.
 
 ## The twelfth sync (2026-11-21): final devicetree-delta adoption, two remaining blockers and the E0-a result
 
-Source pin: **`691254f`**, the notebook's `opensource` submodule after the final boot-tested-delta
-adoption (notebook parent `bd4ab3e`; commits: native-forwarding plan package, final deltas
+Source pin: **`691254f`** (final boot-tested-delta adoption) plus **`a98d8d7`** (E0-a result appendix), the notebook's `opensource` submodule after the final boot-tested-delta
+adoption (notebook parents `bd4ab3e`..`c957794`; commits: native-forwarding plan package, final deltas
 adopted after the c3ef2a50 boot-test, upstream artifacts regenerated). It is the current pin.
 
 | Path | Change |
