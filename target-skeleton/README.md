@@ -1,15 +1,20 @@
 # Luofu / Cudy WR3000 v2.0 - OpenWrt target skeleton
 
-> **Curated copy (synced 2026-11-21, final boot-tested deltas).** This status page is reproduced
-> from the project's lab notebook (`opensource` submodule `691254f`, 2026-11-21). Current tree:
-> the conservative comment-only board-DTS cleanup plus the boot-tested TWD level-high delta and
-> the final MAC-nvmem removal / switch MMIO-first `reg`/`reg-names` / `cudy,wr3000-v2`-first
-> compatible deltas (all boot-tested: image `c3ef2a50`; DTS 681 lines sha256 `9d96ac31...`;
-> DTS-0001 `c029fd44...`; DTB `a0af2899...` / pad `01b74561...`). Two upstream blockers remain;
-> buttons/LEDs are physically verified; the source-port multi-port experiment and the E0-a
-> mirror-off native-delivery experiment were both negative (mirror workaround remains required;
-> native forwarding is a planned separate project under
-> `docs/incoming/lsw-forwarding/`). Thermal stays unsupported, Wi-Fi is unsupported on 6.18.
+> **Curated copy (synced 2026-11-21, ZERO remaining upstream blockers).** This status page is
+> reproduced from the project's lab notebook (`opensource` submodule `5a6309c`, notebook parent
+> `fb93ff1`, 2026-11-21). Current tree: the conservative comment-only board-DTS cleanup plus all
+> **five boot-tested deltas** - TWD level-high, MAC-nvmem removal, switch MMIO-first
+> `reg`/`reg-names`, `cudy,wr3000-v2`-first compatible, and the final flashinfo
+> compatible pair `"hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"`. All documented
+> upstream blockers are CLOSED (last: flashinfo loader hand-off, boot-tested on image **6e9c54d0**).
+> Artifacts: DTS 681 lines sha256 `381b2e8c...`; DTS-0001 `886f3ad0...` (694 lines); DTB
+> `62574b11...` / pad `8d79794e...`; current DTS-purpose baseline 6e9c54d0 (previous c3ef2a50;
+> earlier f6685b80/7421bb7a). `test-mac-nvmem.sh` was updated to the adopted 6.18 userspace MAC path
+> (77/77). Buttons/LEDs are physically verified; the source-port multi-port experiment and the
+> E0-a mirror-off native-delivery experiment were both negative (mirror workaround still required),
+> while the read-only E0-b stock-vs-ours classifier captures now guide the native-forwarding plan
+> (`docs/incoming/lsw-forwarding/`). Install/recovery lessons are in
+> `docs/INSTALL-RECOVERY-LESSONS.md`. Thermal stays unsupported, Wi-Fi is unsupported on 6.18.
 > Absolute host paths were sanitized to `~`; no vendor binaries are included.
 
 > **STATUS (2026-11-21): BENCH-VERIFIED 2-CPU BRING-UP - NOT A PUBLIC/FLASHABLE RELEASE.**
