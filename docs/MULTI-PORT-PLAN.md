@@ -5,8 +5,14 @@
 > canonical eth2 path**: the driver initializes the PFE NAPT/flow engine (patch 059) and the native
 > exception class delivers unicast to the CPU (patch 060) with no mirror tokens - bench image
 > `50023446`. The mirror patches 054-057 remain in the release line only as the documented
-> fallback (`naptinit=0` + mirror tokens). **M1b (per-port delivery / LAN-to-LAN) is the pending
-> bench step**; multi-port is not claimed.
+> fallback (`naptinit=0` + mirror tokens). **M1b-1 PASS (2026-11-22): native per-port delivery
+> verified on all four jacks** with the W22 image and no mirror (eth0/port9 and eth1/port10
+> ping 200/200 + SSH, eth2/port11 baseline, eth3/port12 WAN link/DHCP-frame delivery);
+> **M1b-3 LAN-to-LAN PASS on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1; broadcast +
+> learned unicast both directions through the software bridge; no hardware L2 offload required).
+> **WAN L3 is also verified** (host DHCP server on eth3/WAN: lease 192.168.50.115/24, default route
+> via 192.168.50.1, ICMP both directions) - no bench items remain. The fallback-image test was
+> retired as untested-by-design (known limitation).
 
 Status: 2026-11-21, after the 2-CPU / single-port bench baseline. Wired LAN works on
 the verified baseline through the documented CPU-copy workaround (mirror eth2 /

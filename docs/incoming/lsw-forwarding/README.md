@@ -6,9 +6,17 @@
 > procfs decode that found the IFC->NAPT unicast path, **M1a PROVEN** (proof image `5800c9ab`:
 > decoded NAPT-init replay + mirror off -> native port=11 deliveries, ping 200/200, SSH), and
 > **W22 release integration** (`w22/`: kernel patches 059/060 are now in the L1 release line, with
-> canonical cmdline `naptinit=1` and no mirror tokens; bench image `50023446`). `m1b/` holds the
-> next experiment plan (per-port delivery, LAN-to-LAN) - **M1b, the fallback-image rebuild and the
-> soak are pending bench steps; multi-port is not claimed**. Scripts here are bench instruments
+> canonical cmdline `naptinit=1` and no mirror tokens; bench image `50023446`). `m1b/` holds the plan and the
+> **M1b-1 PASS results** (`m1b/M1B-RESULTS.md`: native per-port delivery on all four jacks with
+> the W22 image and no mirror - eth0/port9 and eth1/port10 ping 200/200 + SSH, eth2/port11
+> baseline, eth3/port12 WAN link/DHCP-frame delivery). **M1b-3 LAN-to-LAN PASS on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1: broadcast +
+> learned unicast both directions through the software bridge; no hardware L2 offload required).
+> **WAN L3 validation PASS** (host DHCP server on the leftmost jack: lease 192.168.50.115/24,
+> default route, ICMP both directions; host ufw UDP 67/68 gotcha recorded) - no bench items remain.
+> The
+> **fallback-image test was retired as untested-by-design** (build cmdline-cache mistake; the
+> source option `naptinit=0` + mirror tokens remains as a documented known limitation).
+> Scripts here are bench instruments
 > requiring attended/recovery gating; the release copies of the W22 patches are under
 > `target-skeleton/`. The retained plan's host NIC MAC was redacted; nothing was executed by this
 > repository.
