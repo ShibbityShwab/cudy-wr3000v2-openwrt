@@ -26,6 +26,17 @@ material was sanitized, and how to verify the publication claims.
   stock board_id=3 LED/keys nodes, the base-DTB `pad-dtb` alignment fix, the W17/W19
   `dev_dbg` quieting, the refreshed DTS-0001 and the retained read-only feature-inventory
   and Wi-Fi recon reports - see the sixth-sync section below.
+  The **seventh sync (2026-11-21)** moves it to the DTS/install follow-up:
+  `opensource` submodule commit `d6db2e1` (notebook parent `0983229`), which adds the
+  conservative comment-only board-DTS cleanup (active content byte-identical to the
+  hardware-verified known-good DTB), the verified automated stock-telnet install path, the
+  multi-port Ethernet plan, the DTS cleanup/regression record and the feature-inventory update
+  - see the seventh-sync section below.
+  The **eighth sync (2026-11-21)** moves it to the submission-package follow-up:
+  `opensource` submodule commit `c931c74` (notebook parent `fa76c97`), which adds the
+  **documentation-only upstream submission package** (`submission/`), the bench-only multi-port
+  source-port probe patch 066 + prepared probe image `a91ebcf0`, and the final validation
+  records - see the eighth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -77,9 +88,12 @@ material was sanitized, and how to verify the publication claims.
 | Content | Why it is published |
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
-| `docs/` (15 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report, the trailer-format doc including the base-DTB alignment section, and the validation records through the 2026-11-21 board-feature/quiet-image pass |
-| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract **and the stock board_id=3 LED/keys nodes**, the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the two **retained read-only device reports** under `docs/incoming/` (feature inventory, Wi-Fi recon; curated notes explain superseded findings) |
-| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `8ee4b8e71...`, refreshed with the board LED/keys nodes; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs |
+| `docs/` (16 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report, the trailer-format doc including the base-DTB alignment section, the multi-port plan (incl. the prepared probe image), and the validation records through the 2026-11-21 board-feature/quiet-image, DTS/install and submission-package follow-up passes |
+| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, **the stock board_id=3 LED/keys nodes and the conservative comment-only cleanup** (active content byte-identical to the known-good DTB), the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
+| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `8ee4b8e71...`, refreshed with the board LED/keys nodes; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs, plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the retained optional deltas) |
+| `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription; the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
+| `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the prepared probe image `a91ebcf0` is documented in the multi-port plan. The experiment has not been run |
+| `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, inactive-pair only; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 
@@ -277,6 +291,122 @@ native switch forwarding is a separate project, and nothing is upstream-reviewed
 - repository hygiene: no binary objects in the tree or history, no credentials/keys, no
   per-unit identifiers, no host paths; link checks clean; working tree clean.
 
+## The seventh sync (2026-11-21): conservative DTS cleanup, verified install path and the regression record
+
+Source pin: **`d6db2e1`**, the notebook's `opensource/` submodule after the DTS/install
+follow-up (notebook parent `0983229`; commits `77dff89`, `ba3b3e8`,
+`ddeaa63`, `538377c`, `7dcb745`, `7ae18f2`, `8e73c0f`, `d6db2e1`). It
+post-dates the board-feature sync by the same day's bench work and is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/dts/luofu-r116.dts` | **conservative comment-only cleanup**: 1,329 -> **691 lines**; every active node name, unit address, property order/value, `reg` order, status, label, phandle, child name and alias unchanged; the compiled DTB is the **byte-identical known-good DTB** (13,041 B sha256 `49fe5c47...`; padded by `Build/luofu-pad-dtb` to 13,048 B sha256 `402e4f71...`) |
+| `upstream/series-6.18/dts-series/` | DTS-0001 regenerated from the conservative single source: **sha256 `072d0b8b...`**, 704 lines, board DTS byte-identical to the target DTS |
+| `upstream/series-6.18/{00,04,05,06,07}*.md`, `README.md` | the DTS cleanup record: `04-validation.md` sections 22 (superseded active cleanup, with the regression warning) and 23 (conservative re-validation), `05-release-line.md` updated (three verified baselines, DTB/pad hashes, 07 reference), `06-dts-series-dependency.md` updated (DTS-0001 hash/lines, regression refs), **new `07-dts-upstream-bindings.md`** (hardware regression, conservative cleanup, optional hardware-tested deltas, manual binding review, remaining blockers), `README.md` updated; `validation/git-log.txt` refreshed |
+| `target-skeleton/RELEASE-NOTES.md` | install-path status (manual repeats + the stock-telnet tool), the **active-DTS hardware-regression record**, the multi-port status and the known-good baseline/byte-identical rebuild facts |
+| `target-skeleton/docs/incoming/feature-inventory/UPDATE-2026-11-21.md` | **new retained update**: matrix corrections (LEDs/keys/watchdog fixed, thermal root-caused, MAC concern withdrawn), the install-path finding and the verified automated stock-telnet follow-up, and the multi-port follow-up |
+| `docs/MULTI-PORT-PLAN.md` | **new**: multi-port Ethernet limit (only eth2 works; CPU-copy completions report port 0/no source id; the far-right jack is a LAN port), the attended source-port experiment and the decision gate |
+| `tools/` | **new published bench tooling**: `stock-telnet-install.sh` (fail-closed, inactive-pair only, verified end-to-end) + `telnet-exec.py` + `README.md`. Staging path sanitized to `$HOME/staging-fi`; MIT SPDX per the project-tool split |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | known-good baseline (`7421bb7a`), verified install path, the DTS regression record, the multi-port limit and the updated layout/license/scope text |
+
+Curation rules applied to this sync: host paths sanitized to `~` (the installer's staging
+path became `$HOME/staging-fi`); the two published bench tools carry the MIT SPDX header per
+the license split while the DTS/patch/base-files content stays GPL-2.0-only; no vendor
+binaries, firmware blobs, credentials, keys or per-unit identifiers are added; the retained
+feature-inventory update is text-only and reuses the redacted documentation MAC prefix; the
+notebook's bench helpers (`bench-link.sh`/`recovery-card.sh`) and the image build are
+**not** published (the installer refuses without their preflight; documented in
+`tools/README.md`). DTS-0001 and the release-line hashes match the source notebook.
+
+### What this sync changes about the repository's honest status
+
+- The **known-good hardware baseline is image `7421bb7a`** (sha256
+  `7421bb7ace41e2e03613a0314874fabfcd16aeef60dbdd713ebc6c2b735cd4b3`); the conservative
+  comment-only DTS rebuild reproduces it **byte-for-byte**, so the devicetree semantics are the
+  hardware-verified ones.
+- The **install path is verified end-to-end** with the published stock-telnet installer: from
+  the vendor stock firmware, only the inactive pair is written, the active pair is verified
+  unchanged, the selector is verified and our 2-CPU image boots. No install image is published
+  and no recovery procedure is included.
+- The **superseded aggressive DTS cleanup (image `6f19c6d6`) is documented as a boot
+  regression**: it passed every host check but MTD partition registration stalled and the
+  U-Boot watchdog reset the unit (stock fallback). The lesson is recorded: host checks are
+  necessary but not sufficient; every active-DTS change must be boot-tested.
+- **Multi-port Ethernet is explicitly limited** today: only eth2 works through the CPU-copy
+  mirror; the CPU-copy completion reports port 0 with no confirmed source-port identifier, so
+  multi-port needs the attended source-port experiment or the native L2/VLAN bridge. The plan
+  and decision gate are published.
+- Still **not** a release: `platform_do_upgrade` has never run on a device, per-slot A/B
+  trailer handling and the loader env re-stamp remain open, Wi-Fi and thermal are unsupported,
+  and nothing is upstream-reviewed.
+
+### Checks run for this sync (2026-11-21)
+
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 review-form patches, no drift);
+- `(cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt)` - **89/89 OK**;
+- `upstream/series-6.18/tools/check-release-line.sh <linux-6.18.60.tar.xz> <workdir>` -
+  **PASS**: 51/51 include patches with `patch(1)` RC=0 (146 file events, 3 offset hunks, 0 fuzz,
+  0 rejects), strict `git apply` clean, the conservative board DTS compiles to DTB **13,041 B
+  sha256 `49fe5c47...`** with the loader hand-off contract, the unaligned totalsize triggers
+  `pad-dtb.py` on a copy (**13,048 B sha256 `402e4f71...`**, contract preserved), and
+  DTS-0001 (sha256 `072d0b8b...`) applies with its board DTS byte-identical to the target DTS;
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **82/82**;
+- new tools: `bash -n` and `py_compile` pass; `stock-telnet-install.sh` with no image exits
+  non-zero ("--image is required") and refuses `--apply` without the attended/recovery flags;
+- repository hygiene: no binary objects in the tree or history, no credentials/keys, no per-unit
+  identifiers, no host paths; link checks clean; working tree clean.
+
+## The eighth sync (2026-11-21): documentation-only submission package and the prepared multi-port probe
+
+Source pin: **`c931c74`**, the notebook's `opensource/` submodule after the submission-package
+follow-up (notebook parent `fa76c97`; commits `4640631` - multi-port source-port probe
+patch + prepared experiment image - and `c931c74` - documentation-only upstream submission
+package + final validation records). It is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `docs/MULTI-PORT-PLAN.md` | updated with the **prepared experiment image `a91ebcf0`** (save copy sha256 `a91ebcf04892ac9d5128c6ae5144eb9d6e09674b98938aac0aa8af289b3bc653`): the known-good `7421bb7a` userspace/kernel plus the source-mask probe patch and built-in probe tokens `luofu_pie.rxdiag=1 luofu_switch.mirror_src_mask=0x1e00`; run plan and restore step included. Bench-only, not run; the cable is on a non-eth2 jack |
+| `docs/incoming/multi-port-probe/` | **new retained bench-only record**: `066-net-lsw-mirror-src-mask.patch` (adds the `luofu_switch.mirror_src_mask` module parameter, default `0x800`; GPL-2.0-only kernel diff) plus a curated README. Not part of the release line, review form or submission package |
+| `upstream/series-6.18/submission/` | **new documentation-only upstream submission package**: `README.md` (status, artifact checklist, reproduction commands, six merge-intent blockers, out-of-scope list), `cover-email-draft.md` (one-page v3 RFC draft, **not sent**), `TESTED-BY-POLICY.md` (no upstream Tested-by/Reviewed-by; target-image bench evidence only) and `MANIFEST.sha256` (102 entries, regenerated against this curated tree; `sha256sum -c` passes 102/102) |
+| `upstream/series-6.18/{04-validation,05-release-line,07-dts-upstream-bindings,README}.md`, `validation/git-log.txt` | final records: `04-validation.md` section 24 (submission-package validation run: release line 51/51, DTB 13,041 B `49fe5c47...`, pad 13,048 B `402e4f71...`, review form 26/26, checkpatch 0/58, hash checks 89/89), conservative-final references (`7ae18f2`), the six upstream blockers, and the README pointer to the submission package; the review-form git log was regenerated |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | submission package, prepared multi-port probe, manifest-regeneration note and the updated documentation index |
+
+Curation rules applied to this sync: host paths sanitized to `~` (none were new); no vendor
+binaries, firmware blobs, credentials, keys or per-unit identifiers; the submission package's
+`MANIFEST.sha256` was **regenerated against this curated tree** (8 entries differ from the
+notebook package because of curation: review-form README curated note, path-adapted
+`01-commit-messages.md`, MIT SPDX headers on the host tools) and its README carries a curated
+note explaining this - `sha256sum -c MANIFEST.sha256` passes 102/102 from inside the package;
+the bench-only probe patch 066 is kept verbatim with a curated README and is not part of the
+release line or upstream series; the package contains no email transport, account, list
+subscription, secret or Tested-by claim.
+
+### What this sync adds to the honest status
+
+- The upstream path now has a **reviewable dry-run package**, but **nothing has been submitted**
+  and no third-party review/Tested-by exists; the six merge-intent blockers are recorded in the
+  package and in `07-dts-upstream-bindings.md`.
+- The multi-port work has a **prepared experiment** (image `a91ebcf0` + patch 066), but the
+  probe has **not been run**; the cable is on a non-eth2 jack, so the run is blocked until it is
+  moved back. No multi-port claim is made.
+- Everything else (known-good `7421bb7a` baseline, verified install path, conservative DTS,
+  thermal/Wi-Fi non-support, single-jack LAN workaround) is unchanged from the seventh sync.
+
+### Checks run for this sync (2026-11-21)
+
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 review-form patches, no drift);
+- `(cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt)` - **89/89 OK**;
+- `upstream/series-6.18/tools/check-release-line.sh <linux-6.18.60.tar.xz> <home-workdir>` -
+  **PASS**: 51/51 include patches with `patch(1)` RC=0 (146 file events, 3 offset hunks, 0 fuzz,
+  0 rejects), strict `git apply` clean, DTB 13,041 B sha256 `49fe5c47...`, pad-dtb exercised
+  to 13,048 B sha256 `402e4f71...` with the contract preserved, DTS-0001 (`072d0b8b...`)
+  applies with its board DTS byte-identical to the target DTS;
+- `(cd upstream/series-6.18/submission && sha256sum -c MANIFEST.sha256)` - **102/102 OK**;
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **82/82**;
+- bench tools: `bash -n` / `py_compile` pass and the fail-closed `--apply` gates are intact;
+- repository hygiene: no binary objects in the tree or history, no credentials/keys, no per-unit
+  identifiers, no host paths; link checks clean; working tree clean.
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -290,8 +420,9 @@ native switch forwarding is a separate project, and nothing is upstream-reviewed
 | Python bytecode caches and UART/boot evidence logs | build/evidence artifacts from the lab; the intermediate source commit `12eb48c` had a `__pycache__/*.pyc` file that is deliberately not synced (the source tree removed it in `4030e86`), and the 2026-11-19 boot/rebuild logs - including the final `001`-`026` image rebuild - stay private lab evidence described only in prose |
 | per-unit identifiers (MAC/serial/PIN/efuse/`secret`/UUID values) | privacy and responsible disclosure; the docs name the offset instead of printing the value |
 | credentials, keys, tokens, Lab/bench secrets | never published (and never committed to the source tree either) |
+| the notebook bench helpers the installer calls (`tools/bench-link.sh`, `tools/recovery-card.sh`), the image build and the physical recovery procedure | they are live-lab instruments, not publication content; the published installer refuses without their preflight and `tools/README.md` states the dependency. No recovery procedure is published |
 | the `lab/` programs and vendor-module analysis fixtures | out of scope for the OpenWrt port repo; the relevant specifications are in `docs/` |
-| incoming/lane staging packages, **except** the two retained read-only reports | a deliberate exception: `target-skeleton/docs/incoming/feature-inventory/` and `target-skeleton/docs/incoming/wifi-recon/` are text-only, read-only device/Wi-Fi reports needed to explain the current status; their `SUMMARY.md` files carry curated notes and no vendor binaries, secrets or per-unit identifiers (the one MAC placeholder uses the documentation prefix `02:00:00:xx:xx:xx`) |
+| incoming/lane staging packages, **except** the retained read-only reports and the bench-only probe record | a deliberate exception: `target-skeleton/docs/incoming/feature-inventory/` and `target-skeleton/docs/incoming/wifi-recon/` are text-only, read-only device/Wi-Fi reports needed to explain the current status (curated notes; no vendor binaries, secrets or per-unit identifiers; the one MAC placeholder uses the documentation prefix `02:00:00:xx:xx:xx`), and `docs/incoming/multi-port-probe/` retains the bench-only probe patch 066 + note because the multi-port experiment plan references it. None is part of the release line or upstream series |
 
 The tooling and documentation are written so that an owner of the unit can re-derive the
 private inputs locally; nothing in this repository depends on redistributing vendor binaries.
@@ -356,6 +487,19 @@ tree.
 - **The retained device reports' MAC placeholder** was redacted to the documentation prefix
   `02:00:00:xx:xx:xx`; the unit's real OUI does not appear (the reports are otherwise reproduced
   with curated status notes only).
+- **The bench installer's staging path** was sanitized from the author's home directory to
+  `$HOME/staging-fi`; the project host tools published under `tools/` carry the MIT SPDX
+  header per the license split (their notebook copies are GPL-2.0-only project code).
+- **The submission package's `MANIFEST.sha256` was regenerated for this curated tree** (the
+  notebook manifest hashes cover the notebook layout and original files; this repository's
+  review-form README carries a curated note, `01-commit-messages.md` uses this repository's path
+  layout, and the host tools carry MIT SPDX headers). The submission README carries a curated
+  note describing this; `sha256sum -c MANIFEST.sha256` passes 102/102 from inside the package.
+  The package is documentation-only - no account, list subscription or email transport is
+  included, and nothing has been sent.
+- **The multi-port probe patch 066** is kept verbatim from the notebook (a GPL-2.0-only kernel
+  diff, our own code) with a curated README; it is not part of the release line, the review form
+  or the submission package, and the prepared image `a91ebcf0` is a bench instrument only.
 - The kernel patches and validation logs are the author's host output; they contain no device
   state.
 
@@ -415,13 +559,23 @@ stack (001-058 + 062-065; numbered 001-061 at the time) plus the DTS loader hand
 CPUs, LAN through the documented CPU-copy mirror workaround, SSH, persistent ubifs overlay,
 15-minute soak with 0 failures and reboot persistence. The same-day board-feature phase ran
 `7f270b8c` (six writable `oem:green:*` LEDs, `event0` gpio-keys-polled, `watchdog0` sysfs)
-and the quiet image `7421bb7a` (periodic W17/W19/heartbeat dmesg spam removed); it required
-the base-DTB `pad-dtb` alignment step. Thermal telemetry is unsupported on this board
-(temperature register reads 0, vendor DT disables the sensor), Wi-Fi is unsupported on the
-6.18 target, and the earlier MAC-duplication concern is withdrawn (LAN ports share the vendor
-base MAC, WAN = base+1 by design). The intermediate host-only full-series rebuilds (001-023
-with the persistent `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW
-egress and bdinfo-MAC nvmem follow-ups) were never flashed or booted. None of the bench phases
-is an install or recovery procedure and the install path has never run on a device, so the
-repository remains curated research material, not a firmware release; see the safety and legal
-section of [`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).
+and the quiet image **`7421bb7a` (known-good baseline, sha256
+`7421bb7ace41e2e03613a0314874fabfcd16aeef60dbdd713ebc6c2b735cd4b3`; periodic W17/W19/heartbeat
+dmesg spam removed)**, and it required the base-DTB `pad-dtb` alignment step. On the same day
+the **automated stock-telnet install path** was verified end-to-end (inactive pair only, active
+pair unchanged, selector verified, 2-CPU image booted), and the superseded aggressive active-DTS
+cleanup (image `6f19c6d6`) was documented as a **hardware boot regression** and reverted; the
+accepted conservative cleanup is comment-only and compiles to the known-good DTB. Thermal
+telemetry is unsupported on this board (temperature register reads 0, vendor DT disables the
+sensor), Wi-Fi is unsupported on the 6.18 target, only one Ethernet jack works through the
+CPU-copy workaround (multi-port is an open experiment/native-bridge project), and the earlier
+MAC-duplication concern is withdrawn (LAN ports share the vendor base MAC, WAN = base+1 by
+design). The intermediate host-only full-series rebuilds (001-023 with the persistent
+`rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and bdinfo-MAC
+nvmem follow-ups) were never flashed or booted. No install image is published, `platform_do_upgrade`
+has never run on a device, and the bench installer in `tools/` is published for evidence, not
+as a general install/recovery guide. The **upstream submission package** is a documentation-only
+dry run - **nothing sent, no Tested-by** - and the **multi-port probe** (patch 066 / image
+`a91ebcf0`) is a bench-only instrument that has not been run; the repository remains curated
+research material, not a firmware release. See the safety and legal section of [`../README.md`](../README.md) and
+[`../NOTICE.md`](../NOTICE.md).

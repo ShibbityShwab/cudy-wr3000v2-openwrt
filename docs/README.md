@@ -1,16 +1,21 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at the
-**2026-11-21 board-feature refresh** - source `opensource` submodule commit `f136cf3`
-(notebook parent `ab0d3cb`): the **51-patch release line** (62 patch files: 001-058 +
+**2026-11-21 submission-package follow-up** - source `opensource` submodule commit
+`c931c74` (notebook parent `fa76c97`): the **51-patch release line** (62 patch files: 001-058 +
 062-065; the 11 bench-only SMP diagnostics are excluded), the **DTS-only loader hand-off SMP
-fix** plus the stock **board_id=3 LED/keys nodes**, the base-DTB **`pad-dtb` 8-byte alignment
-build step**, the refreshed **DTS-0001**, and three bench-verified images - canonical
-`974e6ca6`, board-feature `7f270b8c` and quiet `7421bb7a`. The upstream review form stays at
-26 patches (001-026). The live status of the work is the lab notebook's `STATUS.md`; the honest
-summary of what is host-validated and what the bench phases did - and did **not** - prove is
-in [`../README.md`](../README.md). Read [`PUBLISHING.md`](PUBLISHING.md) for the curation rules,
-the license split, the sanitization performed and the 2026-11-18/19/21 syncs.
+fix** plus the stock **board_id=3 LED/keys nodes**, the **conservative comment-only board-DTS
+cleanup** (active content byte-identical to the hardware-verified known-good DTB), the base-DTB
+**`pad-dtb` 8-byte alignment build step**, the re-generated **DTS-0001**, the verified automated
+**stock-telnet install path**, the **multi-port Ethernet limit and experiment plan** (with the
+prepared bench-only probe patch 066 / image `a91ebcf0`), the **documentation-only upstream
+submission package**, and the known-good bench baseline **`7421bb7a`** (with the canonical
+`974e6ca6` and board-feature `7f270b8c` baselines). The upstream review form stays at 26 patches (001-026). The superseded
+aggressive DTS cleanup is recorded as a **hardware boot regression** (image `6f19c6d6`). The live
+status of the work is the lab notebook's `STATUS.md`; the honest summary of what is host-validated
+and what the bench phases did - and did **not** - prove is in [`../README.md`](../README.md). Read
+[`PUBLISHING.md`](PUBLISHING.md) for the curation rules, the license split, the sanitization
+performed and the 2026-11-18/19/21 syncs.
 
 ## Documents
 
@@ -19,6 +24,8 @@ the license split, the sanitization performed and the 2026-11-18/19/21 syncs.
 | [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan - with the 2026-11-21 release and board-feature updates, the mandatory loader hand-off DTS contract and the closed/partly-closed rows | design proposal (host-validated drafts + bench-verified target images; not accepted upstream) |
 | [TARGET-SKELETON.md](TARGET-SKELETON.md) | the target-skeleton index: what the schematic target, DTS, image recipe, tools and patch stack are; status and what remains [U]/TODO | index |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; the 2026-11-21 update closes the SMP milestone without claiming upstream progress; superseded sections are marked | phase plan / history |
+| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the multi-port Ethernet limit (only eth2 works through the CPU-copy mirror; completions report port 0 / no source id), the measured far-right-jack finding, the attended source-port experiment plan and the decision gate (per-port CPU-copy delivery vs native L2/VLAN bridge), and the prepared bench-only probe image `a91ebcf0` / patch 066 | experiment plan + prepared image, not yet run |
+| [incoming/multi-port-probe/](incoming/multi-port-probe/) | retained bench-only record: patch 066 (`luofu_switch.mirror_src_mask`) and its note; not part of the release line or upstream series | bench instrument (GPL-2.0-only patch), not run |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
 | [SELECTOR-0x21.md](SELECTOR-0x21.md) | reconstruction of the stock A/B boot-selector contract (env `bootflag`, SYSCTRL record cell, the project's `0x21` bench marker) | RE specification, host-only |
 | [TRAILER-FORMAT.md](TRAILER-FORMAT.md) | byte-level format of the FIP trailer the stock loader requires (base DTB, 96-byte descriptor, gate magic, DTBO match rule) plus **section 11: the base-DTB totalsize must be 8-byte aligned** for the `bootfip` gate-word load (the `pad-dtb` build requirement) - curated copy; canonical copy sits next to the tool | decoded format, structurally validated + one measured unaligned-load failure |
@@ -40,11 +47,14 @@ Additional status pages and retained reports:
   `../target-skeleton/docs/port-notes/` (including `smp-decode`, `qm-decode`, `firstinstall`,
   `overlay`, `pie-decode`, `lsw-egress` and `mac-nvmem`).
 - [`../target-skeleton/RELEASE-NOTES.md`](../target-skeleton/RELEASE-NOTES.md) - the short release
-  status: bench-verified baselines, the DTS-only SMP fix, the base-DTB pad requirement, board
-  features, thermal/Wi-Fi non-support, canonical configuration and what is not claimed.
+  status: bench-verified baselines (known-good `7421bb7a`), the DTS-only SMP fix, the base-DTB
+  pad requirement, board features, the verified install path, the DTS cleanup regression, thermal/
+  Wi-Fi non-support, canonical configuration and what is not claimed.
 - [`../target-skeleton/docs/incoming/feature-inventory/SUMMARY.md`](../target-skeleton/docs/incoming/feature-inventory/SUMMARY.md) -
-  retained read-only 2-CPU device feature inventory (full report next to it; the curated note
-  records the later fixes, the thermal root cause and the withdrawn MAC-plan concern).
+  retained read-only 2-CPU device feature inventory (full report and the
+  [UPDATE-2026-11-21.md](../target-skeleton/docs/incoming/feature-inventory/UPDATE-2026-11-21.md)
+  follow-up next to it; the curated notes record the later fixes, the thermal root cause, the
+  withdrawn MAC-plan concern, the verified install path and the multi-port limit).
 - [`../target-skeleton/docs/incoming/wifi-recon/SUMMARY.md`](../target-skeleton/docs/incoming/wifi-recon/SUMMARY.md) -
   retained host-only Hi5622V100 Wi-Fi feasibility recon: vendor-binary stack, no 6.18 driver,
   option C (unsupported) recommended, hybrid 5.10 as the only Wi-Fi-capable system.
@@ -54,6 +64,14 @@ Additional status pages and retained reports:
   [`../upstream/series-6.18/06-dts-series-dependency.md`](../upstream/series-6.18/06-dts-series-dependency.md) -
   the release line (include/exclude classification, canonical configuration, bench evidence,
   padded-DTB requirement) and the explicit DTS-series dependency carried by DTS-0001.
+- [`../upstream/series-6.18/07-dts-upstream-bindings.md`](../upstream/series-6.18/07-dts-upstream-bindings.md) -
+  the board-DTS cleanup record: the hardware regression of the superseded active cleanup, the
+  conservative comment-only cleanup, the optional hardware-tested deltas and the remaining
+  upstream blockers.
+- [`../upstream/series-6.18/submission/README.md`](../upstream/series-6.18/submission/README.md) -
+  the **documentation-only upstream submission package** (RFC form): status/artifact checklist,
+  one-page cover-email draft, explicit no-Tested-by policy and a file manifest. Nothing has been
+  sent anywhere; the manifest was regenerated for this curated tree.
 - [`../NOTICE.md`](../NOTICE.md) - provenance and the no-vendor-code policy.
 
 ## Reading order
@@ -88,10 +106,15 @@ Additional status pages and retained reports:
   the `lab/` programs, the per-phase reports and the lane `docs/incoming/` staging packages
   other than the two retained reports named above). Those links resolve in the lab notebook's
   source subtree, not here.
-- The two retained reports under `../target-skeleton/docs/incoming/` are a deliberate
-  curation exception: they are read-only, text-only device reports that document the feature
-  matrix and the Wi-Fi feasibility decision. Their `SUMMARY.md` files carry curated status notes;
-  no other incoming/staging package is published.
+- The retained reports under `../target-skeleton/docs/incoming/` (feature inventory +
+  its update, and the Wi-Fi recon) and the bench-only probe record under
+  `../docs/incoming/multi-port-probe/` are a deliberate curation exception: they are read-only,
+  text-only device reports that document the feature matrix, the install-path findings, the
+  multi-port limit and the Wi-Fi feasibility decision. Their `SUMMARY.md` files carry curated
+  status notes; no other incoming/staging package is published.
+- The bench install tooling lives at [`../tools/`](../tools/): `stock-telnet-install.sh` and
+  `telnet-exec.py` are published for evidence, not as a general install/recovery guide (see
+  [`../tools/README.md`](../tools/README.md)).
 - `~/openwrt-lab*` paths were the author's host build clones and were sanitized to `~`.
   `build/`, `dumps/`, `firmware/`, `rootfs-*/` are private local evidence and are **not**
   published in this repository. The attended bench evidence (2026-11-19 first boot; the
