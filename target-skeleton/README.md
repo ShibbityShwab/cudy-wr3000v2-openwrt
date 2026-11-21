@@ -1,17 +1,17 @@
 # Luofu / Cudy WR3000 v2.0 - OpenWrt target skeleton
 
-> **Curated copy (synced 2026-11-21, conservative DTS cleanup).** This status page is
-> reproduced from the project's lab notebook (`opensource` submodule `d6db2e1`, 2026-11-21).
-> Since the board-feature refresh it also carries the **conservative comment-only board-DTS
-> cleanup** (691 lines; active content byte-identical to the hardware-verified known-good DTB,
-> 13,041 B padded to 13,048 B), the automated **stock-telnet install tool** (install path
-> verified end-to-end on image `7421bb7a`), the **multi-port Ethernet limit** record
-> (`docs/MULTI-PORT-PLAN.md`), and the **hardware-regression record** for the superseded
-> active-DTS cleanup (image `6f19c6d6` did not boot; known-good baseline remains
-> `7421bb7a`). Thermal stays unsupported (temperature register reads 0, vendor DT disables
-> the sensor); Wi-Fi is unsupported on 6.18. The "PUBLICATION: NOT READY" paragraph further
-> down refers to the *old* `opensource/` repository history; this curated repository was
-> created fresh and contains no vendor binaries. Absolute host paths were sanitized to `~`.
+> **Curated copy (synced 2026-11-21, TWD adoption).** This status page is reproduced from the
+> project's lab notebook (`opensource` submodule `95c4502`, 2026-11-21). Current tree: the
+> conservative comment-only board-DTS cleanup plus the **boot-tested TWD level-high delta**
+> (`interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>`; 700-line DTS
+> sha256 `13427d8e...`; DTS-0001 `e9c9ed58...`; DTB `4fde76df...` / pad `4b50de73...`;
+> boot-tested image `f6685b80`; previously verified baseline `7421bb7a`). Buttons are
+> physically verified (RESET + WPS captured); the source-port multi-port experiment was run and
+> was negative (native L2/VLAN bridge required); the automated stock-telnet install path and the
+> blocker-reduction drafts are retained. Thermal stays unsupported, Wi-Fi is unsupported on 6.18.
+> The "PUBLICATION: NOT READY" paragraph further down refers to the *old* `opensource/`
+> repository history; this curated repository was created fresh and contains no vendor binaries.
+> Absolute host paths were sanitized to `~`.
 
 > **STATUS (2026-11-21): BENCH-VERIFIED 2-CPU BRING-UP - NOT A PUBLIC/FLASHABLE RELEASE.**
 >
