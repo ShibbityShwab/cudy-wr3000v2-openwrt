@@ -41,6 +41,9 @@ material was sanitized, and how to verify the publication claims.
   experiment: NEGATIVE** (`opensource` submodule commit `117ea55`, notebook parent
   `75a4d8c`) - CPU-copy completions carry no source-port identity, so multi-port LAN/WAN
   requires the native L2/VLAN hardware bridge - see the ninth-sync section below.
+  A following documentation-only commit (**`baa9aa3`**, notebook parent `c8106dd`) adds the
+  physical feature-check record (all six LEDs visually confirmed; RESET press captured;
+  WPS pending) - see the tenth-sync note below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -441,6 +444,18 @@ host on the eth2 jack. No code, image or DTS change is implied by this sync.
 - `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 patches, no drift);
 - link checks clean (only the documented notebook-only links unresolved); hygiene scans clean
   (no binaries/secrets/per-unit identifiers/host paths); the pushed-remote fresh clone verified.
+
+## The tenth sync (2026-11-21): physical feature checks
+
+Documentation-only commit **`baa9aa3`** (notebook parent `c8106dd`) adds a "Physical feature
+checks" section to `target-skeleton/RELEASE-NOTES.md`: the user visually confirmed all six
+`oem:green:*` LEDs lit when driven to brightness 1 (then set back to off), and a RESET press was
+captured on `/dev/input/event0` as EV_KEY `KEY_RESTART` (0x198) press+release. The WPS
+`KEY_WPS_BUTTON` (0x211) press is still pending; the physical LED/button status is therefore
+partially closed ([V] LEDs + RESET, [U] WPS). No code, DTS, series, tooling or manifest entries
+change; the release-line validation (51/51), 89/89 validation hashes and 102/102 submission
+manifest are unchanged and were re-verified. The README board-feature rows were updated to
+record the physical result.
 
 ## What is excluded (and why)
 
