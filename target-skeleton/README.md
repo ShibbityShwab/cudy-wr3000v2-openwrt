@@ -1,21 +1,22 @@
 # Luofu / Cudy WR3000 v2.0 - OpenWrt target skeleton
 
-> **Curated copy (synced 2026-11-21, ZERO remaining upstream blockers).** This status page is
-> reproduced from the project's lab notebook (`opensource` submodule `5a6309c`, notebook parent
-> `fb93ff1`, 2026-11-21). Current tree: the conservative comment-only board-DTS cleanup plus all
-> **five boot-tested deltas** - TWD level-high, MAC-nvmem removal, switch MMIO-first
-> `reg`/`reg-names`, `cudy,wr3000-v2`-first compatible, and the final flashinfo
-> compatible pair `"hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"`. All documented
-> upstream blockers are CLOSED (last: flashinfo loader hand-off, boot-tested on image **6e9c54d0**).
-> Artifacts: DTS 681 lines sha256 `381b2e8c...`; DTS-0001 `886f3ad0...` (694 lines); DTB
-> `62574b11...` / pad `8d79794e...`; current DTS-purpose baseline 6e9c54d0 (previous c3ef2a50;
-> earlier f6685b80/7421bb7a). `test-mac-nvmem.sh` was updated to the adopted 6.18 userspace MAC path
-> (77/77). Buttons/LEDs are physically verified; the source-port multi-port experiment and the
-> E0-a mirror-off native-delivery experiment were both negative (mirror workaround still required),
-> while the read-only E0-b stock-vs-ours classifier captures now guide the native-forwarding plan
-> (`docs/incoming/lsw-forwarding/`). Install/recovery lessons are in
-> `docs/INSTALL-RECOVERY-LESSONS.md`. Thermal stays unsupported, Wi-Fi is unsupported on 6.18.
-> Absolute host paths were sanitized to `~`; no vendor binaries are included.
+> **Curated copy (synced 2026-11-21, W22 native-forwarding release integration).** This status
+> page is reproduced from the project's lab notebook (`opensource` submodule `5a6d29d`, notebook
+> parent `8558465`). The target now builds the **W22 release line**: L0 **64** patch files
+> (001-060 + 062-065), **L1 53 release-line patches** (manifest sha256 `619eb15a...`), adding
+> patches **059** (PFE NAPT/flow-engine init, gate `luofu_switch.naptinit`, default on) and **060**
+> (PIE native exception-class delivery, retires `accepterr`). The canonical command line carries
+> `luofu_switch.naptinit=1` and **no** `cpu_mirror`/`accepterr`/`cpucopy` tokens; the CPU-copy
+> mirror patches 054-057 stay in the line as the documented fallback (`naptinit=0` + mirror
+> tokens). Bench-verified canonical image **50023446** (sha256 `50023446...`): 2 CPUs, native NAPT
+> init verified in dmesg, ping/SSH with no mirror, reboot determinism PASS; M1a was first proven
+> with proof image `5800c9ab`. **W22 is release-line only - it is not in the L2 upstream review
+> form yet** (the 26-patch review form is unchanged), and **M1b (per-port/LAN-to-LAN), the
+> fallback-image rebuild and the soak are pending bench steps**. Multi-port is not claimed. The
+> current DTS-purpose baseline remains `6e9c54d0`; the W22 image 50023446 is the current canonical
+> data-path image. Thermal stays unsupported, Wi-Fi unsupported on 6.18. Native-forwarding docs
+> and results are under `docs/incoming/lsw-forwarding/`; install/recovery lessons in
+> `docs/INSTALL-RECOVERY-LESSONS.md`. Absolute host paths were sanitized to `~`; no vendor binaries.
 
 > **STATUS (2026-11-21): BENCH-VERIFIED 2-CPU BRING-UP - NOT A PUBLIC/FLASHABLE RELEASE.**
 >
@@ -1304,6 +1305,12 @@ Skeleton-specific findings recorded while writing the files:
 | target/linux/hisilicon/patches-6.18/049-net-lsw-pie-page-scan.patch | **W14 page scan of all LSW/PIE windows** (2026-11-20, host-only, never executed): W13_RXCFG verified on silicon and all comparable programmable state now matches stock, yet RX never fires; the remaining class is the runtime flow/port tables the vendor CFE modules install (hi_kcfe_pub imports only netdev/notifier APIs; the table-manager consumers cannot load on 6.18). Patch 049 adds read-only page-granularity scans (luofu_switch.scan=1: 15 LSW windows x 128 pages, non-zero pages only; luofu_pie.scan=1: 16 PIE pages) with the matching stock devmem command, to locate the missing table pages. **Host compile (WERROR, 0 warnings), 001-050 series apply RC=0 (50/50), checkpatch 0 errors; never executed on hardware.** | same |
 | target/linux/hisilicon/patches-6.18/050-net-lsw-pagedump-w15.patch | **W15 page-content dump + counter classification** (2026-11-20, host-only, never executed): the W14 page-map diff (15 non-zero stock pages) classifies as **runtime counter/status**, not config - every differing offset appears in the vendor fixtures only as a read in hi_dp_dfx_dump_cnt/hi_pfe_dfx_dump_cnt, never as an init write; the same 0x1b6 occurs in five engines, the fam pair reads 0x2f9/0x2fa, ours are small running counters, and the persistent-looking pages already match. Patch 050 adds luofu_switch.pagedump=1: 16 words of every differing page + matched controls, read twice 10 ms apart, labelled STABLE (persistent candidate) or CHANGED (do not replay), for a stock content diff before any write. **Host compile (WERROR, 0 warnings), 001-051 series apply RC=0 (51/51), checkpatch 0 errors; never executed on hardware.** | same |
 | target/linux/hisilicon/patches-6.18/051-net-gmac-macregs-w16.patch | **W16 static GEMAC config words** (2026-11-20, host-only, never executed): the GEMAC window diff (144 common words, window 0x14480000) has six differences. Decode: 0x1c is static config (hi_mac_hw_config writes 1; ours 0 because macconf was off); 0x100 is max-frame+pause (stock 0x33400600 -> limit 1536, ours MTU+18=1518; vendor frame-length convention +36, formula [U] value [V]); 0xa4/0xac/0xb0/0xb8 are statistics counters read by himac_read_stats (no init write - not replayed). Patch 051 adds gated luofu_gmac.macregs=1 (required for registration, fail-closed): snapshot/stable/readback/restore, writes 0x1c=1 and 0x100=(pre and not 0x3fff) or 0x600. **Host compile (WERROR, 0 warnings), 001-052 series apply RC=0 (52/52), checkpatch 0 errors; never executed on hardware.** | same |
+
+Native forwarding (W22) is the canonical path: the driver initializes the PFE
+NAPT/flow engine and the engine punts unicast to the CPU, so no mirror is used.
+The old CPU-copy mirror fallback (luofu_switch.cpu_mirror=1 mirror_dst=4 with
+luofu_pie.cpucopy_deliver=1 cpucopy_port=11, patches 054-057) is kept only for
+the documented fallback image.
 | `target/linux/hisilicon/patches-6.18/043-net-lsw-ifc-default-table.patch` | **IFC default-classification table (W10)** (2026-11-20, host-only, never executed): the macconf image proved the MAC sequence complete but traffic still dead, so the next vendor layer is the classifier. Decoded `hi_pfe_ifc_init@0x794`: eight default entries, each written through the ifc+0x120 command/data engine (5 words; `0xc0000000 | index`; poll bit31, bit29 error - the EQM-style protocol) and the 4-word tab128 entry at `ifc+0x50000 + index*16`. Payloads extracted by emulating the pinned `hi_lsw_pfe.ko` (sha256 `12ea9fcb...`) and cross-checked by hand for entries 1-5; only tab128 word0 of entries 3..7 depends on the vendor allocator id (0 -> `0x1d00`). Patch 043 adds gate `luofu_switch.ifc=1` (requires arm/egress/qidmap/eps/qminit/pfe): engine idle pre-check, tab128 snapshot + stability + exact readback (restore on mismatch), engine descriptors acknowledged, readiness requires W3-W10. Includes bench verification and failure-signature documentation. **Host compile (WERROR, 0 warnings), 001-044 series apply RC=0 (44/44), checkpatch 0 errors; never executed on hardware.** | same |
 | `target/linux/hisilicon/patches-6.18/045-net-lsw-state-dump.patch` | **Read-only LSW state dump (W11)** (2026-11-20, host-only, never executed): all ten stages W3-W10 verified on silicon (image 24794d64: IFC engine idle, tab128 exact, heartbeat stable) yet no frame crosses, so the missing state is the vendor runtime L2/VLAN/port-forwarding configuration installed by the `hi_kcfe_lrn_*`/`hi_kcara` modules, which cannot load on 6.18. Patch 045 adds `luofu_switch.dump=1`: after the armed path it prints a bounded read-only snapshot of the candidate forwarding areas (l2 config/table area, ifc defaults, dp/eps/pe/eqm/opp state, fam/ips) for a stock-vs-ours diff, no writes, plus the attended diff procedure. **Host compile (WERROR, 0 warnings), 001-046 series apply RC=0 (46/46), checkpatch 0 errors; never executed on hardware.** | same |
 | `target/linux/hisilicon/patches-6.18/046-net-lsw-ifc-fix-eps-ext.patch` | **W10 correction + W12 extended EPS/DP stage** (2026-11-20, host-only, never executed): the stock-vs-ours dump diff proved the W10 tab128 entries were written one slot too low (array index vs vendor idx) and with the wrong allocator id (0x1d00 vs stock 0x1d01); patch 046 writes entries 1..8 at ifc+0x50000+idx*16 with the stock word0 values (0x0, 0x00100800, 0x1d01 x5, 0x00100800). It also adds W12 `luofu_switch.ext=1` (requires arm/egress/qidmap/eps/qminit/pfe/ifc): the 16 unprogrammed extended EPS words (eps+0xb20..0xb3c, eps+0xba0..0xbbc, stock values) and the DP runtime word dp+0x1c=0x18000 (vendor probe writes BIT(16)|mem-info field; stock adds BIT(15), meaning [U]) with snapshot/stability/readback/restore and fail-closed readiness W3-W12. The eqm+0x48..0x70 diff is documented as indirect command/data residue, not configuration; the W11 dump now covers IFC entry 8. **Host compile (WERROR, 0 warnings), 001-047 series apply RC=0 (47/47), checkpatch 0 errors; never executed on hardware.** | same |
@@ -1343,11 +1350,10 @@ recovery armed for every fire; defaults are off).  **No `luofu_smp_*` tokens
 are used** - those belong to the closed SMP investigation only:
 
     luofu_switch.arm=1 luofu_switch.egress=1 luofu_switch.qidmap=1 luofu_switch.eps=1
-    luofu_switch.qminit=1 luofu_switch.pfe=1 luofu_switch.ifc=1 luofu_switch.ext=1
-    luofu_pie.arm=1 luofu_pie.rxcfg=1 luofu_pie.accepterr=1
-    luofu_pie.cpucopy_deliver=1 luofu_pie.cpucopy_port=11
+    luofu_switch.qminit=1 luofu_switch.pfe=1 luofu_switch.naptinit=1 luofu_switch.ifc=1
+    luofu_switch.ext=1
+    luofu_pie.arm=1 luofu_pie.rxcfg=1
     luofu_gmac.macregs=1
-    luofu_switch.cpu_mirror=1 luofu_switch.mirror_dst=4
 
 `luofu_pie.rxdiag=1` / `luofu_pie.rxstroke=1` / `luofu_pie.rxtrace=1` and the
 `dump`/`scan`/`pagedump` gates are optional diagnostics, not canonical.
