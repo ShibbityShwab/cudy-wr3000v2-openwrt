@@ -11,7 +11,9 @@
 > not a defect. Physical LED/button confirmation and multi-port link tests remain
 > open. Some tables below therefore describe the pre-fix state, not the current
 > release baseline; see [RELEASE-NOTES.md](../../../RELEASE-NOTES.md). Per-unit MACs
-> in this report were redacted to the documentation prefix `02:00:00:xx:xx:xx`.
+> in this report were redacted to the documentation prefix `02:00:00:xx:xx:xx`. The
+> install-path and multi-port follow-ups are recorded in the retained
+> [UPDATE-2026-11-21.md](UPDATE-2026-11-21.md) next to this file.
 > 
 
 **Date:** 2026-11-21 (capture window ~05:53-06:03 UTC).
