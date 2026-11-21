@@ -44,3 +44,51 @@ host ping with the CPU mirror kept for management, looking for an additional nat
 completion on port 11. Everything in the EQM/NAPT/L2 windows needs a decoded contract before any
 replay; the planner already refuses NAPT and L2 by name. The E0-a result (native completions
 carry status=37 = exception/punt class) still applies.
+
+### Decode review (2026-11-21, host-side - see E0B-ANALYSIS.md and m1a/)
+
+The follow-up decode changes the reading of three deltas above:
+
+1. tagact entry 1 is a verified tag_write entry (desc[8]=0x08): a tag DELETE action of type 2 with
+   no VLAN/TPID (word1 0x0000c000 = selector 4 + the writer's 0x80 bit). It is not a CPU-punt
+   classifier action by itself; the tagact_id reference lives in L3-interface/multicast entries
+   in the vendor code, none of which are readable/present on our image - so a replay is a
+   hypothesis test with an expected null result.
+2. pfe_glb+0x2c is decoded by the vendor's own dump_glb_attr as up_port (high16, stock 0x1000 =
+   WAN port 12) plus flow_age_en (napt+0x54 bit 8, stock 1). It is a flow-engine attribute, not an
+   L2/CPU-delivery control; the flow_age_en half is in the refused NAPT window.
+3. The L2 0x414/0x415 words are L2 DFX COUNTERS (rx_total/tx_total and friends at l2+0x40000,
+   vendor hi_pfe_dfx_dump_cnt string resolution), not port maps or MAC entries. The L2 page stays
+   read-only; the readable L2 config words are identical on both images.
+
+The EQM words are indirect command/data residue, the PIE words are our own driver's ring config,
+and IFC shows no stock-only entries. The reviewed minimal probe set (m1a/) is therefore tagact
+entry 1 + pfe_glb+0x2c only, with fail-closed scripts and a null-result expectation.
+
+### M1a probe results (both NULL) and the next step
+
+Probe A (tagact entry 1): the write at 0x124d4014 was **ignored** (wrote 0xc000, read 0x0) - the
+pub tag action table has no usable CPU write path. Probe B (pfe_glb+0x2c): accepted/read back but
+eth2 rx delta stayed 531 (mirror only). All words reverted, box healthy; the write experiments
+are closed.
+
+The consistent-stock decoded procfs capture (hsan-stock/hsan2/) resolves the mechanism: stock
+counters show ifc_hit=992, **ifc_tocpu=104** (broadcast/ARP class, ~the 103 broadcasts), and
+**ifc_napt=170 -> napt up_tocpu=129** (unicast class ~the 130 unicasts); dp port4 gets all 274
+frames (uc130+mc41+bc103). So the CPU-punt rule is: IFC defaults punt broadcast to CPU; IFC
+routes unicast to the NAPT engine, whose up-direction punt sends it to CPU. Our image has the
+same IFC defaults but an **uninitialized NAPT engine**, so unicast is dropped there.
+
+Next reviewable step: replay hi_pfe_napt_init (register-only, stock final values, flow tables in
+the reserved 0x80400000/1 MiB switch carveout which is outside Linux memory) - see
+m1a/napt-init/NAPT-INIT-PROPOSAL.md, apply-napt-init.sh, observe-napt-init.sh and
+check-napt-path.sh. Expected observable with the mirror on: eth2 rx_packets delta about 2x the
+ping count and napt up_tocpu / ifc_napt counters incrementing; then the cpu_mirror=0 proof boot.
+
+### M1a PROVEN (2026-11-21)
+
+The decoded NAPT-init replay worked on hardware: proof image 5800c9ab (canonical tree + cmdline
+change only, userspace replay script) booted with cpu_mirror=0 and gave host ping 200/200, working
+SSH, UART RXDIAG native port=11 status=77 deliveries, and stock NAPT register readback. The
+status=37 error class of E0-a is gone. Next: W22 (move the sequence into the driver, see w22/),
+M1b (per-port and LAN-to-LAN, see m1b/), release rebuild/validation.

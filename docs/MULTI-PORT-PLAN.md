@@ -1,5 +1,13 @@
 # Multi-port Ethernet: current limit, experiment plan, decision gate
 
+> **Curated copy note (synced 2026-11-21).** This plan documents the pre-W22 limit and the
+> source-port experiment (negative). **W22 supersedes the CPU-copy mirror workaround for the
+> canonical eth2 path**: the driver initializes the PFE NAPT/flow engine (patch 059) and the native
+> exception class delivers unicast to the CPU (patch 060) with no mirror tokens - bench image
+> `50023446`. The mirror patches 054-057 remain in the release line only as the documented
+> fallback (`naptinit=0` + mirror tokens). **M1b (per-port delivery / LAN-to-LAN) is the pending
+> bench step**; multi-port is not claimed.
+
 Status: 2026-11-21, after the 2-CPU / single-port bench baseline. Wired LAN works on
 the verified baseline through the documented CPU-copy workaround (mirror eth2 /
 switch port 11 ingress to the CPU destination port 4; PIE delivers the copies to

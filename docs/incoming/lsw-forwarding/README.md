@@ -1,24 +1,30 @@
 # LSW native forwarding - plan and first artifacts (2026-11-21)
 
-> **Curated copy (synced 2026-11-21).** Retained native L2/VLAN forwarding lane - planning plus
-> read-only hardware experiments. **E0-a** (mirror off) showed native completions do arrive on
-> port 11 but are exception/punt-class (`status=37 err=1`) and the IP path is dead, so the CPU-copy
-> mirror workaround remains required. **E0-b** took read-only stock-vs-ours runtime captures
-> (9,488 words each, 0 read failures) and found the stock-only classifier/punt state our init
-> lacks (tagact entry 1, `pfe_glb+0x2c` high16 0x1000, plus EQM/NAPT/L2/PIE differences); the next
-> M1a step is a reviewed, fail-closed write of only the justified words followed by a host ping,
-> never a blind replay (the write planner refuses NAPT and L2 by name). Instruments here are a
-> device read-only capture, a host read-only diff and a host write-planner that defaults to
-> print-only and executes only with explicit attended/recovery flags. The retained plan's host NIC
-> MAC was redacted to a documentation prefix; nothing in this directory was run by this repository.
+> **Curated copy (synced 2026-11-21).** Retained native L2/VLAN forwarding lane - planning,
+> reviewed bench probes and read-only experiments. Recorded milestones: E0-a mirror-off (exception
+> path only), E0-b read-only stock-vs-ours capture, M1a probes (both NULL), the consistent-stock
+> procfs decode that found the IFC->NAPT unicast path, **M1a PROVEN** (proof image `5800c9ab`:
+> decoded NAPT-init replay + mirror off -> native port=11 deliveries, ping 200/200, SSH), and
+> **W22 release integration** (`w22/`: kernel patches 059/060 are now in the L1 release line, with
+> canonical cmdline `naptinit=1` and no mirror tokens; bench image `50023446`). `m1b/` holds the
+> next experiment plan (per-port delivery, LAN-to-LAN) - **M1b, the fallback-image rebuild and the
+> soak are pending bench steps; multi-port is not claimed**. Scripts here are bench instruments
+> requiring attended/recovery gating; the release copies of the W22 patches are under
+> `target-skeleton/`. The retained plan's host NIC MAC was redacted; nothing was executed by this
+> repository.
 
 Status: **planning + prototype artifacts only.** No register write is performed by anything here
 unless a human runs the write tool explicitly with the documented flags and an attended bench.
-One experiment from this lane HAS run on hardware: the read-only/command-line-only E0-a mirror-off
-test (2026-11-21, image 990c5cab) - see [E0A-ANALYSIS.md](E0A-ANALYSIS.md) and the appended result in
-[MINIMAL-EXPERIMENT.md](MINIMAL-EXPERIMENT.md). It proved the exception path works natively but only
-ARP-class traffic is punted; the missing piece is unicast-to-CPU delivery. The current hardware
-baseline is image c3ef2a50.
+Hardware rounds so far: E0-a mirror-off (exception path works natively, ARP only), E0-b
+stock-vs-ours read-only capture, the M1a probes (**both NULL** - tagact write ignored, up_port no
+effect), the consistent-stock procfs capture that resolved the mechanism (IFC punts broadcast to
+CPU and routes unicast into the NAPT/flow engine), and finally **M1a PROVEN**: proof image
+5800c9ab with the decoded NAPT init replay and the mirror off gives native port=11 deliveries,
+ping 200/200 and working SSH. Next: W22 (kernel-side NAPT init + PIE delivery, drafts and release
+integration in [w22/](w22/W22-DESIGN.md)) and M1b (per-port / LAN-to-LAN, [m1b/](m1b/M1B-PLAN.md)).
+See [E0A-ANALYSIS.md](E0A-ANALYSIS.md), [E0B-ANALYSIS.md](E0B-ANALYSIS.md), [E0B-RESULTS.md](E0B-RESULTS.md).
+The current hardware baseline is image c3ef2a50 (E0-b ran on the 6e9c54d0 family; the M1a proof
+image is 5800c9ab).
 
 This directory is the "native L2/VLAN forwarding" lane requested after the 2026-11-21
 multi-port decision gate ([../../MULTI-PORT-PLAN.md](../../MULTI-PORT-PLAN.md)): the CPU-copy
@@ -31,6 +37,11 @@ so multi-port LAN/WAN needs the switch's own forwarding / CPU-delivery path.
 | --- | --- | --- |
 | `IMPLEMENTATION-PLAN.md` | the engineering plan: architecture, three ordered implementation routes, exact writes we can justify, netdev/coexistence model, bring-up sequence, risks, patch design (revision after E0-a: sections 2.1, 4.4) | none |
 | `E0A-ANALYSIS.md` | host-side analysis of the mirror-off run: what status=37/err=1 means (class marker, not frame error), what is actually missing (unicast-to-CPU), milestone split M1a/M1b, revised E0-b target | none |
+| `E0B-ANALYSIS.md` | host-side decode of the E0-b captures and the reviewed M1a write proposal: tagact entry 1 decode, pfe_glb up_port decode, L2 counter decode, exclusions, expected observable, risks | none |
+| `m1a/` | the reviewed M1a probe: plan files, fail-closed on-box scripts (tagact entry 1; pfe_glb up_port), read-only observer, attended session runbook (both probes ran NULL - see SESSION.md closeout) | generated write scripts - on-box only with flags |
+| `m1a/napt-init/` | decoded NAPT/flow init replay: proposal, fail-closed on-box script, read-only observers and the proof record (proof-image/RESULT.md) - **M1a proven** | generated write script - on-box only with flags |
+| `w22/` | release integration: kernel-side W22 NAPT init and PIE exception-delivery patch drafts, design and release-line validation plan | patch drafts only; not yet in the release series |
+| `m1b/` | next hardware experiment: per-port native delivery and LAN-to-LAN test matrix, observations and rollback rules | none (plan) |
 | `MINIMAL-EXPERIMENT.md` | the first experiment to run when the bench is available - **command-line changes and read-only captures only, zero register writes** | none |
 | `UNKNOWNS-AND-READS.md` | the [U] list with the exact attended reads/commands that would answer each item | none (read-only) |
 | `capture-runtime-state.sh` | run **on the box** (stock or our image): read-only register/proc/devmem capture into a directory, with the exact address list | read-only |

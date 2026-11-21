@@ -247,6 +247,176 @@ How to use the results:
 
 ~~~
 
+## Status update 2026-11-21 (after E0-b: stock-vs-ours captured and decoded)
+
+E0-b is done (ours image 6e9c54d0 vs vendor stock; 9,488 words each, 0 failures). Decode and the
+reviewed M1a probe: E0B-ANALYSIS.md and m1a/. What it settles for this list:
+
+- **U4 (L2 table / MAC learning state) - ANSWERED for the readable block:** the differing
+  l2+0x40000 page words are L2 DFX counters, not a table. The vendor hi_pfe_dfx_dump_cnt string
+  map decodes them as rx_total (+0), tx_total (+4), rx_drop (+8), tx_drop (+0x3c), port_move
+  (+0xc), age_drop (+0x10), sport_clash (+0x14), search_ok_mc (+0x18), search_fail_mc (+0x1c).
+  Stock 0x414/0x415 vs ours 0x148 are counter values, not port maps or MAC entries. The readable
+  L2 config words (l2+0x100..0x18c) are identical on both sides; no L2 writes are proposed.
+- **U14 (where the stock unicast-to-CPU state lives) - PARTIAL:** it is not in the captured
+  readable set. The IFC table is identical to ours (no stock-only entries), the L2 page is
+  counters, OPP/PA/EPS/DP/FAM/MCC config match, and the only stock-only config words are tag
+  action entry 1 and pfe_glb+0x2c. The remaining candidate is the vendor CFE flow/L2 program in
+  the DDR carveout (0x80400000 area), which cannot be read or replayed safely on our image.
+- **U13/U11 (which action/Cpu-punt encoding to use) - PARTIAL:** tag action entry 1 is decoded as
+  a tag DELETE action (add_type 0, del_type 2, no VLAN); tagact_id is referenced by L3-interface
+  and multicast entries in the vendor code, not by readable IFC entries. The IFC/L3 action
+  encoding needed for our own catch-all punt is still [U] (host-side decode still to do).
+- **New U17-U19 below** cover the tagact reference, the stock procfs decoded dumps that should
+  name it, and the DDR flow table as the remaining possible enabler.
+
+### New unknowns after E0-b
+
+| # | unknown | why it matters | read/experiment |
+| --- | --- | --- | --- |
+| U17 | what references tag action index 1 (L3-interface entry, multicast user-link, or a hardware default) | decides whether replaying entry 1 can have any effect at all | stock procfs decoded dumps: /proc/hsan/lsw/table/l3intf, /proc/hsan/lsw/table/tagact, /proc/hsan/lsw/table/ifc; host-side decode of l3intf_write/l3intf_dump field extraction |
+| U18 | the decoded stock procfs tables (tagact, l3intf, ifc, glb_attr, flow_cnt, tocpu_cnt, drop_cnt, br_dump, cfe flow/mac) | cheapest way to see the vendor's CPU-delivery configuration with the vendor's own field decoders | stock boot, read-only, exact commands below; no register writes |
+| U19 | the CFE flow/L2 program in the DDR carveout | the last remaining candidate for the real unicast-to-CPU state; cannot be replayed on our kernel (DDR is live Linux memory) | do not read/write DDR from our image; treat as out of scope unless a safe read-only method is agreed (e.g. stock-side capture only) |
+
+### Next read-only stock capture (decoded procfs, no register writes)
+
+The E0-b register capture did not include the vendor's decoded procfs dumps. On the stock boot,
+with the host pinging (so the state is live), capture these (read-only, via the stock telnet
+shell; add to capture-runtime-state.sh or paste manually):
+
+    /proc/hsan/lsw/table/tagact          # decoded tag action entries (add/del fields, types)
+    /proc/hsan/lsw/table/l3intf          # L3 interface entries incl. tagact_id (the reference!)
+    /proc/hsan/lsw/table/ifc             # decoded IFC classifier rows (key + action fields)
+    /proc/hsan/lsw/table/glb_attr        # up_port / flow_age_en decoded
+    /proc/hsan/lsw/table/flow_cnt        # flow table counters
+    /proc/hsan/lsw/pfe/tocpu_cnt         # "to CPU" counters
+    /proc/hsan/lsw/pfe/drop_cnt          # drop counters
+    /proc/hsan/cfe/intf/br_dump          # bridge/rootif state
+    /proc/hsan/cfe/table/flow            # software flow entries
+    /proc/hsan/cfe/table/mac_stats       # software FDB/MAC stats
+    /proc/hsan/net/swa/                  # rootif/vlan filter views (already partly captured)
+
+These decoded texts should state the tagact reference and the vendor's CPU-delivery configuration
+directly; they are the natural input to designing our own IFC/L3 entry (the host-side decode of
+ifc_write/l3intf_write is the companion task).
+
+## Status update 2026-11-21 (after the M1a nulls and the stock decoded procfs capture)
+
+The two M1a probes were run on hardware and both were NULL: the tagact word write was ignored
+(wrote 0xc000 at 0x124d4014, read 0x0), and pfe_glb+0x2c was accepted/read back but eth2 rx delta
+stayed 531 = mirror copies only. Words reverted, box healthy; the write experiments are closed.
+A consistent-stock read-only procfs capture (hsan-stock/hsan2/, 137 files) followed. It resolves
+the CPU-punt mechanism:
+
+- **U14 (where the unicast-to-CPU state is) - ANSWERED: it is the NAPT/flow engine path.**
+  Stock counters: ifc rx_total/hit=992/992, ifc_tocpu=104 (broadcast class ~ 103), ifc_napt=170;
+  napt tx_total=170, up_tocpu=129 (unicast class ~ 130); dp port4 queue 274/274 = all CPU frames
+  (uc130+mc41+bc103); pie ch0/ch1 rx = 191/83. So IFC defaults punt broadcast to CPU and route
+  unicast to NAPT, whose up-direction punt sends it to CPU. Our image has the same IFC defaults
+  but NAPT uninitialized (config words zero), which is exactly why the unicast class disappears
+  before PIE (no completion) while ARP arrives.
+- **U15 (completion status classes) - deferred:** the NAPT punt class is not observed yet; once
+  the init replay works, RXDIAG/accepterr handling will show the class.
+- **U13/U11 (IFC action encoding) - deferred:** not needed if the IFC defaults already route
+  unicast to NAPT; the read-only counter test below confirms/refutes that first.
+- **U17 (tagact reference) - no longer on the M1a critical path:** the entry is a tag-delete
+  action referenced by the CFE rootif/L3 program (l3intf/ multicast entries in vendor code); it
+  does not gate unicast CPU delivery. It remains a D2 (VLAN/offload) question.
+- **New U20:** does the vendor NAPT init (register-only replay with the reserved switch flow
+  window bases) alone make the up_tocpu punt work, or is more of hi_pfe_pub_init/flow-table setup
+  needed? The m1a/napt-init prototype answers this.
+- **New U21:** the two napt+0x60 clear commands are engine-managed table initializations; after
+  the replay, do the flow tables stay valid across link events (like the mirror registers did
+  not), or must the sequence be re-applied? Check after M1a proof.
+
+### Exact read-only stock procfs invocations (and what they can/cannot reveal)
+
+All of these are plain reads (cat) or, where marked, a proc command write that only triggers a
+diagnostic dump (no register/config change). The captured hsan2 tree already contains the
+decoded outputs of the first list; the command-based ones are the only way to get live traces.
+
+Read-only cat list (the values that mattered here):
+    cat /proc/hsan/lsw/pfe/cnt        # the pa/ifc/l2/napt/mcc/opp/pe counter decomposition
+    cat /proc/hsan/lsw/pfe/tocpu_cnt  # ifc_point0/tocpu sub-counters
+    cat /proc/hsan/lsw/pfe/drop_cnt
+    cat /proc/hsan/lsw/dp/cnt         # dp rx/tx per port/queue and pie channel split
+    cat /proc/hsan/lsw/table/ifc /l3intf /tagact /flow_cnt /ipv4_flow /ipv6_flow /glb_attr /cnt
+    cat /proc/hsan/lsw/dp/vport /proc/hsan/lsw/queue/cnt /queue/dev_port
+    cat /proc/hsan/net/eth2/cnt /proc/hsan/net/pie_cnt /proc/hsan/net/pie_chl_cnt
+    cat /proc/hsan/net/pie_config /proc/hsan/net/swa/rootif_dump /proc/hsan/net/eth2/attr1
+    cat /proc/hsan/cfe/hook/cnt /proc/hsan/cfe/intf/dump_intf /proc/hsan/cfe/table/mac_stats
+    cat /proc/hsan/cfe/lrn/dump_lib
+
+Command-based dumps (write a command line to the same node, then cat it; these are diagnostic
+commands, not register writes):
+    echo "0xffff 0xffff" > /proc/hsan/lsw/dp/diag ; cat /proc/hsan/lsw/dp/diag
+        # usage decoded from hi_lsw_dp: "echo igr_bitmap egr_bitmap > diag" (hex masks)
+        # prints the per-stage ingress/egress counters (ips/eqm/eps classes)
+    hdb cnt get                        # vendor helper: cats all counter nodes (read-only)
+    hdb info dump <tftp-ip>            # vendor helper: cats all /proc/hsan files into a log
+    hdb flow trace -igr eth2 -dip <host-ip> -detail
+        # writes "flow trace ..." to /proc/hsan/diagnose/flow/flow_trace; diagnostic only,
+        # prints where the packet is seen (cfe/IFC/NAPT/LSW positions); note the helper also
+        # runs "hdb cnt clr" and clears dmesg first - capture counters before using it
+    hdb flow learn -igr eth2 -dmac <mac>   # learning-path diagnostic only
+    hdb flow cnt -igr eth0 -egr eth2       # flow-counter diagnostic only
+
+Important negative result: **there is no proc node that dumps the hardware IFC/L3/flow entries.**
+The table files (ifc/l3intf/ipv4_flow/...) print only the software table-manager shadow, and on
+stock that shadow is empty (alloc=0) while the counters prove the hardware classified 992 frames;
+the classifier entries are direct hardware defaults (the eight W10 defaults) plus CFE flow state
+in the DDR carveout, neither of which is exposed by these dumps. The decoded counter groups above
+are the correct read-only way to see which class goes where; chasing table-dump command syntax is
+not useful.
+
+### Read-only diagnosis on our image (do this first, no writes)
+
+m1a/napt-init/check-napt-path.sh prints the eth2 counters, the IFC counter block, the NAPT
+counters and the NAPT config words. Run it, ping the box from the host, run it again:
+    ROUTER_HOST=root@192.168.1.1 tools/rsh.sh 'sh /tmp/m1a/napt-init/check-napt-path.sh'
+    ping -i 0.02 -c 200 192.168.1.1
+    ROUTER_HOST=root@192.168.1.1 tools/rsh.sh 'sh /tmp/m1a/napt-init/check-napt-path.sh'
+Expected if the NAPT diagnosis is right: the IFC block's ifc_napt-class word increments by about
+200, napt rx_napt/up_tocpu stay 0 (engine uninitialized), eth2 rx_packets rises only by the mirror
+copies, and no new native delivery appears. That confirms the frames reach NAPT and die there,
+which is what the m1a/napt-init replay is designed to fix.
+
+## Status update 2026-11-21 (M1a PROVEN - the NAPT init replay delivered native CPU delivery)
+
+The reviewed NAPT replay was run from a probe-only boot script on proof image 5800c9ab (canonical
+adopted tree + command-line change only: cpu_mirror=0 luofu_napt_init=1 luofu_pie.rxdiag=1):
+
+- boot 6.18.60, 2 CPUs, no Oops/BUG/panic; dmesg "luofu-napt-init: applied
+  (up_port=0x10000034 bases=0x80400000/0x80408000)";
+- with the mirror OFF: host ping 200/200 0% loss AND working SSH; UART RXDIAG native port=11
+  deliveries with status=77 (the E0-a status=37 class is gone);
+- NAPT registers read back the stock values.
+
+So **U20 is answered: yes, the decoded hi_pfe_napt_init replay alone is sufficient** for the
+eth2 unicast CPU delivery; the earlier "NAPT init alone will not produce native forwarding"
+caution is superseded by the measured result (the replay includes the flow-table bases and the
+v4/v6 clear commands, which is what the engine needed).
+
+Implications for the remaining list:
+- **U21 (persistence/re-apply)**: the proof image kept working through its boot (link came up
+  after the replay). Whether the NAPT config survives link flap/reboot must be checked in M1b
+  (m1b/M1B-PLAN.md, M1b-4). The mirror's post-link reset is the precedent; W22 has an idempotent
+  guard so a re-apply can be added cheaply if needed.
+- **U22 (completion status classes)**: the native punt class is status 77 on the proof boot
+  (status 37 was the older IFC/ARP exception class under the mirror-era configuration). W22b
+  delivers every non-zero status class with a valid decoded port by default (no accepterr token);
+  the first deliveries are logged as RXEXC. If M1b sees other status values, the same rule covers
+  them and the log records them - open only as a catalogue to collect.
+- **U23 (LAN-to-LAN class coverage)**: does the punt deliver unknown-unicast/broadcast/LAN-to-LAN
+  frames to the CPU, or only traffic to the box? This decides software-bridge sufficiency vs the
+  hardware bridge; M1b-2/M1b-3 answer it.
+- **U24 (W22 as kernel code)**: the proof used a userspace init script; the driver implementation
+  (w22/ patches) compiles/checkpatch-clean host-side but has not run on hardware yet. The first
+  W22 image boot is the remaining validation.
+- **U25 (mirror retirement)**: mirror patches 054-057 stay in the release line default-off as a
+  fallback. Retire the code only after a W22-only soak; the fallback command line is in
+  w22/RELEASE-INTEGRATION.md.
+
 ## U12 - completion of the identity path (success criterion)
 
 M1 is met when, for all four wired ports, a frame from the bench host (cable on that jack)
