@@ -1,20 +1,24 @@
 # LSW native forwarding - plan and first artifacts (2026-11-21)
 
-> **Curated copy (synced 2026-11-21).** Retained native L2/VLAN forwarding plan from the lsw lane
-> (the multi-port decision gate resolved to the native bridge). It contains the implementation
-> plan, the minimal experiment record and three instruments: `capture-runtime-state.sh` (device,
-> read-only register/proc capture, no write path), `diff-captures.py` (host analysis, read-only) and
-> `plan-writes.sh` (host; emits a reviewed on-box write script that defaults to print-only and
-> executes only with `--apply` plus `LSW_WRITE_ATTENDED=1` and `LSW_RECOVERY_ARMED=1`, with
-> rollback/readback gates). **E0-a result (recorded in MINIMAL-EXPERIMENT.md): with
-> `cpu_mirror=0` the unit boots 2 CPUs and native-path completions arrive on port 11, but every
-> frame is `status=37 err=1` and IP is dead - the stock CPU-punt/IFC/tagact classification is
-> missing, so the mirror workaround remains required.** Nothing here has been run as part of this
-> repository; the host NIC MAC in the retained copy was redacted to the documentation prefix.
+> **Curated copy (synced 2026-11-21).** Retained native L2/VLAN forwarding lane - planning plus
+> read-only hardware experiments. **E0-a** (mirror off) showed native completions do arrive on
+> port 11 but are exception/punt-class (`status=37 err=1`) and the IP path is dead, so the CPU-copy
+> mirror workaround remains required. **E0-b** took read-only stock-vs-ours runtime captures
+> (9,488 words each, 0 read failures) and found the stock-only classifier/punt state our init
+> lacks (tagact entry 1, `pfe_glb+0x2c` high16 0x1000, plus EQM/NAPT/L2/PIE differences); the next
+> M1a step is a reviewed, fail-closed write of only the justified words followed by a host ping,
+> never a blind replay (the write planner refuses NAPT and L2 by name). Instruments here are a
+> device read-only capture, a host read-only diff and a host write-planner that defaults to
+> print-only and executes only with explicit attended/recovery flags. The retained plan's host NIC
+> MAC was redacted to a documentation prefix; nothing in this directory was run by this repository.
 
-Status: **planning + prototype artifacts only. Nothing in this directory has been run on
-hardware. No register write is performed by anything here unless a human runs the write tool
-explicitly with the documented flags and an attended bench.**
+Status: **planning + prototype artifacts only.** No register write is performed by anything here
+unless a human runs the write tool explicitly with the documented flags and an attended bench.
+One experiment from this lane HAS run on hardware: the read-only/command-line-only E0-a mirror-off
+test (2026-11-21, image 990c5cab) - see [E0A-ANALYSIS.md](E0A-ANALYSIS.md) and the appended result in
+[MINIMAL-EXPERIMENT.md](MINIMAL-EXPERIMENT.md). It proved the exception path works natively but only
+ARP-class traffic is punted; the missing piece is unicast-to-CPU delivery. The current hardware
+baseline is image c3ef2a50.
 
 This directory is the "native L2/VLAN forwarding" lane requested after the 2026-11-21
 multi-port decision gate ([../../MULTI-PORT-PLAN.md](../../MULTI-PORT-PLAN.md)): the CPU-copy
@@ -25,7 +29,8 @@ so multi-port LAN/WAN needs the switch's own forwarding / CPU-delivery path.
 
 | file | purpose | risk |
 | --- | --- | --- |
-| `IMPLEMENTATION-PLAN.md` | the engineering plan: architecture, three ordered implementation routes, exact writes we can justify, netdev/coexistence model, bring-up sequence, risks, patch design | none |
+| `IMPLEMENTATION-PLAN.md` | the engineering plan: architecture, three ordered implementation routes, exact writes we can justify, netdev/coexistence model, bring-up sequence, risks, patch design (revision after E0-a: sections 2.1, 4.4) | none |
+| `E0A-ANALYSIS.md` | host-side analysis of the mirror-off run: what status=37/err=1 means (class marker, not frame error), what is actually missing (unicast-to-CPU), milestone split M1a/M1b, revised E0-b target | none |
 | `MINIMAL-EXPERIMENT.md` | the first experiment to run when the bench is available - **command-line changes and read-only captures only, zero register writes** | none |
 | `UNKNOWNS-AND-READS.md` | the [U] list with the exact attended reads/commands that would answer each item | none (read-only) |
 | `capture-runtime-state.sh` | run **on the box** (stock or our image): read-only register/proc/devmem capture into a directory, with the exact address list | read-only |
@@ -37,8 +42,8 @@ so multi-port LAN/WAN needs the switch's own forwarding / CPU-delivery path.
 1. `capture-runtime-state.sh` has no write path at all and refuses to run if it cannot find a
    read-only devmem.
 2. `plan-writes.sh` defaults to **print-only**. Execution needs three independent flags and is
-   limited to an explicit address allow-list (LSW windows only; the `queue`/`flow` DDR windows,
-   the CRG page and the PIE windows are outside the write allow-list).
+   limited to an explicit address allow-list (LSW windows only; the NAPT window and the L2 window,
+   the `queue`/`flow` DDR windows, the CRG page and the PIE windows are refused by name).
 3. Every proposed write carries its rollback word, captured immediately before the write; the
    plan refuses to write an address whose rollback value is missing.
 4. The bench workaround (eth2 mirror + CPU-copy delivery) stays armed during the first
