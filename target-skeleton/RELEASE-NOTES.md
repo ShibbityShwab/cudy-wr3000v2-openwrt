@@ -54,7 +54,7 @@ Without them U-Boot printed `alias console not found`, skipped staging, and CPU1
 never polled the kernel pen; every kernel release had no consumer.  The kernel
 release implementation (patch 018) was correct all along - no SMP kernel code
 change is needed for the fix.  **Base-DTB padding is also required:** the LED/
-keys DTS compiles to a 13,041-byte DTB whose totalsize is not 8-byte aligned;
+DTS compiles to a 13,041-byte DTB whose totalsize is not 8-byte aligned;
 the image build runs `Build/luofu-pad-dtb` (`tools/pad-dtb.py`) to fold
 in the padding (13,048 B) before `append-dtb`, otherwise the stock U-Boot
 bootfip gate-word load is unaligned and the loader falls back to stock
@@ -142,7 +142,7 @@ The 2-CPU baseline is the platform; the remaining work is feature bring-up and h
 | 2 CPUs | [V] working, soak + reboot verified | keep as the baseline |
 | wired LAN (one port, bench workaround) | [V] CPU-copy mirror + port-0 delivery | native CFE-equivalent forwarding is a separate project; multi-port/WAN needs attended cable tests |
 | storage (FMC SPI-NAND + UBI) | [V] rootfs/overlay mounted, 17 partitions | exercise/verify NAND under load and the install path |
-| SSH / userspace / overlay | [V] working | install/upgrade path end-to-end (A/B) |
+| SSH / userspace / overlay | [V] working | install/upgrade path end-to-end (A/B): manual stock-mediated path verified repeatedly; the automated first-install tool is blocked because stock has no SSH/dropbear/opkg |
 | LEDs / buttons | [V] 6 oem:green:* LEDs + gpio-keys-polled (reset/WPS) exposed; brightness writable; physical light/button press pending user confirmation | stock overlay board_id=3 map (GPIO 24/25/3/2/0/1 LEDs, 22/23 keys, active-low) |
 | thermal / watchdog / RTC | thermal ENODATA [X]; watchdog [V] sysfs timeout/identity/state visible (untested arm); RTC absent | debug the tvsensor read; one attended watchdog test with recovery armed |
 | USB / PCIe / I2C / SPI | [U] drivers ported, devices unverified | inventory devices/buses, add board nodes, test per feature |
@@ -169,3 +169,57 @@ armed and UART captured; (3) Wi-Fi feasibility then optional port; (4) upstream 
   (13,041 B); U-Boot bootfip data-aborted on the unaligned gate-word load and fell
   back to stock.  scripts/pad-dtb.py now pads the DTB to 13,048 B / 8-byte
   totalsize, and the image boots (2 CPUs, ping 0% loss).
+  **Active-DTS warning [V]:** the first active-DTS cleanup (image 6f19c6d6)
+  did not boot - MTD scan stalled and the U-Boot watchdog reset the unit.
+  The DTS is back to the known-good active content (compiled DTB
+  byte-identical to the 7421bb7a baseline); after any active-DTS change the
+  rebuilt image must be boot-tested before it is trusted.
+
+## Install path status (2026-11-21)
+
+Manual stock-mediated install is verified repeatedly on the bench (write kernelb from the stock
+telnet shell, ubiformat rootfsb, selector cell 0x11, reboot): latest run wrote image 7421bb7a
+(kernelb sha 5632ccdb..., rootfs part sha 52977160...) and booted with 2 CPUs/6 LEDs/event0.
+The automated first-install tool is host-side untested on the unit because it needs an SSH
+transport and the vendor image has no dropbear and no opkg; a target dropbear pushed to /tmp also
+failed host-key generation (Bad buf_getptr). Adding a telnet+base64 transport (binary-safe
+readback) or provisioning a working SSH server on stock are the two ways to close the automated
+install gate. Also: writing next_pair a from OUR image is effective (cell reads 0x10) but the
+boot-pair recorder re-records the running pair on the next boot, so a warm reboot can return to
+pair B; the reliable stock switch is the stock-side cell write + stock reboot.
+
+## Hardware validation status of the cleaned DTS (2026-11-21)
+
+The upstream-bindings cleanup that turned the board DTS into its cleaned 712-line form (commit
+538377c) is HOST-VALIDATED ONLY and HARDWARE-REGRESSED: an image built from it (6f19c6d6) boots
+the kernel but stalls in MTD partition registration and is reset by the U-Boot watchdog, then
+falls back to stock. The known-good hardware baseline remains image **7421bb7a** with the
+pre-clean DTS. Any active-DTS change must be boot-tested on the unit; host-side patch/dtc/
+contract checks are necessary but not sufficient. A conservative cleanup (prose/comment removal
+without active-node renames or removals) is in place (submodule commit `7ae18f2`):
+only comments were removed, the compiled DTB is byte-identical to the known-good
+7421bb7a DTB (13,041 B sha256 `49fe5c47...`), and a boot-test of the rebuilt
+image is still required before treating it as hardware-validated.
+
+Verified 2026-11-21 (lead): the conservative comment-only cleanup (submodule 7ae18f2) compiles to
+a DTB byte-identical to the known-good DTB (13041 B sha256 49fe5c47..., padded 13048 B sha256
+402e4f71...) and the rebuilt image reproduces the verified image 7421bb7a byte-for-byte
+(sha256 7421bb7ace41e2e03613a0314874fabfcd16aeef60dbdd713ebc6c2b735cd4b3); release-line validator
+PASS with DTS-0001 072d0b8b... byte-identical and the loader contract intact. No new boot
+behaviour is introduced. The 14 deferred active deltas (switch unit address/reg order, node
+renames, status removals, thermal/WiFi/sp804/WOE removals, model/compatible change, macro
+rendering) are documented in upstream/series-6.18/07-dts-upstream-bindings.md section 3 and each
+needs its own hardware boot-test; driver-facing deltas must never ride along with prose cleanup.
+
+## Multi-port Ethernet status (2026-11-21)
+
+The verified baseline serves one jack (eth2) through the CPU-copy workaround: switch
+ingress mirror of eth2/port 11 to CPU destination port 4, and PIE delivers the copies
+to the eth2 netdev. The other jacks do not work through this path because the CPU-copy
+completion reports port 0 and carries no confirmed source-port identifier; delivering
+all mirrored frames to one netdev would be incorrect bridge behaviour. The far-right
+bench jack was verified to be a LAN port (box stayed alive and its LAN bridge sent IPv6
+RAs, while host-to-box frames were not delivered). The agreed next step is the attended
+source-port experiment in opensource/docs/MULTI-PORT-PLAN.md: if the RX completion has a
+source-port field, extend mirror mask + per-port delivery; if not, multi-port LAN/WAN
+forwarding is the native L2/VLAN hardware bridge project (LSW-SPEC), not a CPU-copy hack.
