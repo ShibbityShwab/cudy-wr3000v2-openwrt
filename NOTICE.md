@@ -6,35 +6,64 @@ work, plus **three bench phases** - the first userspace boot on 2026-11-19 (a bu
 kernel patches `001`-`017`; console only, no network, tmpfs overlay); the canonical 2-CPU
 baseline verified on 2026-11-21 (image `974e6ca6`: 2 CPUs, wired LAN through the documented
 CPU-copy mirror workaround, SSH, persistent overlay, 15-minute soak with 0 failures, reboot
-persistence); and the same-day board-feature and quiet images (`7f270b8c` / `7421bb7a`: six
-writable `oem:green:*` LEDs, `event0` gpio-keys-polled, `watchdog0` sysfs, periodic
-dmesg spam removed), which required the base-DTB `pad-dtb` alignment step. It is not a
-firmware release and not a flashing guide: the install path has never run on a device, the
-intermediate host-only rebuilds (`001`-`023` and `001`-`026`) were never flashed or booted, and
-the image container keeps the `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker.
-Thermal telemetry is unsupported on this board and Wi-Fi is unsupported on the 6.18 target.
+persistence); and the same-day board-feature and quiet images (`7f270b8c` / **`7421bb7a`
+(known-good)**: six writable `oem:green:*` LEDs, `event0` gpio-keys-polled, `watchdog0`
+sysfs, periodic dmesg spam removed), which required the base-DTB `pad-dtb` alignment step.
+The **stock-mediated install path is verified** - manually and with the published bench
+stock-telnet installer - writing only the inactive pair and booting our 2-CPU image; the
+**known-good baseline `7421bb7a` was reproduced byte-for-byte** by the conservative
+comment-only DTS cleanup. The superseded aggressive DTS cleanup (image `6f19c6d6`) is a
+recorded hardware regression: it passed the host checks but did not boot (MTD partition scan
+stalled, U-Boot watchdog reset, stock fallback). It is not a firmware release and not a general
+flashing/recovery guide: no install image is published, `platform_do_upgrade` has never run
+on a device, the intermediate host-only rebuilds (`001`-`023` and `001`-`026`) were never flashed
+or booted, and the image container keeps the
+`BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker. Thermal telemetry is unsupported
+on this board, Wi-Fi is unsupported on the 6.18 target, and only one Ethernet jack works through
+the CPU-copy workaround (multi-port is a separate project). A **documentation-only upstream
+submission package** (RFC form, artifact checklist, cover-email draft, explicit no-Tested-by
+policy, file manifest) is included for owner review; **nothing has been submitted anywhere**.
+A **bench-only multi-port source-port probe patch (066)** and a prepared probe image
+(**a91ebcf0**) are retained as an experiment record - neither is part of the release line or the
+upstream series, and the probe has not been run.
 
 ## What is in this repository
 
 - Our own documentation: OpenWrt target/device-tree/image design, reverse-engineering
   specifications, the roadmap, the consolidated reversal report and the validation logs.
-- The **retained read-only device reports**: the 2-CPU feature inventory
-  (`target-skeleton/docs/incoming/feature-inventory/`) and the Hi5622V100 Wi-Fi feasibility
-  recon (`target-skeleton/docs/incoming/wifi-recon/`). Both are text-only; no vendor binary,
-  firmware blob, credential or per-unit identifier is included, and the inventory's one MAC
-  placeholder uses the documentation prefix `02:00:00:xx:xx:xx`. Their curated notes record
+- The **retained read-only device reports**: the 2-CPU feature inventory, its follow-up
+  update (`target-skeleton/docs/incoming/feature-inventory/`) and the Hi5622V100 Wi-Fi
+  feasibility recon (`target-skeleton/docs/incoming/wifi-recon/`). All are text-only; no vendor
+  binary, firmware blob, credential or per-unit identifier is included, and the inventory's one
+  MAC placeholder uses the documentation prefix `02:00:00:xx:xx:xx`. Their curated notes record
   which findings were later fixed (LEDs/keys/watchdog), root-caused (thermal) or withdrawn
-  (the MAC-duplication concern).
+  (the MAC-duplication concern), the verified install path and the multi-port limit.
+- The multi-port Ethernet limit and the attended source-port experiment plan:
+  [`docs/MULTI-PORT-PLAN.md`](docs/MULTI-PORT-PLAN.md).
+- The **documentation-only upstream submission package** (`upstream/series-6.18/submission/`):
+  package README/checklist, one-page v3 RFC cover-email draft, explicit no-Tested-by policy and
+  `MANIFEST.sha256` covering the review-form documents, DTS-0001, release-line classification,
+  tooling and validation logs. No transport, account or list subscription is included; nothing
+  has been sent. The manifest in this repository was regenerated against the curated tree.
+- The **bench-only multi-port probe record** (`docs/incoming/multi-port-probe/`): patch 066
+  (a draft kernel diff adding `luofu_switch.mirror_src_mask`) and the prepared probe image
+  `a91ebcf0`. It is not part of the release line or review form; the experiment plan and
+  decision gate are in `docs/MULTI-PORT-PLAN.md`.
 - Our own tooling: FIP image-slicing/trailer tools, the base-DTB `pad-dtb` build guard, image
-  builders and mocked host tests.
+  builders and mocked host tests, plus the verified bench **stock-telnet installer**
+  (`tools/stock-telnet-install.sh` + `tools/telnet-exec.py`; fail-closed, inactive-pair
+  only, published for evidence - see `tools/README.md`).
 - Our own kernel code (as patches): the 62 L0 patch files of the Linux 6.18 target stack
   (`001-058` + `062-065`), of which the **51 include patches form the release line** and the 11
   bench-only SMP diagnostics are excluded (`upstream/series-6.18/release-line/`); the 26-patch
   upstream review form (`001-026`: 19 merge-intent patches plus the seven fail-closed data-path
   drafts `020`-`026`, marked do-not-merge); the board DTS with the loader hand-off contract,
-  the stock board_id=3 LED/keys nodes and the DTS-0001 companion entry (refreshed 2026-11-21);
-  and the schematic OpenWrt target/base-files files. The release-line hashes for patches
-  054/056 were refreshed after the `dev_dbg` quieting (manifest sha256 `4da8b960...`).
+  the stock board_id=3 LED/keys nodes, the **conservative comment-only cleanup** (active content
+  byte-identical to the hardware-verified known-good DTB) and the DTS-0001 companion entry
+  (`072d0b8b...`); and the schematic OpenWrt target/base-files files. The release-line hashes for
+  patches 054/056 were refreshed after the `dev_dbg` quieting (manifest sha256
+  `4da8b960...`). The retained [DTS cleanup record](upstream/series-6.18/07-dts-upstream-bindings.md)
+  documents the boot regression of the superseded active cleanup and the optional deltas.
 - The image recipe's standard OpenWrt **squashfs + `rootfs_data` UBI layout**: the static
   read-only rootfs volume plus an empty dynamic overlay volume (`vol_size=1MiB`,
   `vol_flags=autoresize`) that the kernel's first read-write UBIFS mount formats.
@@ -94,8 +123,8 @@ and this repository does not claim they are.
 | Content | License | SPDX |
 | --- | --- | --- |
 | Documentation (`README.md`, `docs/`, `NOTICE.md`, `target-skeleton/README.md`, `target-skeleton/docs/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` |
-| Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` (SPDX header in each file) |
-| Kernel code: the target patch stack (001-058 + 062-065), DTS-0001, draft DTS/DTBO, OpenWrt target, image recipe and `base-files/` | GPL-2.0-only — [LICENSE-GPL-2.0](LICENSE-GPL-2.0) | `GPL-2.0-only` (SPDX header in each file) |
+| Tools/scripts (`tools/` bench installer, `target-skeleton/tools/`, `upstream/series-6.18/tools/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` (SPDX header in each file) |
+| Kernel code: the target patch stack (001-058 + 062-065), DTS-0001, the bench-only probe patch 066, draft DTS/DTBO, OpenWrt target, image recipe and `base-files/` | GPL-2.0-only — [LICENSE-GPL-2.0](LICENSE-GPL-2.0) | `GPL-2.0-only` (SPDX header in each file) |
 
 Notes:
 
@@ -119,12 +148,27 @@ HiSilicon.
   patches `001`-`017`) to a userspace console - console only, no network, tmpfs overlay. The
   2026-11-21 canonical phase ran image `974e6ca6` (2 CPUs, wired LAN through the documented
   CPU-copy mirror workaround, SSH, persistent ubifs overlay, 15-minute soak with 0 failures,
-  reboot persistence). The same-day board-feature phase ran images `7f270b8c` and `7421bb7a`
-  (six LEDs, `event0` gpio-keys-polled, `watchdog0` sysfs, dmesg spam removed; thermal
-  unsupported). The intermediate host-only full-series rebuilds (`001`-`023` and `001`-`026`)
-  were not flashed and not booted, the install path has never run on a device, and the image
-  container keeps the `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker. There are
-  no install or recovery instructions here.
+  reboot persistence). The same-day board-feature phase ran images `7f270b8c` and
+  **`7421bb7a` (known-good)** (six LEDs, `event0` gpio-keys-polled, `watchdog0` sysfs,
+  dmesg spam removed; thermal unsupported), then the automated stock-telnet install was verified
+  end-to-end (inactive pair only, active pair untouched, selector verified, 2-CPU image booted).
+  The intermediate host-only full-series rebuilds (`001`-`023` and `001`-`026`) were not
+  flashed and not booted, and no install image is published; the image container keeps the
+  `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker. The bench installer in
+  `tools/` is published for evidence, not as a general install/recovery guide - it needs the
+  vendor stock firmware and the notebook's bench-link/recovery helpers. A recovery is physical
+  (power-off + RESET through the counter + TFTP) and is not covered here.
+- **The upstream submission package is a dry run.** It is documentation for the owner to review
+  and send manually if they choose; it contains no transport and no Tested-by/Reviewed-by is
+  claimed. Do not present target-image bench evidence as an upstream Test-by.
+- **The multi-port probe patch is bench-only.** Image `a91ebcf0` was built for an attended
+  experiment (built-in `luofu_pie.rxdiag=1` / `luofu_switch.mirror_src_mask=0x1e00` tokens);
+  it is not a release artifact, and the experiment has not been run.
+- **An active-DTS change must be boot-tested.** The superseded aggressive DTS cleanup (image
+  `6f19c6d6`) passed every host check but did not boot (MTD partition registration stalled,
+  U-Boot watchdog reset, stock fallback); it was reverted. The accepted conservative cleanup
+  is comment-only and compiles to the hardware-verified DTB. Host checks are necessary but not
+  sufficient.
 - **UART on the bench unit is read-only** (the host→router serial path is physically dead).
   Do not write to a UART on a board whose wiring you have not verified.
 - **Do not flash a WR3000 v1 / MediaTek image** to this board; it is the HiSilicon luofu v2
