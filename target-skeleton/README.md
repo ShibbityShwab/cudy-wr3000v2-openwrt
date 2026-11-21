@@ -1,14 +1,17 @@
 # Luofu / Cudy WR3000 v2.0 - OpenWrt target skeleton
 
-> **Curated copy (synced 2026-11-21, 6.18 release line).** This status page is reproduced
-> from the project's lab notebook (`opensource` submodule at `a6b46a9`, 2026-11-21). It now
-> carries the release line (51 target patches plus the DTS loader hand-off fix; the
-> bench-only SMP diagnostics are classified in `upstream/series-6.18/release-line/`), the
-> canonical 2-CPU baseline image `974e6ca6`, the DTS-only SMP root cause and the short
-> [RELEASE-NOTES.md](RELEASE-NOTES.md). The "PUBLICATION: NOT READY" paragraph further down
-> refers to the *old* `opensource/` repository history (ten vendor `.o` files still present
-> there); this curated repository was created fresh and contains no vendor binaries. Live
-> status remains the lab notebook's `STATUS.md`. Absolute host paths were sanitized to `~`.
+> **Curated copy (synced 2026-11-21, board-feature refresh).** This status page is
+> reproduced from the project's lab notebook (`opensource` submodule `f136cf3`,
+> 2026-11-21). It now also records the board-feature pass: the stock board_id=3
+> LED/keys nodes, the base-DTB `pad-dtb` 8-byte-alignment fix (U-Boot bootfip
+> gate-word unaligned load), the W17/W19 `dev_dbg` quieting and the
+> `CONFIG_WATCHDOG_SYSFS` config. Verified images: **`7f270b8c`** (LEDs/keys/watchdog)
+> and the quiet image **`7421bb7a`**; thermal stays unsupported (temperature register
+> reads 0, vendor DT disables the sensor); Wi-Fi remains vendor-only and is declared
+> unsupported on 6.18. The "PUBLICATION: NOT READY" paragraph further down refers to
+> the *old* `opensource/` repository history; this curated repository was created
+> fresh and contains no vendor binaries. Absolute host paths were sanitized to `~`.
+> 
 
 > **STATUS (2026-11-21): BENCH-VERIFIED 2-CPU BRING-UP - NOT A PUBLIC/FLASHABLE RELEASE.**
 >
