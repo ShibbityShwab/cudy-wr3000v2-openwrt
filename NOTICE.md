@@ -2,30 +2,36 @@
 
 This repository is a **curated, fresh-history publication** of engineering for the Cudy WR3000
 v2.0 (HiSilicon Hi5671Y "luofu", board R116): host-validated target, driver, image and install
-work, plus **one attended hardware result** - a build of this target booted to a userspace
-console on 2026-11-19. It is not a firmware release and not a flashing guide; the booted build
-was kernel patches `001`-`017` only, it had no network and no persistent overlay, and later
-host-only rebuilds from the full series - `001`-`023` (persistent `rootfs_data` overlay
-volume, gated connectivity drafts) and the final `001`-`026` image (`24`-`26` add the PIE
-completion/TX-descriptor decode, the gated LSW egress stage and the bdinfo-MAC nvmem source) -
-have **never been flashed or booted**. The published container stays marked
-`BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED`.
+work, plus **two attended bench sessions** - the first userspace boot on 2026-11-19 (a build
+from kernel patches `001`-`017`; console only, no network, tmpfs overlay) and the canonical
+2-CPU baseline verified on 2026-11-21 (image `974e6ca6`: 2 CPUs, wired LAN through the
+documented CPU-copy mirror workaround, SSH, persistent overlay, 15-minute soak with 0
+failures, reboot persistence). It is not a firmware release and not a flashing guide: the
+install path has never run on a device, the intermediate host-only rebuilds (`001`-`023` and
+`001`-`026`) were never flashed or booted, and the image container keeps the
+`BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker.
 
 ## What is in this repository
 
 - Our own documentation: OpenWrt target/device-tree/image design, reverse-engineering
   specifications, the roadmap, the consolidated reversal report and the validation logs.
 - Our own tooling: FIP image-slicing/trailer tools, image builders and mocked host tests.
-- Our own kernel code (as patches): the 26-patch Linux 6.18 series, carried in the upstream
-  review form as a 001-026 set (19 merge-intent patches plus the seven fail-closed data-path
-  drafts `020`-`026`, marked do-not-merge), the draft board DTS and the schematic OpenWrt
-  target/base-files files.
+- Our own kernel code (as patches): the 62 L0 patch files of the Linux 6.18 target stack
+  (`001-058` + `062-065`), of which the **51 include patches form the release line** and the 11
+  bench-only SMP diagnostics are excluded (`upstream/series-6.18/release-line/`); the 26-patch
+  upstream review form (`001-026`: 19 merge-intent patches plus the seven fail-closed data-path
+  drafts `020`-`026`, marked do-not-merge); the board DTS with the loader hand-off contract and
+  the DTS-0001 companion entry; and the schematic OpenWrt target/base-files files.
 - The image recipe's standard OpenWrt **squashfs + `rootfs_data` UBI layout**: the static
   read-only rootfs volume plus an empty dynamic overlay volume (`vol_size=1MiB`,
   `vol_flags=autoresize`) that the kernel's first read-write UBIFS mount formats.
 - The five first-boot fixes found by the 2026-11-19 attended bring-up: built-in kernel
   command line, 4 KiB squashfs payload padding before ubinize, the XZ ARM-BCJ decoder config,
   the semantic UBI-volume read-back verifier, and the single-write selector recipe.
+- The release-critical SMP fix (2026-11-21): the board-DTS **loader hand-off contract**
+  (`/aliases/console` and `reserved-memory/flashinfo@80600000`, reg `0x80600000`+`0x4000`,
+  `atag-offset = <0x1000>`), shipped as the explicit DTS-series entry DTS-0001 (companion to
+  kernel patch 0018; see `upstream/series-6.18/06-dts-series-dependency.md`).
 
 ## What is deliberately **not** in this repository
 
@@ -67,7 +73,7 @@ and this repository does not claim they are.
 | --- | --- | --- |
 | Documentation (`README.md`, `docs/`, `NOTICE.md`, `target-skeleton/README.md`, `target-skeleton/docs/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` |
 | Tools/scripts (`target-skeleton/tools/`, `upstream/series-6.18/tools/`) | MIT — [LICENSE-MIT](LICENSE-MIT) | `MIT` (SPDX header in each file) |
-| Kernel code: patches 001–026, draft DTS/DTBO, OpenWrt target, image recipe and `base-files/` | GPL-2.0-only — [LICENSE-GPL-2.0](LICENSE-GPL-2.0) | `GPL-2.0-only` (SPDX header in each file) |
+| Kernel code: the target patch stack (001-058 + 062-065), DTS-0001, draft DTS/DTBO, OpenWrt target, image recipe and `base-files/` | GPL-2.0-only — [LICENSE-GPL-2.0](LICENSE-GPL-2.0) | `GPL-2.0-only` (SPDX header in each file) |
 
 Notes:
 
@@ -87,13 +93,15 @@ HiSilicon.
 
 ## Safety, radio and legal
 
-- **One attended bench bring-up booted a build of this tree to a userspace console on
-  2026-11-19.** That is the only hardware result, and the booted build was kernel patches
-  `001`-`017` only, with no network and no persistent overlay. The later host-only full-series
-  rebuilds (the `001`-`023` persistent-overlay image and the final `001`-`026` image with the
-  PIE completion, LSW egress and MAC-nvmem follow-ups) were not flashed and not booted; the
-  published image remains marked `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED`. There
-  are no install or recovery instructions here.
+- **Two attended bench sessions are recorded.** The 2026-11-19 session booted a build of this
+  tree (kernel patches `001`-`017`) to a userspace console - console only, no network, tmpfs
+  overlay. The 2026-11-21 session ran the canonical 2-CPU image `974e6ca6` (2 CPUs, wired LAN
+  through the documented CPU-copy mirror workaround, SSH, persistent ubifs overlay, 15-minute
+  soak with 0 failures, reboot persistence). The intermediate host-only full-series rebuilds
+  (`001`-`023` and `001`-`026`) were not flashed and not booted, the install path has never run
+  on a device, and the image container keeps the
+  `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker. There are no install or
+  recovery instructions here.
 - **UART on the bench unit is read-only** (the host→router serial path is physically dead).
   Do not write to a UART on a board whose wiring you have not verified.
 - **Do not flash a WR3000 v1 / MediaTek image** to this board; it is the HiSilicon luofu v2
