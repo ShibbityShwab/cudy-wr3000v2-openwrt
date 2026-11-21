@@ -9,10 +9,17 @@
 > `luofu_switch.naptinit=1` and **no** `cpu_mirror`/`accepterr`/`cpucopy` tokens; the CPU-copy
 > mirror patches 054-057 stay in the line as the documented fallback (`naptinit=0` + mirror
 > tokens). Bench-verified canonical image **50023446** (sha256 `50023446...`): 2 CPUs, native NAPT
-> init verified in dmesg, ping/SSH with no mirror, reboot determinism PASS; M1a was first proven
-> with proof image `5800c9ab`. **W22 is release-line only - it is not in the L2 upstream review
-> form yet** (the 26-patch review form is unchanged), and **M1b (per-port/LAN-to-LAN), the
-> fallback-image rebuild and the soak are pending bench steps**. Multi-port is not claimed. The
+> init verified in dmesg, ping/SSH with no mirror, reboot determinism PASS and a **15-minute soak PASS 900/900 0% loss**; M1a was first proven
+> with proof image `5800c9ab`. **M1b-1 PASS**: native per-port CPU delivery on all four jacks
+> (eth0/port9 and eth1/port10 ping 200/200 + SSH, eth2/port11 baseline, eth3/port12 WAN
+> link/DHCP-frame delivery; ping N/A on the WAN zone). **W22 is release-line only - it is not in
+> the L2 upstream review form yet** (the 26-patch review form is unchanged). **M1b-3 LAN-to-LAN is proven in both directions on both tested LAN pairs** (eth2<->eth0 and
+> eth2<->eth1: broadcast + learned unicast through the software bridge; bridge FDB on the correct
+> ports; no hardware L2 offload required). **WAN L3 is also verified** (host DHCP server on the
+> leftmost jack: lease 192.168.50.115/24, default route via 192.168.50.1, ICMP both directions;
+> host ufw UDP 67/68 gotcha recorded) - **no bench items remain**. The **fallback-image test is
+> retired as untested-by-design** (source
+> option `naptinit=0` remains; known limitation). The
 > current DTS-purpose baseline remains `6e9c54d0`; the W22 image 50023446 is the current canonical
 > data-path image. Thermal stays unsupported, Wi-Fi unsupported on 6.18. Native-forwarding docs
 > and results are under `docs/incoming/lsw-forwarding/`; install/recovery lessons in

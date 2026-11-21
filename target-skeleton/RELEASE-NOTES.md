@@ -1,5 +1,28 @@
 # Release notes / status - Cudy WR3000 v2.0 (HiSilicon luofu, board R116)
 
+> **Curated addendum (synced 2026-11-22; notebook parent `c38863f`, `opensource` `5cf46b5`).** W22 native
+> forwarding is bench-verified and **multi-port networking is complete on the bench**: canonical
+> image **`50023446`** boots with the driver NAPT/flow-engine init (no mirror tokens, 2 CPUs,
+> SSH/ping), a **15-minute soak PASSed 900/900 0% loss**, and it was re-installed with the corrected
+> **two-stage pair procedure** after a recovery (installer guard `f188360`). **M1b-1 PASS:** native
+> per-port CPU delivery on all four jacks - far-right `eth0`/port 9 (ping 200/200 + SSH),
+> second-from-right `eth1`/port 10 (200/200 + SSH), `eth2`/port 11 (baseline), leftmost `eth3`/port 12
+> WAN (link up 1000 Mbps). **M1b-3 LAN-to-LAN PASS on BOTH tested LAN pairs** (eth2<->eth0 and
+> eth2<->eth1) with a second host USB-Ethernet adapter: broadcast + learned unicast PASS in both
+> directions through the box's software bridge; bridge FDB shows the host MACs on the correct ports
+> (bench adapter on port 1/eth2; second adapter on port 3/eth0 and port 2/eth1 respectively). **No
+> hardware L2/VLAN offload is required.** **WAN L3 PASS:** with the second adapter on the leftmost
+> jack (eth3/WAN) and a host dnsmasq DHCP server on 192.168.50.1/24, the box obtained WAN lease
+> 192.168.50.115/24 (udhcpc select/lease), eth3 came up with a default route via 192.168.50.1, and
+> ICMP passed both ways (box->gateway 5/5, host->box 4/4). Gotcha recorded: a host `ufw INPUT DROP`
+> silently dropped the DHCP broadcasts until UDP 67/68 was allowed on the test interface.
+> **No bench items remain.** The **fallback-image test is retired as untested-by-design** (a build
+> cmdline-cache mistake invalidated it; the fallback remains a source option `naptinit=0` + mirror
+> tokens and is documented as a known limitation, no further cycles). The source release notes above
+> are the notebook's current text; this addendum records the parent-side bench details of
+> 2026-11-22. Retained evidence: `docs/incoming/lsw-forwarding/m1b/M1B-RESULTS.md` (host MACs
+> redacted for publication).
+
 **Date:** 2026-11-21.  **Status: bench-verified 2-CPU baseline; NOT a public or
 flashable release.**  This page is the short release status for the target; the
 full record is [../upstream/series-6.18/05-release-line.md](../upstream/series-6.18/05-release-line.md)
@@ -71,7 +94,7 @@ patch series** (see `release-line/manifest.tsv` in the upstream directory).
 | capability | state |
 | --- | --- |
 | 2 CPUs (SMP) | working on the canonical image [V] |
-| wired LAN | working **natively** on eth2 via the W22 kernel NAPT/flow-engine init (M1a proven: ping/SSH with no CPU-copy mirror). The mirror tokens remain only in the documented fallback image. Multi-port LAN/WAN (per-port native delivery, LAN-to-LAN) is the next bench step (M1b) and is not yet claimed [V bench M1a] / [I] |
+| wired LAN | working **natively on all four jacks** via the W22 kernel NAPT/flow-engine init: bench-verified per-port CPU delivery on eth0/port9, eth1/port10, eth2/port11 and eth3/port12 (WAN; link+DHCP-class frames), and LAN-to-LAN forwarding through the software bridge proven in both directions on eth2<->eth0 AND eth2<->eth1 with a second host adapter (broadcast + learned unicast) - no CPU-copy mirror, no hardware L2 offload required. WAN eth3 is a separate zone but its L3 path is also verified: DHCP lease from a host server, default route, and ICMP both directions [V bench M1a/M1b] |
 | SSH / userspace | working (`OpenWrt 6.18.60`, procd) [V] |
 | persistent overlay | ubifs `/overlay`, survives reboot [V] |
 | DEVMEM / devmem diagnostic image | optional debugging aid; the canonical image carries it, it is not required for normal operation [V] |
