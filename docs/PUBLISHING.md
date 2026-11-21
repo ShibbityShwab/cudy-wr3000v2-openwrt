@@ -21,6 +21,11 @@ material was sanitized, and how to verify the publication claims.
   `opensource` submodule commit `a6b46a9` (notebook parent `a66a14f`), which adds the
   51-patch release line, the DTS-only loader hand-off SMP fix, DTS-0001, the canonical
   2-CPU image `974e6ca6` and the updated docs - see the fifth-sync section below.
+  The **sixth sync (2026-11-21)** moves it again to the board-feature refresh:
+  `opensource` submodule commit `f136cf3` (notebook parent `ab0d3cb`), which adds the
+  stock board_id=3 LED/keys nodes, the base-DTB `pad-dtb` alignment fix, the W17/W19
+  `dev_dbg` quieting, the refreshed DTS-0001 and the retained read-only feature-inventory
+  and Wi-Fi recon reports - see the sixth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -72,9 +77,9 @@ material was sanitized, and how to verify the publication claims.
 | Content | Why it is published |
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
-| `docs/` (15 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report and the 2026-11-19 boot + host-only full-series rebuild records |
-| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume), base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools and mocked host tests — the actual deliverable |
-| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude, `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator with `validation/release-line/` raw logs |
+| `docs/` (15 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report, the trailer-format doc including the base-DTB alignment section, and the validation records through the 2026-11-21 board-feature/quiet-image pass |
+| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract **and the stock board_id=3 LED/keys nodes**, the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the two **retained read-only device reports** under `docs/incoming/` (feature inventory, Wi-Fi recon; curated notes explain superseded findings) |
+| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `8ee4b8e71...`, refreshed with the board LED/keys nodes; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 
@@ -212,6 +217,66 @@ is left in place as history.
 - repository hygiene: no binary objects in the tree or history, no credentials/keys, no
   per-unit identifiers (the same scans as before).
 
+## The sixth sync (2026-11-21): board features, base-DTB padding and the quiet image
+
+Source pin: **`f136cf3`**, the notebook's `opensource/` submodule after the board-feature
+pass (notebook parent `ab0d3cb`; commits `a8914d8` (read-only feature inventory),
+`aff7e27` (LED/keys DTS, pad-dtb, watchdog sysfs) and `f136cf3` (release-line/DTS-0001
+refresh, quiet image)). It post-dates the release-line consolidation by the same day's bench
+work and is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/dts/luofu-r116.dts` | stock **board_id=3** overlay nodes: gpio-keys-polled (reset = GPIO22, WPS = GPIO23, active-low, 20 ms, `KEY_RESTART`/`KEY_WPS_BUTTON`) and six `oem:green:*` gpio-leds (status=GPIO24, wan=25, lan=3, internet=2, wifi=0, wifi5g=1) |
+| `target-skeleton/target/linux/hisilicon/luofu/config-6.18` | built-in cmdline now bakes the canonical module gates plus `oops=panic panic=0`; adds `CONFIG_DEVMEM`/`CONFIG_STRICT_DEVMEM=n` and `LEDS_GPIO`, `INPUT`/`INPUT_EVDEV`/`INPUT_KEYBOARD`, `KEYBOARD_GPIO_POLLED`, `WATCHDOG_SYSFS` (`INPUT_HISI_POWERKEY` off) |
+| `target-skeleton/target/linux/hisilicon/image/luofu.mk` | new `Build/luofu-pad-dtb` step before `append-dtb` |
+| `target-skeleton/tools/pad-dtb.py` | **new** MIT host tool: pads the compiled base DTB to an 8-byte FDT totalsize, folds the padding into the header and asserts `len(dtb) == totalsize` / `totalsize % 8 == 0`. Measured 13,041 B -> 13,048 B: the unaligned `bootfip` gate-word load data-aborted, reset the CPU and fell back to the stock pair before the fix (TRAILER-FORMAT.md section 11) |
+| patches 054 / 056 | periodic W17/W19 logs quieted `dev_warn`/`dev_info` -> `dev_dbg` (release-line hashes refreshed) |
+| `base-files/etc/init.d/heartbeat` | interval 5 s -> 60 s |
+| `target-skeleton/docs/incoming/feature-inventory/{SUMMARY,REPORT}.md` | **new retained read-only reports**: the 2-CPU device feature matrix and gaps; the curated note records the later LED/keys/watchdog fixes, the thermal root cause and the withdrawn MAC-duplication concern |
+| `target-skeleton/docs/incoming/wifi-recon/{SUMMARY,REPORT}.md` | **new retained host-only reports**: Hi5622V100 vendor-binary stack, no 6.18 driver, option C (unsupported) recommended, hybrid 5.10 as the only Wi-Fi-capable system |
+| `target-skeleton/RELEASE-NOTES.md` | updated: board-feature baseline `7f270b8c`, quiet image `7421bb7a`, thermal unsupported, the pad-dtb requirement |
+| `target-skeleton/README.md` | re-synced status page (curated note updated for the board-feature pass) |
+| `docs/TRAILER-FORMAT.md` | section 11 (base-DTB 8-byte totalsize alignment) folded into this repository's canonical and `docs/` copies from the notebook's standalone TRAILER-FORMAT note |
+| `upstream/series-6.18/` | **DTS-0001 regenerated** for the board nodes (sha256 `8ee4b8e71...`, 1,329-line board DTS); manifest 054/056 hashes refreshed (manifest sha256 `4da8b960...`, still **51 include / 11 exclude**); 00-cover-letter / 04-validation / 05-release-line / 06-dts-series-dependency / README updated; `check-release-line.sh` now exercises the pad-dtb step; validation logs and `sha256sums.txt` refreshed (**89 entries**) |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | current status, sixth-sync provenance, retained reports, thermal/Wi-Fi/MAC statements |
+
+Curation rules applied to this sync: absolute host paths sanitized to `~`; the host-only
+`pad-dtb.py` carries the MIT SPDX header per the license split (the DTS/config/image/base-files
+content stays GPL-2.0-only); no vendor binaries, firmware blobs, credentials or secrets are
+added; the retained reports are text-only and their per-unit MAC placeholder was redacted to
+the documentation prefix `02:00:00:xx:xx:xx` (the real unit OUI is removed); the two reports are
+a deliberate, documented exception to the "no incoming/staging material" rule (curated notes in
+their `SUMMARY.md` files mark superseded rows). The DTS-0001 hash, release-line manifest hash and
+`sha256sums.txt` match the source notebook.
+
+### What this sync changes about the repository's honest status
+
+The previous snapshot recorded two bench sessions and host-only board features. Now the
+stock board_id=3 features are **verified on hardware** (image `7f270b8c`: six writable LEDs,
+`event0` gpio-keys-polled, `watchdog0` sysfs; image `7421bb7a`: same plus the periodic dmesg
+spam removed), the base-DTB alignment bug is found and guarded, and **thermal** and **Wi-Fi** are
+recorded as unsupported on this board/6.18 target (with the reasons in the retained reports).
+The earlier "duplicate MAC" concern is **withdrawn**: LAN ports share the vendor base MAC and
+WAN = base+1 by design. Still **not** a release: the install path has never run on a device,
+native switch forwarding is a separate project, and nothing is upstream-reviewed.
+
+### Checks run for this sync (2026-11-21)
+
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 review-form patches, no drift);
+- `(cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt)` - **89/89 OK**;
+- `upstream/series-6.18/tools/check-release-line.sh <linux-6.18.60.tar.xz> <workdir>` -
+  **PASS**: 51/51 include patches apply with `patch(1)` RC=0 (146 file events, 3 offset hunks,
+  0 fuzz, 0 rejects), strict `git apply` clean, the board DTS compiles to DTB 13,041 B
+  sha256 `49fe5c47...` with the loader hand-off contract, the unaligned totalsize triggers
+  `pad-dtb.py` on a copy (13,048 B, contract preserved), and DTS-0001 applies with its board
+  DTS byte-identical to the target DTS;
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **82/82**;
+- `pad-dtb.py` guard smoke test on a copy of the compiled DTB (pads, folds totalsize, refuses a
+  non-FDT / size-mismatch input);
+- repository hygiene: no binary objects in the tree or history, no credentials/keys, no
+  per-unit identifiers, no host paths; link checks clean; working tree clean.
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -226,6 +291,7 @@ is left in place as history.
 | per-unit identifiers (MAC/serial/PIN/efuse/`secret`/UUID values) | privacy and responsible disclosure; the docs name the offset instead of printing the value |
 | credentials, keys, tokens, Lab/bench secrets | never published (and never committed to the source tree either) |
 | the `lab/` programs and vendor-module analysis fixtures | out of scope for the OpenWrt port repo; the relevant specifications are in `docs/` |
+| incoming/lane staging packages, **except** the two retained read-only reports | a deliberate exception: `target-skeleton/docs/incoming/feature-inventory/` and `target-skeleton/docs/incoming/wifi-recon/` are text-only, read-only device/Wi-Fi reports needed to explain the current status; their `SUMMARY.md` files carry curated notes and no vendor binaries, secrets or per-unit identifiers (the one MAC placeholder uses the documentation prefix `02:00:00:xx:xx:xx`) |
 
 The tooling and documentation are written so that an owner of the unit can re-derive the
 private inputs locally; nothing in this repository depends on redistributing vendor binaries.
@@ -287,16 +353,23 @@ tree.
   file refers to it as "the project SSH key" in this curated copy; no key material is published.
 - **No vendor binaries or dumps** were copied in any form (verified by extension scan, by
   `file(1)` type scan — every file is text — and by the repository size).
+- **The retained device reports' MAC placeholder** was redacted to the documentation prefix
+  `02:00:00:xx:xx:xx`; the unit's real OUI does not appear (the reports are otherwise reproduced
+  with curated status notes only).
 - The kernel patches and validation logs are the author's host output; they contain no device
   state.
 
 ## Documentation status and link conventions
 
 The copied documents are **snapshots** written inside the lab notebook between 2026-11-18 and
-2026-11-19 (with the attended bring-up session, the host-only full-series rebuild and the
+2026-11-21 (with the attended bring-up session, the host-only full-series rebuild and the
 connectivity session appended to `SKELETON-SMOKE.md` in the second and third syncs, the
-LSW-egress, bdinfo-MAC-nvmem and PIE-completion sessions added in the fourth sync, and
-TARGET-DESIGN.md sections 5.1/5.3/5.5/5.6 updated). Some of
+LSW-egress, bdinfo-MAC-nvmem and PIE-completion sessions added in the fourth sync, the
+release-line consolidation in the fifth, and the 2026-11-21 board-feature/pad-dtb/quiet-image
+pass in the sixth; TARGET-DESIGN.md sections 5.1/5.3/5.5/5.6 updated). The two retained device
+reports under `target-skeleton/docs/incoming/` are the only copied "incoming" material and
+carry curated status notes; their per-unit MAC placeholder was redacted to the documentation
+prefix. Some of
 them describe the *old* `opensource/` repository as "not publishable" because ten vendor
 `.o` files were removed from its HEAD but remained in its history. **That statement does not
 apply to this repository**, which never had that history. Where a document says "publication
@@ -335,14 +408,20 @@ and it will be removed promptly; corrections are welcome.
 
 ## Scope reminder
 
-Two attended bench sessions are recorded. The 2026-11-19 session booted a build of this tree
-(patches `001`-`017`) to a userspace console - console only, no network, tmpfs overlay - and
-was the first hardware result. The 2026-11-21 session ran the canonical image `974e6ca6` built
-from the L0 stack (001-058 + 062-065; numbered 001-061 at the time) plus the DTS loader hand-off fix: 2 CPUs, LAN through the documented
-CPU-copy mirror workaround, SSH, persistent ubifs overlay, 15-minute soak with 0 failures and
-reboot persistence. The intermediate host-only full-series rebuilds (001-023 with the
-persistent `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and
-bdinfo-MAC nvmem follow-ups) were never flashed or booted. Neither bench session is an install
-or recovery procedure and the install path has never run on a device, so the repository
-remains curated research material, not a firmware release; see the safety and legal section of
-[`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).
+Three bench phases are recorded. The 2026-11-19 phase booted a build of this tree (patches
+`001`-`017`) to a userspace console - console only, no network, tmpfs overlay - and was the
+first hardware result. The 2026-11-21 canonical phase ran image `974e6ca6` built from the L0
+stack (001-058 + 062-065; numbered 001-061 at the time) plus the DTS loader hand-off fix: 2
+CPUs, LAN through the documented CPU-copy mirror workaround, SSH, persistent ubifs overlay,
+15-minute soak with 0 failures and reboot persistence. The same-day board-feature phase ran
+`7f270b8c` (six writable `oem:green:*` LEDs, `event0` gpio-keys-polled, `watchdog0` sysfs)
+and the quiet image `7421bb7a` (periodic W17/W19/heartbeat dmesg spam removed); it required
+the base-DTB `pad-dtb` alignment step. Thermal telemetry is unsupported on this board
+(temperature register reads 0, vendor DT disables the sensor), Wi-Fi is unsupported on the
+6.18 target, and the earlier MAC-duplication concern is withdrawn (LAN ports share the vendor
+base MAC, WAN = base+1 by design). The intermediate host-only full-series rebuilds (001-023
+with the persistent `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW
+egress and bdinfo-MAC nvmem follow-ups) were never flashed or booted. None of the bench phases
+is an install or recovery procedure and the install path has never run on a device, so the
+repository remains curated research material, not a firmware release; see the safety and legal
+section of [`../README.md`](../README.md) and [`../NOTICE.md`](../NOTICE.md).

@@ -1,10 +1,12 @@
 # The luofu FIP trailer - decoded format and validation rules
-
-> **Curated copy.** The canonical copy of this document sits next to the tool it describes:
-> [../target-skeleton/docs/TRAILER-FORMAT.md](../target-skeleton/docs/TRAILER-FORMAT.md).
+> **Curated copy (synced 2026-11-21).** The canonical copy of this document sits next to the
+> tool it describes: [../target-skeleton/docs/TRAILER-FORMAT.md](../target-skeleton/docs/TRAILER-FORMAT.md).
 > This docs/ copy is provided for the documentation index; the two copies are identical
 > except for relative links (this copy links to [TARGET-DESIGN.md](TARGET-DESIGN.md) directly).
-
+> Section 11 (base-DTB 8-byte totalsize alignment for the U-Boot bootfip gate-word load) was
+> folded into the canonical copy from the notebook's standalone `opensource/docs/TRAILER-FORMAT.md`
+> during this sync.
+> 
 
 Status: **decoded from local artifacts and stock U-Boot code; generation is
 structurally validated, not hardware-proven.** Last analysis: 2026-11-18
@@ -467,3 +469,21 @@ boots; it claims the format and the decoded validation rules are satisfied.
     # 4. generator regression against both recorded vendor containers
     #    (extract base/overlays from the local firmware images as in the
     #    tool's README self-checks; the expected outputs are byte-identical)
+
+
+## 11. Base-DTB totalsize must be 8-byte aligned (measured 2026-11-21)
+
+The overlay-container gate word is a 32-bit BE load at
+base_dtb + FDT-totalsize (section 4; fip-slice.py validate_slice).  A DTB whose
+totalsize is not 4-byte aligned makes that load unaligned; on this ARMv7 it
+data-aborts inside U-Boot's bootfip.  Measured with the gpio-LEDs/keys DTS: dtc
+produced a 13,041-byte blob (strings block ended unaligned), bootfip read the
+gate at 0x832032f1, aborted (r1=0x83200040), reset the CPU and the loader fell
+back to the stock pair.  The image recipe now runs scripts/pad-dtb.py on
+$(LUOFU_BASE_DTB) before append-dtb; it pads to 8 bytes (a superset of the FDT
+4-byte rule) and folds the padding into the FDT totalsize, so both the
+in-uImage DTB and the trailer agree.  With totalsize 13,048 the gate sits at an
+aligned address and the image boots.
+
+Build-time guard: Build/luofu-pad-dtb also asserts len(dtb) == totalsize and
+totalsize % 8 == 0, so an unaligned blob can never reach a trailer again.
