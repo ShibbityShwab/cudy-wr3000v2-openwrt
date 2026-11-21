@@ -386,7 +386,7 @@ both numbers (section 2.4) and is not needed by bootfip.
 The evidence is sufficient to generate a trailer that satisfies every check the
 stock bootfip performs, and `tools/fip-slice.py` now does so:
 
-    python3 target-skeleton/tools/fip-slice.py make-trailer \
+    python3 opensource/target-skeleton/tools/fip-slice.py make-trailer \
       --base-dtb  <our compiled board DTB> \
       --overlay   <our reference overlay DTBO> \
       --overlay   <our board overlay DTBO> \
@@ -440,7 +440,7 @@ boots; it claims the format and the decoded validation rules are satisfied.
 ## 10. Reproduction (read-only, local artifacts)
 
     # 1. fixed trailer: decode and print its descriptor/overlay table
-    python3 target-skeleton/tools/fip-slice.py check-trailer \
+    python3 opensource/target-skeleton/tools/fip-slice.py check-trailer \
       build/linux-kbuild/slice-trailer-40732.bin
 
     # 2. fixed trailer is the first 40,732 bytes of the 2.4.15 vendor container

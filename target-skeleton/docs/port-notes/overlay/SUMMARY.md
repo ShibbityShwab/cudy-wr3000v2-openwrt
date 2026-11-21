@@ -9,11 +9,6 @@ board_detect fixes; the next attended boot is its first hardware test.
 Lane: `overlay-lane`. Device contract: host-only (no router, UART, TFTP or flash tool was
 touched; the WR3000 was never accessed).
 
-> **Curated integration note.** This lane record was integrated into the source repository on
-> 2026-11-19; the incoming package is not kept in this curated tree and this SUMMARY is the
-> durable record. The image/tool changes and the documentary updates it describes are in the
-> tree. Absolute host paths were sanitized to `~`.
-
 ## 1. Final artifact
 
 | item | value |
@@ -211,9 +206,8 @@ HEAD) and updates:
   recipe row, tool row, fact-table UBI/overlay rows, §3.3 slot/overlay text, DTS row (enabled
   nodes vs fail-closed drivers) and a new validated-build bullet with the final hashes.
 
-The integration patch was applied in the source repository on 2026-11-19 and is not kept in
-this curated tree; its effects are the synced `docs/TARGET-DESIGN.md`, `docs/SKELETON-SMOKE.md`
-and `target-skeleton/README.md` content.
+Apply with `git -C opensource apply ../../target-skeleton/docs/incoming/overlay/shared.patch`
+from the repository root (or `git apply` inside `opensource/`), then commit the submodule.
 
 ## 8. Local evidence (gitignored)
 

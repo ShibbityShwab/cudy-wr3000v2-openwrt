@@ -1,34 +1,29 @@
-# lsw-egress - LSW TX egress decode + R1/R3/R5 probe-configuration stage (patch 025)
+# incoming/lsw-egress - LSW TX egress decode + R1/R3/R5 probe-configuration stage (patch 025)
 
 **Lane:** `lsw-egress`, shared task `task-57`, 2026-11-19.
 **Status:** HOST-ONLY DRAFT. Nothing in this package has been executed on the board. There was
 **no device access** of any kind (no SSH/telnet/TFTP/flash/UART); the router was not touched.
 Publication remains NOT READY.
 
-> **Curated integration note.** This lane record was integrated into the source repository on
-> 2026-11-19 and the incoming package is not kept in this curated tree; this SUMMARY is the
-> durable record. Patch `025` is in
-> `target-skeleton/target/linux/hisilicon/patches-6.18/`, the `docs/LSW-SPEC.md` and
-> `docs/SKELETON-SMOKE.md` changes it describes are in the tree, and the review-form series
-> covers `001`-`026` (`024`-`026` are do-not-merge drafts). Absolute host paths were
-> sanitized to `~`.
-
-This directory is the durable integration record: the kernel patch is in
-`target-skeleton/target/linux/hisilicon/patches-6.18/`, the documentation changes described in
-section 1 are integrated in the tree, and the review-form series carries the patch as `0025`.
+This directory is an **incoming** deliverable: it carries no direct edit to a shared repository
+file. The kernel patch is already in
+`target-skeleton/target/linux/hisilicon/patches-6.18/` (direct lane write scope). Apply
+`shared.patch` from the `opensource/` root for the documentation changes, then move this SUMMARY
+to `target-skeleton/docs/port-notes/lsw-egress/SUMMARY.md` (or append it to
+`port-notes/lsw/SUMMARY.md`).
 
 ## 1. Deliverables
 
 | file | what it is | sha256 |
 | --- | --- | --- |
 | `target-skeleton/target/linux/hisilicon/patches-6.18/025-net-lsw-egress-luofu.patch` | third attended LSW write stage (`luofu_lsw.egress=1`, requires `arm=1`): pre-write conformance, the vendor R1/R3/R5 probe-configuration writes (dp/ips/eqm), readback against values derived from the pre-write snapshot, restore-on-mismatch, ready = probe config + qid map; R4/`fam` read-only; EQM queue tables excluded | `0fd8b1eafd701703c785d087f864d27142335ee335c60517e390a21773e39ce7` |
-| source-lane `docs/incoming/lsw-egress/shared.patch` (applied 2026-11-19, not kept here) | `docs/LSW-SPEC.md` (R1/R3/R5 rows, EQM command-word decode, `port_bitmap` decode, new section 7.8 TX egress, W-table/risks/summary/unknowns), `docs/SKELETON-SMOKE.md` (new LSW egress session: gate matrix, attended sequence, proof split), `target-skeleton/README.md` (025 row + session blurb) | `bbf101094636514bdcbc2200a7af7526974a7a5349ad67e16c78a94f3152e893` |
-| this file (`target-skeleton/docs/port-notes/lsw-egress/SUMMARY.md`) | durable lane record | - |
+| `target-skeleton/docs/incoming/lsw-egress/shared.patch` | `docs/LSW-SPEC.md` (R1/R3/R5 rows, EQM command-word decode, `port_bitmap` decode, new section 7.8 TX egress, W-table/risks/summary/unknowns), `docs/SKELETON-SMOKE.md` (new LSW egress session: gate matrix, attended sequence, proof split), `target-skeleton/README.md` (025 row + session blurb) | `bbf101094636514bdcbc2200a7af7526974a7a5349ad67e16c78a94f3152e893` |
+| `target-skeleton/docs/incoming/lsw-egress/SUMMARY.md` | this file (moved to `port-notes/lsw-egress/SUMMARY.md` on integration) | - |
 
-The integration patch applied to the source working tree at integration (`git apply --check`
-**RC=0**, 3 files, 457 lines). It did not touch the DTS, the binding, `config-6.18`, the image
+`shared.patch` applies to the current `opensource/` working tree with `git apply --check`
+**RC=0** (3 files, 457 lines). It does not touch the DTS, the binding, `config-6.18`, the image
 recipe or any other lane's files; patch 025 does not change the devicetree, so no DTS/binding
-change was required.
+change is required.
 
 ## 2. What the session decoded (evidence grade per item)
 
@@ -159,7 +154,7 @@ read as a working link.
 | `fam+0x504` pre-state differs from the measured state | med | conformance refuses before the first write and logs the found value; that refusal is itself useful evidence, do not bypass |
 | `dp+0x64` two-write latch meaning [I] | low/med | best-effort: vendor shape replayed exactly; readback verifies the final value |
 | block left half-configured on an unexpected failure | low | every refusal restores the found words and powers the block down; `remove()` also restores |
-| DTS/binding drift from other lanes | low | this patch touches no DTS/binding; the integration patch is docs only |
+| DTS/binding drift from other lanes | low | this patch touches no DTS/binding; shared.patch is docs only |
 
 ## 7. Attended test sequence (summary; exact console lines in SKELETON-SMOKE.md)
 
@@ -178,15 +173,18 @@ read as a working link.
    failure: no frame forwards until the EQM queue tables (E1) and the per-frame egress selection
    are solved (a wiring-level bench trace or GPL source).
 
-## 8. Integration record
+## 8. Integration steps for the lead
 
-1. Patch `025` was committed as
-   `target-skeleton/target/linux/hisilicon/patches-6.18/025-net-lsw-egress-luofu.patch` (sha256
-   above) and carried into the review form as `0025`.
-2. The documentation patch was applied in the source repository (3 docs files; `git apply
-   --check` RC=0) and the review form was regenerated and re-validated for the full
-   `001`-`026` series (26/26 apply, clean checkpatch; see `04-validation.md`).
-3. The image was not rebuilt or flashed from 025 as part of this lane; the attended sequence in
+1. Commit `target-skeleton/target/linux/hisilicon/patches-6.18/025-net-lsw-egress-luofu.patch`
+   (already written; sha256 above) as the skeleton's next patch.
+2. Apply `shared.patch` from the `opensource/` root (3 docs files; `git apply --check` RC=0).
+3. Copy 025 into the upstream review form (`opensource/upstream/series-6.18/0025-net-lsw-egress-luofu.patch`)
+   and re-run the upstream series validation of 001-025. Patch 024 (PIE lane) is present in the
+   skeleton now; if it changes after this session, re-validate 024 and the 001-025 chain (025 is
+   file-disjoint from 024, so no rebase is expected).
+4. Move this SUMMARY to `target-skeleton/docs/port-notes/lsw-egress/SUMMARY.md` or append it to
+   `port-notes/lsw/SUMMARY.md`.
+5. Do not rebuild/flash the image from 025 as part of this lane: the attended sequence in
    section 7 is the next gate.
 
 ## 9. Local evidence (gitignored, absolute paths under the repo)

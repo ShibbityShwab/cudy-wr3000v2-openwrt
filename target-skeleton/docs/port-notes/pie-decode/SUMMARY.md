@@ -1,4 +1,9 @@
-# pie-decode - PIE RX completion decode + TX descriptor (patch 024)
+> Integration note: this directory is an **incoming** deliverable. Apply
+> `shared.patch` (below) to the current repository and commit it together with
+> `target/linux/hisilicon/patches-6.18/024-net-pie-completion-decode-luofu.patch`; the
+> SUMMARY is the durable record of the lane.
+
+# incoming/pie-decode - PIE RX completion decode + TX descriptor (patch 024)
 
 **Task:** task-56 (lane `pie-decode`, agent `pie-decode`). **Date:** 2026-11-19.
 **Scope:** decode the vendor PIE v250 RX completion descriptor and the normal non-TSO TX
@@ -8,13 +13,6 @@ patch `024` behind the existing `luofu_pie.arm=1` arm gate, and validate the `00
 in an isolated `openwrt main` clone. **No device was touched** (no router, UART, TFTP, flash or
 bench tool) and no PIE register has ever been written. Host-only, evidence-graded.
 
-> **Curated integration note.** This lane record was integrated into the source repository on
-> 2026-11-19 and the incoming package is not kept in this curated tree; this SUMMARY is the
-> durable record. Patch `024` is in
-> `target-skeleton/target/linux/hisilicon/patches-6.18/`, the board DTS carries the required
-> `hisilicon,port` properties, and the review-form series covers `001`-`026` (`024`-`026`
-> are do-not-merge drafts). Absolute host paths were sanitized to `~`.
-
 ---
 
 ## 1. Deliverables
@@ -22,8 +20,8 @@ bench tool) and no PIE register has ever been written. Host-only, evidence-grade
 | file | what it is | sha256 |
 | --- | --- | --- |
 | `target-skeleton/target/linux/hisilicon/patches-6.18/024-net-pie-completion-decode-luofu.patch` | RX completion decode + NAPI delivery, RX port registration, full v250 normal non-TSO TX descriptor, ring-index pointer semantics; GEMAC reads `hisilicon,port` and registers/unregisters its RX port; binding updates | `d81a44fb7c004e66d9c686d0d38ee5cccdf52e8ba6f9e454a92f091352ae36f1` |
-| source-lane `docs/incoming/pie-decode/shared.patch` (applied 2026-11-19, not kept here) | board DTS (`hisilicon,port` 8..12 on the five MAC nodes), README (patch-024 row + status), SKELETON-SMOKE (session), PIE-DATAPATH (decoded descriptor tables, flows, unknowns), TARGET-DESIGN rows; diffed against `opensource` HEAD `5a25d39` (the 026 integration) so it applies on top of 024/025/026 docs | `a2b37a2dafa5f290255dc5d92d6c02c29b4e5e8a05d59f6f22257acdc81ad38c` |
-| this file (`target-skeleton/docs/port-notes/pie-decode/SUMMARY.md`) | durable lane record | - |
+| `target-skeleton/docs/incoming/pie-decode/shared.patch` | board DTS (`hisilicon,port` 8..12 on the five MAC nodes), README (patch-024 row + status), SKELETON-SMOKE (session), PIE-DATAPATH (decoded descriptor tables, flows, unknowns), TARGET-DESIGN rows; diffed against `opensource` HEAD `5a25d39` (the 026 integration) so it applies on top of 024/025/026 docs | `a2b37a2dafa5f290255dc5d92d6c02c29b4e5e8a05d59f6f22257acdc81ad38c` |
+| `target-skeleton/docs/incoming/pie-decode/SUMMARY.md` | this file (moved to `port-notes/pie/SUMMARY.md` on integration) | - |
 
 ---
 
@@ -138,7 +136,7 @@ corrected patch (sha256 `d81a44fb...`) was re-prepared and recompiled from a cle
 | `checkpatch.pl --no-tree -f` | 0 errors / 0 warnings / 0 checks on the 1,644-line PIE driver, the 35-line PIE header, the 463-line GEMAC driver and both YAMLs (119/130 lines) |
 | static safety checks | no RC-misc `0x10161000` / forbidden CA `0x400392f0` / ACP cells; no `devmem`/`/dev/mem`/raw MMIO helpers; every PIE register write is inside the arm-only functions reached after the `luofu_pie_arm_gate` check; the GEMAC writes remain the measured link-up/link-down words |
 | cross-lane 001-026 chain | all 26 patches (024 + parallel 025 LSW egress + 026 bdinfo MAC nvmem) apply in order with 0 rejected hunks (026 still applies on top of the 024 GEMAC edits); the combined tree compiles RC=0, 0 errors / 0 compiler warnings, zImage 3,282,656 B sha256 `346fb1f629dbd5b59308fb267d090afcf046d3ea26fba81713b2dbc9d1de77bc`; a separate **fully-clean** 001-026 run (fresh kernel extraction; `make target/linux/prepare` RC=0 with 1,233 `patching file` lines, 0 `.rej`; `make target/linux/compile` RC=0, 0 errors / 0 compiler warnings, 37 pre-existing modpost warnings, zImage 3,282,528 B sha256 `08b7674749a0c155285a89fd35fa2433c2c97ce48ee5a1773cb3541365544c67`, `_text = stext = 0xc0608000`) in `~/openwrt-lab-pie-decode-full` repeats the check from a fresh extraction |
-| integration patch | applied to the source working tree at integration (`git apply --check` RC=0, 5 files); the DTS hunks used one line of context around each `reg`/`hisilicon,port` insertion so they applied with either mac-lane DTS state |
+| `shared.patch` | applies to the current repo working tree **and** to the committed HEAD copies with `git apply --check` RC=0 (5 files); the DTS hunks use one line of context around each `reg`/`hisilicon,port` insertion so they apply with either mac-lane DTS state |
 
 Note: the first delivery of this patch used `== GRO_DROP` after `napi_gro_receive()`; 6.18 has no
 `GRO_DROP` in `enum gro_result` (`GRO_MERGED/GRO_MERGED_FREE/GRO_HELD/GRO_NORMAL/GRO_CONSUMED`).
@@ -153,7 +151,7 @@ and chain results above are from the corrected patch.
 RX length/status/port fields, the summary contract, the normal TX descriptor byte image and the
 ring pointer arithmetic are each read or written by the named `hi_kpie.ko` function; the full
 `001`-`024` series applies/prepares/compiles with WERROR and no warnings; the load contract
-(TEXT_OFFSET) and the config symbol set are unchanged; the bindings and the post-integration
+(TEXT_OFFSET) and the config symbol set are unchanged; the bindings and the post-shared.patch
 board DTS validate; checkpatch is clean; the non-arm probe path cannot touch the engine (no
 MMIO/clock/reset/IRQ/NAPI) and every new code path is reachable only after `luofu_pie.arm=1`.
 
@@ -188,14 +186,17 @@ wire.**
 
 ---
 
-## 7. Integration record
+## 7. Notes for the lead (apply/commit)
 
-- Integrated into the source repository on 2026-11-19: patch `024` committed, the board DTS
-  `hisilicon,port` properties and the documentation changes applied, and the review-form series
-  regenerated to `001`-`026`. This SUMMARY is the durable record of the lane; the incoming
-  `shared.patch` directory was source-repository staging material and is not kept here.
-- The shared patch was a plain git-style diff against the then-current working tree; the DTS
-  hunks inserted `hisilicon,port` after each MAC `reg` line.
-- Parallel lanes owned patches `025` (LSW egress) and `026` (bdinfo MAC nvmem); a union of the
-  added rows/sections was the conflict resolution, and the final `001`-`026` chain applies and
-  compiles host-side as recorded above.
+- Apply: `cd opensource && git apply target-skeleton/docs/incoming/pie-decode/shared.patch`,
+  then move this SUMMARY to `target-skeleton/docs/port-notes/pie/SUMMARY.md` (append to the
+  patch-`020` record already there), delete the incoming directory and commit the new
+  `patches-6.18/024-*.patch` with the shared-file changes.
+- The shared.patch is a plain git-style diff against the current working-tree state of the six
+  listed files; the DTS hunks only insert `hisilicon,port` after each MAC `reg` line, so they
+  also apply to the committed HEAD version.
+- Parallel lanes own patches `025` (LSW egress) and `026` (bdinfo MAC nvmem); this lane touches
+  no file they own except the shared documentation files named in `shared.patch`, where a union
+  of the added rows/sections is the expected conflict resolution.
+- No shared repository file was edited in place during the lane; the untracked additions are the
+  new patch file and this incoming directory.

@@ -1,32 +1,28 @@
-# mac-nvmem - factory MAC exposed to the kernel netdev layer + guarded LAN/WAN map
+# incoming/mac-nvmem - factory MAC exposed to the kernel netdev layer + guarded LAN/WAN map
 
 **Lane:** `mac-nvmem`, shared task `task-58`, 2026-11-19.
 **Status:** HOST-ONLY, NOTHING BOOTED. No device, router, UART, network, TFTP, flash or bench
 tool was touched; the box was not contacted and no MAC was read from a real unit. Publication
 remains NOT READY.
 
-> **Curated integration note.** This lane record was integrated into the source repository on
-> 2026-11-19 and the incoming package is not kept in this curated tree; this SUMMARY is the
-> durable record. The code artifacts (board DTS, kernel patch `026`, base-files, host test) are
-> in the tree, the documentation changes it describes are integrated, and the review-form series
-> covers `001`-`026` (`024`-`026` are do-not-merge drafts). Absolute host paths were
-> sanitized to `~`.
-
-This directory is the durable integration record: the code artifacts listed in section 1 are in
-`target-skeleton/`, the documentation changes described there are applied, and the lane's
-incoming `shared.patch` directory was source-repository staging material and is not kept here.
+This directory is the incoming deliverable for the factory-MAC nvmem lane. It carries the shared
+**documentation** patch only (`shared.patch`); the code artifacts (board DTS, kernel patch
+`026`, base-files, host test) are direct lane writes already present in
+`target-skeleton/` and listed in section 1. Apply `shared.patch` from the `opensource/`
+root, then move this `SUMMARY.md` to
+`target-skeleton/docs/port-notes/mac-nvmem/SUMMARY.md` (same convention as the other lanes).
 
 ## 1. Deliverables
 
 | file | what it is | sha256 |
 | --- | --- | --- |
 | `target-skeleton/target/linux/hisilicon/patches-6.18/026-net-gmac-bdinfo-mac-nvmem.patch` | GEMAC MAC-source hardening: read before netdev allocation; honour `-EPROBE_DEFER` from a not-yet-registered MTD nvmem provider (defer, do not randomise); keep the logged random fallback for every other error; install `ndo_set_mac_address = eth_mac_addr` / `ndo_validate_addr = eth_validate_addr` so userspace `macaddr` still applies. Comments + binding description document the bdinfo nvmem source. No register/MTD write. **Refreshed against the post-024 context after 024 landed: applying 001-025 then this patch is a clean apply (no fuzz/offset) and the resulting files are byte-identical to the version the full build compiled.** | `f979ea9ba4ab0a6789514a3b373e66c909fc316993ec340e6d90a94d2db033b3` |
-| `target-skeleton/dts/luofu-r116.dts` (modified) | `bdinfo` partition becomes `read-only` with a `nvmem-layout` (`fixed-layout`) holding one `mac-base` cell `mac@de00 { reg = <0xde00 0x6>; #nvmem-cell-cells = <1>; }`; gmac1..3 get `nvmem-cells = <&bdinfo_mac 0>` (LAN base), gmac4 `<&bdinfo_mac 1>` (WAN base+1), each with `nvmem-cell-names = "mac-address"`. Comments record the per-port-offset plan, the LSW port correlation and the backport dependency. **Direct lane write, not in the integration patch.** | `d4b523cce7644a3db55a6561079ac469e7200633d7078b66b349f0327f37e4d1` |
+| `target-skeleton/dts/luofu-r116.dts` (modified) | `bdinfo` partition becomes `read-only` with a `nvmem-layout` (`fixed-layout`) holding one `mac-base` cell `mac@de00 { reg = <0xde00 0x6>; #nvmem-cell-cells = <1>; }`; gmac1..3 get `nvmem-cells = <&bdinfo_mac 0>` (LAN base), gmac4 `<&bdinfo_mac 1>` (WAN base+1), each with `nvmem-cell-names = "mac-address"`. Comments record the per-port-offset plan, the LSW port correlation and the backport dependency. **Direct lane write, not in `shared.patch`.** | `d4b523cce7644a3db55a6561079ac469e7200633d7078b66b349f0327f37e4d1` |
 | `target-skeleton/target/linux/hisilicon/base-files/lib/functions/luofu-netdev.sh` (new) | Guarded LAN/WAN interface map (vendor R116 map WAN = eth3, LAN = eth2 eth1 eth0) that activates only when all four expected GEMAC netdevs exist; otherwise logs a placeholder naming the missing devices and configures nothing. Documents LSW MAC ports 9..12 / qid rows 4-12 and carries `TODO(netdevs)`. `LUOFU_NET_TEST_ROOT` host seam. | `376be25983759846034e583f770e2968a3833ed12ec62a88ffde49492e96f580` |
 | `target-skeleton/target/linux/hisilicon/base-files/etc/board.d/02_network` (modified) | Sources/calls `luofu-netdev.sh` before the unchanged factory-MAC provisioning; header updated to the implemented state (guarded map + kernel-side nvmem path). **The existing `luofu-mac.sh` provisioning is kept intact** (still sourced, still `luofu_mac_setup`/`luofu_mac_apply`; its 103-assertion test still passes). | `c0f4ff475bdc22cfabb966c1c38f55692c409dafb4d02917f6c2a7a7200993cb` |
 | `target-skeleton/tools/test-mac-nvmem.sh` (new, 0755) | Host test: statics; synthetic-bdinfo read-path mock; kernel mac-base arithmetic incl. wrap/erased/zero cases; per-node offsets from the DTS; `--kernel <tree>` cpp+dtc compile + decompiled-DTB phandle checks; mocked `/sys/class/net` interface-map scenarios; re-runs the pre-existing provisioner test. **96/96 assertions pass.** | `92826dc9531d9219e9b27cd570f36fb71983b9c284ccd0a68ad2701c6459fb96` |
-| source-lane `docs/incoming/mac-nvmem/shared.patch` (applied 2026-11-19, not kept here) | Documentation hunks only: `docs/MISC-SOC-BLOCKS.md` (new 1.4a + 1.5 update), `docs/SKELETON-SMOKE.md` (session record + one stale-line correction), `docs/TARGET-DESIGN.md` (open question 5), `target-skeleton/README.md`. Rebased on the `025` integration commit (`opensource` HEAD `4d965d6`); `git apply --check` RC=0. | `73b3ff26273926551e9bd9b52672cdd7b5e904a5505c0db3ada3b940bac9b99a` |
-| this file (`target-skeleton/docs/port-notes/mac-nvmem/SUMMARY.md`) | durable lane record | - |
+| `target-skeleton/docs/incoming/mac-nvmem/shared.patch` | Documentation hunks only: `docs/MISC-SOC-BLOCKS.md` (new 1.4a + 1.5 update), `docs/SKELETON-SMOKE.md` (session record + one stale-line correction), `docs/TARGET-DESIGN.md` (open question 5), `target-skeleton/README.md`. Rebased on the `025` integration commit (`opensource` HEAD `4d965d6`); `git apply --check` RC=0. | `73b3ff26273926551e9bd9b52672cdd7b5e904a5505c0db3ada3b940bac9b99a` |
+| `target-skeleton/docs/incoming/mac-nvmem/SUMMARY.md` | this file | - |
 
 Evidence bundle (local-only, gitignored):
 `build/linux-kbuild/waves/2026-11-19-mac-nvmem/` (logs, DTS/DTB, pristine-apply log,
@@ -219,30 +215,41 @@ invented identity.
 - the "absent partition" and "erased copy" branches are only unit-mocked/source-audited, not
   observed.
 
-## 6. Integration record
+## 6. Integration steps for the lead
 
-1. The documentation patch (sha256
-   `73b3ff26273926551e9bd9b52672cdd7b5e904a5505c0db3ada3b940bac9b99a`) was applied in the
-   source repository; it is not kept in this curated tree. It touched
-   `docs/MISC-SOC-BLOCKS.md`, `docs/SKELETON-SMOKE.md`, `docs/TARGET-DESIGN.md` and
-   `target-skeleton/README.md`.
-2. **The board DTS change was a direct lane write, not in the integration patch** (so
-   `tools/test-mac-nvmem.sh` passes in the delivered tree). The 024/025 lanes' DTS hunks were
-   unioned with it rather than reverting it.
-3. **Numbering:** the kernel patch is `026` and the tree carries the contiguous series
-   `001-026`. The full `001-026` order applies cleanly to pristine `linux-6.18.60` (26/26,
-   0 failed hunks) and the full tree compiles host-side with 0 errors / 0 compiler warnings; the
-   earlier `GRO_DROP` blocker in patch 024 was fixed before the final validation. 026 was
-   refreshed against the post-024 context (clean apply, resulting files byte-identical to the
-   compiled ones). If 024 is ever rebased, re-check `patch --dry-run` for 026 and rebase only
-   that patch.
-4. No `config-6.18`, image-recipe or base-files install change is needed beyond the two
+1. Apply the documentation patch from the `opensource/` root:
+
+       cd opensource
+       git apply target-skeleton/docs/incoming/mac-nvmem/shared.patch
+
+   (`shared.patch` sha256
+   `73b3ff26273926551e9bd9b52672cdd7b5e904a5505c0db3ada3b940bac9b99a`; base: `opensource`
+   HEAD `4d965d6`, i.e. it is already rebased on the integrated `025` commit, which also edited
+   `docs/SKELETON-SMOKE.md` and `target-skeleton/README.md`; touches only
+   `docs/MISC-SOC-BLOCKS.md`, `docs/SKELETON-SMOKE.md`, `docs/TARGET-DESIGN.md`,
+   `target-skeleton/README.md`. If another lane's docs land first, rebase this patch rather than
+   dropping hunks.)
+2. Move this `SUMMARY.md` to `target-skeleton/docs/port-notes/mac-nvmem/SUMMARY.md`.
+3. **The board DTS change is a direct lane write, not in `shared.patch`** (so
+   `tools/test-mac-nvmem.sh` passes in the delivered tree). If the 024/025 lanes also carry
+   DTS hunks, rebase them on this file rather than reverting this change.
+4. **Numbering / build blocker:** the kernel patch is `026` and the tree now carries the
+   contiguous series `001-026` (024 and 025 landed from their lanes while this lane was
+   validating). The full `001-026` order applies cleanly on pristine `linux-6.18.60`
+   (26 patches, 100 files, 0 failed hunks) and the OpenWrt prepare stage is RC=0, but the
+   **001-026 compile is currently blocked by patch 024** (`luofu-pie.c`: `GRO_DROP`
+   undeclared in 6.18) - a pie-decode-lane defect to fix before any integrated image build;
+   this lane's files compile cleanly in that tree. 024 also edits `luofu-gmac.c` and
+   `hisilicon,luofu-gmac.yaml`; 026 was refreshed against the post-024 context (clean apply,
+   resulting files byte-identical to the compiled ones). If 024 is ever rebased, re-check
+   `patch --dry-run` for 026 and rebase only that patch.
+5. No `config-6.18`, image-recipe or base-files install change is needed beyond the two
    base-files files already written in the tree (`luofu-netdev.sh` is installed automatically
    by the existing base-files copy).
-5. Do not move the bdinfo `read-only`/nvmem DTS hunk into a kernel patch: the DTS is delivered
+6. Do not move the bdinfo `read-only`/nvmem DTS hunk into a kernel patch: the DTS is delivered
    through the target's `dts/` mechanism (README section 4), and the provider is stock MTD
    core.
-6. The mac-base support depends on `target/linux/generic/pending-6.18/804-...` and
+7. The mac-base support depends on `target/linux/generic/pending-6.18/804-...` and
    `809-01-...`; if those OpenWrt backports are ever dropped/changed, the WAN "+1" offset
    silently stops being applied (the cell would read raw bytes) - re-run
    `tools/test-mac-nvmem.sh` and keep the dependency documented.

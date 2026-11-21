@@ -1,21 +1,15 @@
-# net-lane - minimum connectivity path: LSW W2 qid-map writes + GEMAC/PIE netdev readiness (patches 022/023)
+# incoming/net-lane - minimum connectivity path: LSW W2 qid-map writes + GEMAC/PIE netdev readiness (patches 022/023)
 
 **Lane:** `net-lane`, shared task `task-52`, 2026-11-19.
 **Status:** HOST-ONLY DRAFT. Nothing in this package has been executed on the board. There was
 **no device access** of any kind (no SSH/telnet/TFTP/flash/UART); the router was not touched.
 Publication remains NOT READY.
 
-> **Curated integration note.** This lane record was integrated into the source repository on
-> 2026-11-19 and the incoming package is not kept in this curated tree; this SUMMARY is the
-> durable record. The two kernel patches are in
-> `target-skeleton/target/linux/hisilicon/patches-6.18/`, the board DTS and `config-6.18`
-> updates it describes are in the tree, and the review-form series covers `001`-`023`
-> (patches `022`/`023` are do-not-merge drafts). Absolute host paths were sanitized to `~`.
-
-This directory is the durable integration record: the two kernel patches are in
-`target-skeleton/target/linux/hisilicon/patches-6.18/` and the board DTS, `config-6.18` and
-documentation changes described in section 1 are integrated in the tree. The lane's incoming
-`shared.patch` directory was source-repository staging material and is not published here.
+This directory is an **incoming** deliverable: it carries no direct edit to a shared repository
+file. The two kernel patches are already in
+`target-skeleton/target/linux/hisilicon/patches-6.18/` (direct lane write scope). Apply
+`shared.patch` from the `opensource/` root for the board DTS, `config-6.18` and documentation
+changes, then move this SUMMARY to `target-skeleton/docs/port-notes/net/SUMMARY.md`.
 
 ## 1. Deliverables
 
@@ -23,12 +17,12 @@ documentation changes described in section 1 are integrated in the tree. The lan
 | --- | --- | --- |
 | `target-skeleton/target/linux/hisilicon/patches-6.18/022-net-lsw-qidmap-write-luofu.patch` | LSW staged write path (W3 power/snapshot, W4/W5 qid-map write + readback) behind `luofu_lsw.arm`/`qidmap` gates; `luofu-switch.h` readiness API; measured hardware port numbers in the port model; binding + Kconfig help | `33ab13647791b1a0dab5edf151d8eb5a50304f1d8f2690f9f799862ad04fde3e` |
 | `target-skeleton/target/linux/hisilicon/patches-6.18/023-net-gmac-netdev-connect-luofu.patch` | GEMAC netdev readiness: requires PIE armed **and** LSW egress map ready; `PHYLINK_NETDEV` carrier fix; DT MAC address + random fallback; link-up log; Kconfig dep | `bf5fb54b663d72b62f92c873c640aaee21eb2496efeee0d06d13153dcc35d0f1` |
-| source-lane `docs/incoming/net-lane/shared.patch` (applied 2026-11-19, not kept here) | board DTS (enable lsw/pie/gmac1-4, add `hisilicon,port`), `config-6.18` provenance annotations, README, LSW-SPEC, PIE-DATAPATH, SKELETON-SMOKE, TARGET-DESIGN | `92972f01f9ea4c22aa727b43f703f15fd292ba8ee449c613f07eb241e84c658e` |
-| this file (`target-skeleton/docs/port-notes/net/SUMMARY.md`) | durable lane record | - |
+| `target-skeleton/docs/incoming/net-lane/shared.patch` | board DTS (enable lsw/pie/gmac1-4, add `hisilicon,port`), `config-6.18` provenance annotations, README, LSW-SPEC, PIE-DATAPATH, SKELETON-SMOKE, TARGET-DESIGN | `92972f01f9ea4c22aa727b43f703f15fd292ba8ee449c613f07eb241e84c658e` |
+| `target-skeleton/docs/incoming/net-lane/SUMMARY.md` | this file (moved to `port-notes/net/SUMMARY.md` on integration) | - |
 
-The integration patch applied cleanly to the source repository at integration (`git apply
---check` **RC=0**, 7 files); it did not touch `image/luofu.mk` or `tools/luofu-image.py`, so it
-did not collide with the overlay/image lane.
+`shared.patch` applies to the current `opensource/` HEAD with `git apply --check` **RC=0**
+(7 files); it does not touch `image/luofu.mk` or `tools/luofu-image.py`, so it does not collide
+with the in-progress overlay/image lane.
 
 ## 2. What the patches do, and the gate model
 
@@ -152,8 +146,8 @@ set; the driver read set is the measured inventory read set.
 4. Pin/consumer states for MDIO/GEMAC (pinctrl TODO) and the PHY firmware patch load.
 5. The userspace port map in `base-files/etc/board.d/02_network` is still a placeholder (the
    switch port model exists, but the LAN/WAN assignment is a userspace policy decision).
-6. Review-form upstream series: the curated form now covers `001`-`023` (`022`/`023` are
-   do-not-merge drafts and have never been submitted).
+6. Review-form upstream series (`opensource/upstream/series-6.18`) currently ends at 021 and has
+   not been extended to 022/023.
 
 ## 7. Evidence (local-only, gitignored)
 

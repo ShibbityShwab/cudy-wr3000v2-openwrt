@@ -12,7 +12,7 @@ WHAT THIS IS
   "bootfip" accepts the vendor's FIP package: a legacy uImage followed by a
   trailer that carries the base DTB, a 96-byte overlay-container descriptor and
   the board DTBO overlays. The trailer anatomy and the descriptor are decoded
-  in target-skeleton/docs/TRAILER-FORMAT.md (local evidence:
+  in opensource/target-skeleton/docs/TRAILER-FORMAT.md (local evidence:
   2026-10-11 bench ledger PHASE 91/95/99; 2026-11-18 U-Boot disassembly of the
   on-device build; local-only vendor containers). The values below are
   recomputed from the file the operator supplies; no vendor bytes are embedded.
