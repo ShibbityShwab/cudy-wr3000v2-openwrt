@@ -1,17 +1,16 @@
 # Luofu / Cudy WR3000 v2.0 - OpenWrt target skeleton
 
-> **Curated copy (synced 2026-11-21, TWD adoption).** This status page is reproduced from the
-> project's lab notebook (`opensource` submodule `95c4502`, 2026-11-21). Current tree: the
-> conservative comment-only board-DTS cleanup plus the **boot-tested TWD level-high delta**
-> (`interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>`; 700-line DTS
-> sha256 `13427d8e...`; DTS-0001 `e9c9ed58...`; DTB `4fde76df...` / pad `4b50de73...`;
-> boot-tested image `f6685b80`; previously verified baseline `7421bb7a`). Buttons are
-> physically verified (RESET + WPS captured); the source-port multi-port experiment was run and
-> was negative (native L2/VLAN bridge required); the automated stock-telnet install path and the
-> blocker-reduction drafts are retained. Thermal stays unsupported, Wi-Fi is unsupported on 6.18.
-> The "PUBLICATION: NOT READY" paragraph further down refers to the *old* `opensource/`
-> repository history; this curated repository was created fresh and contains no vendor binaries.
-> Absolute host paths were sanitized to `~`.
+> **Curated copy (synced 2026-11-21, final boot-tested deltas).** This status page is reproduced
+> from the project's lab notebook (`opensource` submodule `691254f`, 2026-11-21). Current tree:
+> the conservative comment-only board-DTS cleanup plus the boot-tested TWD level-high delta and
+> the final MAC-nvmem removal / switch MMIO-first `reg`/`reg-names` / `cudy,wr3000-v2`-first
+> compatible deltas (all boot-tested: image `c3ef2a50`; DTS 681 lines sha256 `9d96ac31...`;
+> DTS-0001 `c029fd44...`; DTB `a0af2899...` / pad `01b74561...`). Two upstream blockers remain;
+> buttons/LEDs are physically verified; the source-port multi-port experiment and the E0-a
+> mirror-off native-delivery experiment were both negative (mirror workaround remains required;
+> native forwarding is a planned separate project under
+> `docs/incoming/lsw-forwarding/`). Thermal stays unsupported, Wi-Fi is unsupported on 6.18.
+> Absolute host paths were sanitized to `~`; no vendor binaries are included.
 
 > **STATUS (2026-11-21): BENCH-VERIFIED 2-CPU BRING-UP - NOT A PUBLIC/FLASHABLE RELEASE.**
 >
