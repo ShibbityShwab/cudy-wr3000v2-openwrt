@@ -27,25 +27,32 @@ A **bench-only multi-port source-port probe patch (066)** and probe image (**a91
 retained as an experiment record - neither is part of the release line or the upstream series.
 The experiment was run on 2026-11-21 and was **negative**: the CPU-copy completions carry no
 source-port identity (identical descriptors across jacks), so multi-port LAN/WAN requires the
-native L2/VLAN hardware bridge and the single-port workaround stands. The devicetree final now
-adopts all five **boot-tested deltas** - TWD level-high, MAC-nvmem removal, switch MMIO-first
+native L2/VLAN hardware bridge; the eth2 single-port data path is now **native (W22)**, with the
+CPU-copy mirror retained only as documented fallback. The devicetree final adopts all five
+**boot-tested deltas** - TWD level-high, MAC-nvmem removal, switch MMIO-first
 `reg`/`reg-names`, `cudy,wr3000-v2` first compatible and the final flashinfo compatible pair
 `"hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"` (image **`6e9c54d0`**; DTS sha256
 `381b2e8c...`, 681 lines; DTS-0001 `886f3ad0...`, 694 lines; DTB `62574b11...` / pad
 `8d79794e...`; previous DTS-purpose baselines `c3ef2a50`/`f6685b80`; original verified
 `7421bb7a`). **All documented upstream blockers are now closed (zero remain)** - the retained
 blocker documents are maintainer-facing RFC/review material. The review-form patch 0021 was
-reordered MMIO-first and the form re-run clean (26/26, checkpatch 0 errors / 58 warnings);
-release-line manifest sha256 `1e00b568...`. The **E0-a native-delivery experiment was negative**
-(mirror off: 2 CPUs boot, native completions arrive on port 11 but every frame is
-`status=37 err=1` exception/punt-class and IP is dead), so the CPU-copy mirror workaround remains
-required; the **read-only E0-b stock-vs-ours captures** now identify the missing classifier/punt
-state and scope the planned M1a write test (no blind replay). The forwarding plan, E0-a/E0-b
-records and instruments are retained under `docs/incoming/lsw-forwarding/`, and the
-bench-verified **install/recovery lessons** are recorded in `docs/INSTALL-RECOVERY-LESSONS.md`.
-The owner-only legacy history-purge runbook is prepared/dry-run validated **notebook-side** (not
-published here) and `PUBLISH-READINESS.md` item 1 remains unchecked - no history rewrite or push
-has run.
+reordered MMIO-first and the form re-run clean (26/26, checkpatch 0 errors / 58 warnings).
+
+**W22 native forwarding is now release-integrated**: the **release line is 53 patches** (L0 64
+files: 001-060 + 062-065; manifest sha256 `619eb15a...`), adding patches **059** (PFE
+NAPT/flow-engine init, gate `luofu_switch.naptinit` default on) and **060** (PIE native
+exception-class delivery, retires `accepterr`). The canonical command line uses
+`luofu_switch.naptinit=1` and carries no `cpu_mirror`/`accepterr`/`cpucopy` tokens; the CPU-copy
+mirror patches 054-057 remain in the line only as the documented fallback. **W22 is release-line
+only - it is not in the L2 upstream review form (unchanged, 26 patches)**. Bench: canonical image
+**`50023446`** boots with native eth2 CPU delivery (dmesg "W22: NAPT/flow engine initialized and
+verified", 2 CPUs, ping 200/200 0% loss, SSH, reboot determinism PASS); M1a was first proven with
+image `5800c9ab`. **M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending
+bench steps**; multi-port is not claimed. The E0-a/E0-b experiments, M1a proof, W22 drafts and the
+M1b plan are retained under `docs/incoming/lsw-forwarding/`, and the bench-verified
+**install/recovery lessons** are in `docs/INSTALL-RECOVERY-LESSONS.md`. The owner-only legacy
+history-purge runbook is prepared/dry-run validated **notebook-side** (not published here) and
+`PUBLISH-READINESS.md` item 1 remains unchecked - no history rewrite or push has run.
 
 ## What is in this repository
 
@@ -80,13 +87,14 @@ has run.
   builders and mocked host tests, plus the verified bench **stock-telnet installer**
   (`tools/stock-telnet-install.sh` + `tools/telnet-exec.py`; fail-closed, inactive-pair
   only, published for evidence - see `tools/README.md`).
-- The **retained native L2/VLAN forwarding plan** (`docs/incoming/lsw-forwarding/`): the
-  implementation plan, the E0-a analysis/minimal-experiment record (negative: native completions
-  are exception/punt-class, IP dead), the **E0-b read-only stock-vs-ours capture results**
-  (stock-only classifier/punt candidates: tagact entry 1, `pfe_glb+0x2c`, EQM/NAPT/L2/PIE
-  differences) and three instruments - device read-only capture, host read-only diff, and a host
-  write-PLANNER that defaults to print-only and executes only with explicit attended/recovery
-  flags. Planning and read-only experiments only; nothing there was run by this repository.
+- The **retained native L2/VLAN forwarding lane** (`docs/incoming/lsw-forwarding/`): the
+  implementation plan, E0-a/E0-b analyses and results (negative mirror-off run, then read-only
+  stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and the
+  M1a proof** (`m1a/napt-init/proof-image/RESULT.md`; proof image `5800c9ab`), the **W22
+  release-integration drafts** (`w22/`; now release-line patches 059/060) and the **M1b plan**
+  (`m1b/M1B-PLAN.md`; per-port/LAN-to-LAN, pending bench step), plus read-only capture/diff tools
+  and a print-only write planner. The on-box probe scripts are gated (attended + recovery-armed);
+  nothing there was run by this repository. The plan's host NIC MAC was redacted.
 
 - The **bench-verified install/recovery lessons** (`docs/INSTALL-RECOVERY-LESSONS.md`): the
   telnet-installer end-to-end procedure (pair-b only, env-`bootflag`/`selector` agreement, read-backs +
@@ -94,16 +102,19 @@ has run.
   `bootflag` together with the selector cell; our image is pair-b-only; the broker channel only works
   on a consistent vendor pair; recovery is physical RESET-hold + TFTP). Bench record only - not a
   general install or recovery guide.
-- Our own kernel code (as patches): the 62 L0 patch files of the Linux 6.18 target stack  (`001-058` + `062-065`), of which the **51 include patches form the release line** and the 11
-  bench-only SMP diagnostics are excluded (`upstream/series-6.18/release-line/`); the 26-patch
-  upstream review form (`001-026`: 19 merge-intent patches plus the seven fail-closed data-path
-  drafts `020`-`026`, marked do-not-merge; patch 0021 reordered MMIO-first to match the
-  boot-tested DTS and the form rerun clean); the board DTS with the loader hand-off contract,
+- Our own kernel code (as patches): the 64 L0 patch files of the Linux 6.18 target stack
+  (`001-060` + `062-065`), of which the **53 include patches form the release line** (including
+  the **W22 native-forwarding patches 059** NAPT/flow-engine init and **060** PIE native
+  exception-class delivery) and the 11 bench-only SMP diagnostics are excluded
+  (`upstream/series-6.18/release-line/`); the **26-patch upstream review form** (`001-026`:
+  19 merge-intent patches plus the seven fail-closed data-path drafts `020`-`026`, marked
+  do-not-merge; patch 0021 reordered MMIO-first to match the boot-tested DTS, form rerun clean;
+  **W22 is release-line only and not in this form**); the board DTS with the loader hand-off contract,
   the stock board_id=3 LED/keys nodes, the **conservative comment-only cleanup plus all five
   boot-tested deltas** (DTS 681 lines `381b2e8c...`; hardware baseline image `6e9c54d0`) and the
   DTS-0001 companion entry (`886f3ad0...`, 694 lines); and the schematic OpenWrt target/base-files
   files. The release-line hashes for patches 054/056 were refreshed after the `dev_dbg` quieting
-  and the review-form 0021 reorder (manifest sha256 `1e00b568...`). The retained
+  and the W22 release-line extension (manifest sha256 `619eb15a...`). The retained
   [DTS cleanup record](upstream/series-6.18/07-dts-upstream-bindings.md) documents the boot
   regression of the superseded active cleanup, the boot-tested deltas, and the closed blocker
   list (zero remain).
@@ -215,14 +226,12 @@ HiSilicon.
   **not been executed**; `PUBLISH-READINESS.md` item 1 stays unchecked until a purge runs and a
   fresh clone of the public remote verifies clean. No force-push or cache purge has been done.
   This curated repository is unaffected (fresh history, zero binary blobs).
-- **The E0-a result stands: the CPU-copy mirror is still required.** With the mirror disabled the
-  unit boots 2 CPUs and native-path completions arrive on port 11, but every frame is
-  `status=37 err=1` (exception/punt class) and IP is dead - the stock classifier/punt state is not
-  in our init. The read-only **E0-b** captures narrowed that down to specific stock-only
-  candidates (tagact entry 1, `pfe_glb+0x2c` high16 0x1000, EQM/NAPT/L2/PIE differences); the
-  planned M1a step writes only the justified words under attended/recovery gates, never a blind
-  replay. Native forwarding remains a separate project and the plan's write-planner defaults to
-  print-only.
+- **W22 native forwarding is canonical, but its scope is limited.** The driver now initializes
+  the PFE NAPT/flow engine (patch 059) and delivers the native exception class (patch 060), so
+  eth2 works with no CPU-copy mirror (image `50023446`; M1a first proven with `5800c9ab`). The
+  CPU-copy mirror patches 054-057 remain only as the documented fallback (`naptinit=0` + mirror
+  tokens). **Multi-port (per-port delivery, LAN-to-LAN) is the pending M1b bench step; the
+  fallback-image rebuild and the soak are also pending** - no multi-port claim is made.
 - **The install/recovery record is bench evidence, not an instruction manual.** The published
   installer is fail-closed (pair-b only, env-`bootflag`/`selector` agreement enforced, read-backs,
   selector last) and is not a general install or recovery guide; recovery is physical RESET-hold

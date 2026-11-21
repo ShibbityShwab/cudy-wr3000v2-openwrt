@@ -1,20 +1,27 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at the
-**2026-11-21 zero-blocker final state** - source `opensource` submodule `5a6309c`
-(notebook parent `fb93ff1`; `123ca0a` + `5a6309c` in the submodule): the **51-patch release line** (62 patch files: 001-058 +
-062-065; the 11 bench-only SMP diagnostics are excluded), the **DTS-only loader hand-off SMP
-fix** plus the stock **board_id=3 LED/keys nodes**, the **conservative comment-only board-DTS
+**2026-11-21 W22 release-integration state** - source `opensource` submodule `5a6d29d`
+(notebook parent `8558465`; W22 release integration and M1a/W22/M1b docs): the **53-patch
+release line** (64 patch files: 001-060 + 062-065; the 11 bench-only SMP diagnostics are excluded)
+including the **W22 native-forwarding patches 059** (PFE NAPT/flow-engine init) and **060** (PIE
+native exception-class delivery; canonical cmdline `naptinit=1` with no mirror tokens; the
+CPU-copy mirror patches 054-057 remain only as the documented fallback), the **DTS-only loader
+hand-off SMP fix** plus the stock **board_id=3 LED/keys nodes**, the **conservative comment-only board-DTS
 cleanup plus all five boot-tested deltas** (TWD level-high, MAC-nvmem removal, switch MMIO-first
 order, cudy-first compatible, flashinfo compatible-first; DTS `381b2e8c...`; DTB `62574b11...` / pad `8d79794e...`;
-current DTS-purpose baseline image `6e9c54d0`), the base-DTB **`pad-dtb` 8-byte alignment build step**, the
+current DTS-purpose baseline image `6e9c54d0` and the **canonical W22 data-path image
+`50023446`** with the **M1a proof image `5800c9ab`**), the base-DTB **`pad-dtb` 8-byte alignment build step**, the
 re-generated **DTS-0001** (`886f3ad0...`, 694 lines), the verified automated
 **stock-telnet install path**, the **multi-port Ethernet limit and experiment plan** (with the
 bench-only probe patch 066 / image `a91ebcf0`, whose source-port experiment was run and was
 **negative** - CPU-copy completions carry no port identity, so the native L2/VLAN bridge is the
-required multi-port path), the **documentation-only upstream submission package** (zero remaining blockers), and the
-current DTS-purpose baseline **`6e9c54d0`** (previous `c3ef2a50`; earlier f6685b80; with the canonical
-`974e6ca6` and board-feature `7f270b8c` baselines). The upstream review form stays at 26 patches (001-026). The superseded
+required multi-port path), the **documentation-only upstream submission package** (zero remaining blockers),
+and the current baselines: **`50023446`** (canonical W22, native CPU delivery), `6e9c54d0` (current
+DTS-purpose; previous `c3ef2a50`; earlier f6685b80), and `974e6ca6`/`7f270b8c`/`7421bb7a` for the
+pre-W22 bring-up. The upstream review form stays at 26 patches (001-026) - **W22 is release-line only,
+not in the L2 form**; **M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are
+pending bench steps**. The superseded
 aggressive DTS cleanup is recorded as a **hardware boot regression** (image `6f19c6d6`). The live
 status of the work is the lab notebook's `STATUS.md`; the honest summary of what is host-validated
 and what the bench phases did - and did **not** - prove is in [`../README.md`](../README.md). Read
@@ -28,10 +35,10 @@ performed and the 2026-11-18/19/21 syncs.
 | [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan - with the 2026-11-21 release and board-feature updates, the mandatory loader hand-off DTS contract and the closed/partly-closed rows | design proposal (host-validated drafts + bench-verified target images; not accepted upstream) |
 | [TARGET-SKELETON.md](TARGET-SKELETON.md) | the target-skeleton index: what the schematic target, DTS, image recipe, tools and patch stack are; status and what remains [U]/TODO | index |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; the 2026-11-21 update closes the SMP milestone without claiming upstream progress; superseded sections are marked | phase plan / history |
-| [incoming/lsw-forwarding/](incoming/lsw-forwarding/) | retained native L2/VLAN forwarding lane: implementation plan, E0-a analysis/record (mirror-off native completions are exception/punt-class and IP is dead - mirror workaround remains required), **E0-b read-only stock-vs-ours captures** (9,488 words each, 0 read failures; stock-only classifier/punt candidates: tagact entry 1, `pfe_glb+0x2c`, EQM/NAPT/L2/PIE differences) and three read-only/print-only instruments | planning + read-only experiments only; nothing executed by this repository |
+| [incoming/lsw-forwarding/](incoming/lsw-forwarding/) | retained native L2/VLAN forwarding lane: implementation plan, E0-a/E0-b analyses and results (negative mirror-off run; read-only stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and proof** (`m1a/napt-init/proof-image/RESULT.md`; proof image `5800c9ab` - native port=11 deliveries, ping 200/200, SSH), the **W22 release-integration drafts** (`w22/`; now release-line patches 059/060, canonical image `50023446`) and the **M1b plan** (`m1b/M1B-PLAN.md`; per-port/LAN-to-LAN, pending), plus read-only capture/diff tools and a print-only write planner | bench records + gated instruments only; nothing executed by this repository; M1b/fallback-image/soak pending |
 | [incoming/upstream-blockers/](incoming/upstream-blockers/) | **ZERO remaining upstream blockers** - the last (flashinfo loader hand-off binding) was closed by boot-tested image `6e9c54d0` with `compatible = "hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"`; for the record: the pre-clean active deltas (TWD, 6.18 MAC provisioning, switch MMIO-first, cudy-first) were closed on f6685b80/c3ef2a50. The retained files are maintainer-facing documentation/drafts for normal RFC review | not blocker tasks; text-only, not applied; any new active delta still needs its own boot-test |
 | [INSTALL-RECOVERY-LESSONS.md](INSTALL-RECOVERY-LESSONS.md) | bench-verified install/recovery lessons (telnet installer end-to-end PASS, pair-b-only rule, env-bootflag/cell coupling, mixed-pair diagnosis, physical recovery) **⚠ note** | bench-only record, not a general install or recovery guide |
-| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the multi-port Ethernet limit (only eth2 works through the CPU-copy mirror; completions report port 0 / no source id), the measured far-right-jack finding, the attended source-port experiment plan and the decision gate (per-port CPU-copy delivery vs native L2/VLAN bridge), and the bench-only probe image `a91ebcf0` / patch 066 | experiment plan + prepared image; **experiment run 2026-11-21: negative** (no source-port id in CPU-copy completions - native L2/VLAN bridge required) |
+| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the pre-W22 multi-port Ethernet limit and the source-port experiment (negative), the decision gate and the bench-only probe image `a91ebcf0` / patch 066; a curated note records that **W22 makes eth2 native** (no mirror tokens) and that **M1b is the pending multi-port step** | experiment plan + prepared image; experiment run 2026-11-21: negative; W22 supersedes the mirror for eth2, multi-port not claimed |
 | [incoming/multi-port-probe/](incoming/multi-port-probe/) | retained bench-only record: patch 066 (`luofu_switch.mirror_src_mask`) and its note; not part of the release line or upstream series | bench instrument (GPL-2.0-only patch); experiment run 2026-11-21, **negative**; retained as artifact |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
 | [SELECTOR-0x21.md](SELECTOR-0x21.md) | reconstruction of the stock A/B boot-selector contract (env `bootflag`, SYSCTRL record cell, the project's `0x21` bench marker) | RE specification, host-only |
@@ -69,18 +76,20 @@ Additional status pages and retained reports:
   review form is and is not, what was validated, and the decisions required before submitting.
 - [`../upstream/series-6.18/05-release-line.md`](../upstream/series-6.18/05-release-line.md) and
   [`../upstream/series-6.18/06-dts-series-dependency.md`](../upstream/series-6.18/06-dts-series-dependency.md) -
-  the release line (include/exclude classification, canonical configuration, bench evidence,
-  padded-DTB requirement) and the explicit DTS-series dependency carried by DTS-0001.
+  the release line (include/exclude classification, canonical configuration, bench evidence; now
+  **53 patches / L0 64 files incl. W22 059-060**, manifest `619eb15a...`, W22 record in
+  section 7) and the explicit DTS-series dependency carried by DTS-0001.
 - [`../upstream/series-6.18/07-dts-upstream-bindings.md`](../upstream/series-6.18/07-dts-upstream-bindings.md) -
   the board-DTS cleanup record: the hardware regression of the superseded active cleanup, the
   conservative comment-only cleanup, the boot-tested deltas and the closed blocker list (zero remain).
 - [`../upstream/series-6.18/submission/README.md`](../upstream/series-6.18/submission/README.md) -
   the **documentation-only upstream submission package** (RFC form): status/artifact checklist,
   one-page cover-email draft, explicit no-Tested-by policy and a file manifest. It now reflects
-  the **zero-blocker** final state (flashinfo compatible-first boot-tested on image `6e9c54d0`)
+  the **zero-blocker** final state (flashinfo compatible pair boot-tested on image `6e9c54d0`)
   and the current artifact hashes (DTS `381b2e8c...`; DTS-0001 `886f3ad0...`; DTB
-  `62574b11...` / pad `8d79794e...`). Nothing has been sent anywhere; the manifest was
-  regenerated for this curated tree.
+  `62574b11...` / pad `8d79794e...`). **The L2 review form/package is unchanged by W22**
+  (patches 059/060 are release-line only), while the release-line manifest is now `619eb15a...`.
+  Nothing has been sent anywhere; the manifest was regenerated for this curated tree.
 - [`../docs/incoming/upstream-blockers/00-INDEX.md`](../docs/incoming/upstream-blockers/00-INDEX.md) -
   the retained blocker-reduction documentation index (all blockers closed; maintainer-facing
   drafts only, not the release series, not applied).

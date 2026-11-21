@@ -19,7 +19,7 @@ material was sanitized, and how to verify the publication claims.
   (2026-11-18: 21-patch review form).
   The **fifth sync (2026-11-21)** moves the pin to the release-line consolidation:
   `opensource` submodule commit `a6b46a9` (notebook parent `a66a14f`), which adds the
-  51-patch release line, the DTS-only loader hand-off SMP fix, DTS-0001, the canonical
+  53-patch release line, the DTS-only loader hand-off SMP fix, DTS-0001, the canonical
   2-CPU image `974e6ca6` and the updated docs - see the fifth-sync section below.
   The **sixth sync (2026-11-21)** moves it again to the board-feature refresh:
   `opensource` submodule commit `f136cf3` (notebook parent `ab0d3cb`), which adds the
@@ -66,6 +66,19 @@ material was sanitized, and how to verify the publication claims.
   manifest sha256 `1e00b568...`; **ZERO remaining blockers**), the native-forwarding E0-a/E0-b
   results were retained, and the bench install/recovery lessons were added - see the
   thirteenth-sync section below.
+  The **fourteenth sync (2026-11-21)** moves it to the **W22 release-integration state**:
+  `opensource` submodule `5a6d29d` (notebook parent `8558465`) - the **W22 native
+  forwarding is release-integrated**: patches **059** (PFE NAPT/flow-engine init, gate
+  `luofu_switch.naptinit` default on) and **060** (PIE native exception-class delivery, retires
+  `accepterr`) are now in L0/L1 (L0 **64** files 001-060 + 062-065, **L1 53** patches, manifest
+  sha256 `619eb15a...`); the canonical cmdline uses `naptinit=1` with **no** mirror/accepterr/
+  cpucopy tokens (mirror patches 054-057 retained only as the documented fallback); the W22
+  canonical image is **`50023446`** and M1a was proven with `5800c9ab`. **W22 is release-line
+  only - the L2 upstream review form/submission is unchanged (26 patches)**; **M1b
+  (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending bench steps**. The
+  m1a/napt-init, w22, m1b, E0B docs were retained and the release-line validation logs refreshed;
+  host paths in the validation logs were sanitized to `~` for this curated copy - see the
+  fourteenth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -118,10 +131,11 @@ material was sanitized, and how to verify the publication claims.
 | --- | --- |
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
 | `docs/` (16 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report, the trailer-format doc including the base-DTB alignment section, the multi-port plan (incl. the prepared probe image), and the validation records through the 2026-11-21 board-feature/quiet-image, DTS/install and submission-package follow-up passes |
-| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, **the stock board_id=3 LED/keys nodes and the conservative comment-only cleanup** (active content byte-identical to the known-good DTB), the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
-| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `c029fd44...`, final boot-tested deltas; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs, plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the retained optional deltas) |
+| `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, **the stock board_id=3 LED/keys nodes and the conservative comment-only cleanup** (active content byte-identical to the known-good DTB), the 64 L0 patch files (001-060 + 062-065; the release line is the 53 include patches, including
+W22 patches 059 NAPT/flow-engine init and 060 PIE native exception-class delivery), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
+| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: **53 include** / 11 exclude, L0 64 files, manifest sha256 `619eb15a...`; W22 record in `05-release-line.md` section 7 and `04-validation.md` section 29), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `886f3ad0...`, unchanged by W22; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs (host paths sanitized to `~` in this curated copy), plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the closed blocker list) |
 | `docs/incoming/upstream-blockers/` | **retained upstream review documents** - **ZERO remaining blockers**: the last (flashinfo loader hand-off binding) was boot-tested on image `6e9c54d0` and adopted; the retained files are maintainer-facing RFC/review material (driver/YAML items incl. the adopted in-series binding reorder, and the drafted reserved-memory binding). Text-only; not the release series, not applied; any new active delta needs its own hardware boot-test |
-| `docs/incoming/lsw-forwarding/` | **retained native L2/VLAN forwarding lane**: implementation plan, E0-a analysis/minimal-experiment record (negative: native completions are exception/punt-class, IP dead, mirror required), **E0-b read-only stock-vs-ours capture results** (stock-only classifier/punt candidates: tagact entry 1, pfe_glb+0x2c high16 0x1000, EQM/NAPT/L2/PIE differences; no blind replay) and three instruments: device read-only capture, host read-only diff, and a host write-planner that defaults to print-only and executes only with explicit attended/recovery flags. Planning/read-only experiments only; nothing executed by this repository |
+| `docs/incoming/lsw-forwarding/` | **retained native L2/VLAN forwarding lane**: implementation plan, E0-a/E0-b analyses + results (negative mirror-off run; read-only stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and proof** (`m1a/napt-init/proof-image/RESULT.md`; image `5800c9ab`), the **W22 release-integration drafts** (`w22/`; now release-line patches 059/060, canonical image `50023446`) and the **M1b plan** (`m1b/M1B-PLAN.md`; per-port/LAN-to-LAN, pending), plus read-only capture/diff tools and a print-only write planner. The on-box probe scripts are gated (attended + recovery-armed); planning and bench records only - nothing was run by this repository; the plan's host NIC MAC was redacted |
 | `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription. It now reflects the final-delta adoption (**ZERO remaining blockers**; all five devicetree deltas and the flashinfo loader hand-off boot-tested) and the current artifact hashes (DTS `381b2e8c...`; DTS-0001 `886f3ad0...`; release-line manifest `1e00b568...`); the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
 | `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the probe image `a91ebcf0` is documented in the multi-port plan. The experiment was run on 2026-11-21 and was **negative**; native L2/VLAN bridge required |
 | `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, inactive-pair only; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository |
@@ -680,6 +694,60 @@ current pin.
   retained forwarding plan's host NIC MAC is redacted to a documentation prefix);
 - fresh clone of the pushed remote verified (hashes/series/manifest/artifacts match).
 
+## The fourteenth sync (2026-11-21): W22 native forwarding release-integrated
+
+Source pin: **`5a6d29d`**, the notebook's `opensource` submodule at the W22 release-integration
+state (notebook parent `8558465`). It is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/target/linux/hisilicon/patches-6.18/059-net-lsw-napt-init.patch` | **W22 patch 059** - PFE NAPT/flow-engine init (vendor `hi_pfe_napt_init` sequence with stock-captured values, gate `luofu_switch.naptinit` default on, self-verifying); sha256 `cfd7debc...` |
+| `target-skeleton/target/linux/hisilicon/patches-6.18/060-net-pie-exception-delivery.patch` | **W22 patch 060** - PIE native exception-class delivery, retires the experimental `accepterr` gate; sha256 `8c748061...` |
+| `target-skeleton/target/linux/hisilicon/luofu/config-6.18` | canonical cmdline now `luofu_switch.naptinit=1` and **no** `cpu_mirror`/`mirror_dst`/`accepterr`/`cpucopy_*` tokens; the mirror command line is documented only for the fallback image (`naptinit=0` + mirror tokens) |
+| `target-skeleton/RELEASE-NOTES.md`, `target-skeleton/README.md`, `docs/incoming/feature-inventory/REPORT.md`, `docs/port-notes/qm-decode/SUMMARY.md` | W22 truth updates: eth2 wired LAN is native via the driver NAPT init (no mirror), mirror patches 054-057 retained only as the documented fallback, M1b/soak not claimed; historical mirror records kept with a native-forwarding note |
+| `upstream/series-6.18/` | release line extended: L0 **64** files (001-060 + 062-065), **L1 53** include patches, manifest sha256 **`619eb15a...`** (53 include / 11 exclude); `00-cover-letter` (row 16 manifest sha), `04-validation` section 29 (W22 record + bench evidence), `05-release-line` (W22 section 7), `06` (manifest sha) refreshed; `release-line/INCLUDED.txt` + manifest rows added; `validation/release-line/` logs refreshed (validator PASS 53/53, 149 file events, 0 fuzz/rejects; DTS contract and DTS-0001 identity unchanged: DTB 12,678 B `62574b11...` / pad 12,680 B `8d79794e...`; DTS-0001 `886f3ad0...`). **Host paths in the copied logs were sanitized to `~`** |
+| `upstream/series-6.18/submission/` | **unchanged** by W22 - the L2 review form and submission package stay at 26 patches and the notebook manifest is unchanged (102/102); the curated manifest was regenerated against this curated tree (12 entries differ because of curation) and verifies 102/102 |
+| `docs/incoming/lsw-forwarding/` | retained native-forwarding lane expanded: `m1a/` (session record, reviewed probe plans/scripts, read-only observer), `m1a/napt-init/` (proposal, fail-closed on-box script, read-only observers, **proof-image/RESULT.md** for image `5800c9ab`), `w22/` (W22-DESIGN, RELEASE-INTEGRATION, the two patch drafts, README), `m1b/M1B-PLAN.md` (next experiment), new `E0B-ANALYSIS.md` and updated E0B-RESULTS/plan/unknowns/README. The on-box scripts are attended/recovery-gated; the plan's host NIC MAC was redacted; private capture tarballs are not published; nothing was run by this repository |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | W22 release-integration state: 53-patch line/64 L0 files, manifest `619eb15a...`, canonical cmdline, image `50023446` (+ M1a proof `5800c9ab`), mirror fallback, "release-line only, not in the L2 review form", pending M1b/fallback-image/soak |
+
+### What this sync changes about the repository's honest status
+
+- **W22 native forwarding is now in the release line and bench-verified.** Canonical image
+  **`50023446`** (sha256 `500234462bdc2e62d963067f00ba580e639a82c10b05323533684f8536ca8c9f`) boots 6.18.60,
+  2 CPUs, `GIC-0 29 Level twd`, no Oops/BUG/panic; dmesg shows `W22: NAPT/flow engine initialized
+  and verified`; the command line carries **no** mirror/accepterr/cpucopy tokens; host ping
+  200/200 0% loss + SSH work; reboot determinism PASS. M1a was first proven with image
+  **`5800c9ab`** (userspace NAPT-init replay; native port=11 deliveries in the status-77 class).
+- **Scope limit:** W22 is **release-line only - it is not in the L2 upstream review form** (still
+  26 patches; the submission package is unchanged). **M1b (per-port native delivery,
+  LAN-to-LAN), the fallback-image rebuild and the soak are pending bench steps**; multi-port is
+  not claimed. The clock constraint is respected as before (the known-good 7421bb7a baseline is
+  the pre-W22 one; no claim is made about exceeding the earlier verified boot).
+- The CPU-copy mirror patches **054-057 remain in the line only as the documented fallback**
+  (`naptinit=0` + mirror tokens); the mirror workaround is no longer the canonical path for eth2.
+- Unchanged: zero upstream blockers; install/recovery lessons; multi-port source-port experiment
+  negative; Wi-Fi/thermal unsupported; history-purge item open (owner-only runbook notebook-side,
+  not executed, `PUBLISH-READINESS.md` item 1 unchecked; curated repos unaffected).
+
+### Checks run for this sync (2026-11-21, /home workdirs)
+
+- `tools/check-release-line.sh <linux-6.18.60.tar.xz> /home/.../tmp-release-line-check` -
+  **PASS**: 53/53 include patches `patch(1)` RC=0 (149 file events, 3 offset hunks, 0 fuzz,
+  0 rejects), strict `git apply` clean; DTS contract unchanged (DTB **12,678 B sha256
+  `62574b11...`**, pad **12,680 B sha256 `8d79794e...`**); DTS-0001 **`886f3ad0...`** applies and
+  its board DTS is byte-identical;
+- `gen-series.py --check` - **PASS** (26 review-form patches, no drift; the review form is unchanged
+  by W22);
+- `sha256sum -c validation/sha256sums.txt` - **89/89 OK**; release-line manifest sha256
+  **`619eb15a...`** (53 include / 11 exclude);
+- `sha256sum -c submission/MANIFEST.sha256` - **102/102 OK** (curated-tree manifest; 12 entries differ
+  from the notebook's);
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **77/77**;
+- link checks clean (only the documented notebook-only links unresolved); repository hygiene:
+  zero binary objects in tree/history, no credentials/keys, no full MACs, no host paths (the
+  refreshed validation logs were sanitized to `~`);
+- fresh clone of the pushed remote verified (hashes/series/manifest/artifacts match).
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -779,7 +847,10 @@ tree.
   The new E0-a/E0-b analysis documents are read-only experiment records (no capture tarballs or
   per-unit data are published); the instruments are read-only/print-only by design and nothing in
   them was executed by this repository. The updated `test-mac-nvmem.sh` (77/77) now matches the
-  adopted 6.18 userspace MAC path.
+  adopted 6.18 userspace MAC path. The **fourteenth sync** sanitized host paths in the refreshed
+  release-line validation logs to `~` (they were generated in the notebook's private lab tree) and
+  regenerated the curated submission manifest (12 entries differ from the notebook's because of
+  curation).
 - **The multi-port probe patch 066** is kept verbatim from the notebook (a GPL-2.0-only kernel
   diff, our own code) with a curated README; it is not part of the release line, the review form
   or the submission package, and the prepared image `a91ebcf0` is a bench instrument only.
@@ -850,8 +921,9 @@ pair unchanged, selector verified, 2-CPU image booted), and the superseded aggre
 cleanup (image `6f19c6d6`) was documented as a **hardware boot regression** and reverted; the
 accepted conservative cleanup is comment-only and compiles to the known-good DTB. Thermal
 telemetry is unsupported on this board (temperature register reads 0, vendor DT disables the
-sensor), Wi-Fi is unsupported on the 6.18 target, only one Ethernet jack works through the
-CPU-copy workaround (multi-port is an open experiment/native-bridge project), and the earlier
+sensor), Wi-Fi is unsupported on the 6.18 target, the eth2 jack now works **natively** (W22
+driver NAPT init, no CPU-copy mirror), and multi-port (per-port/LAN-to-LAN) remains the open
+M1b/native-bridge project, and the earlier
 MAC-duplication concern is withdrawn (LAN ports share the vendor base MAC, WAN = base+1 by
 design). The intermediate host-only full-series rebuilds (001-023 with the persistent
 `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and bdinfo-MAC
@@ -865,13 +937,17 @@ stock loader staging PASS, 2 CPUs, `GIC-0 29 Level twd`, cmdline ubi.mtd=rootfsb
 previous DTS-purpose baselines c3ef2a50/f6685b80; original verified 7421bb7a). **All documented
 upstream blockers are now closed (zero remain)**; the retained review documents under
 `docs/incoming/upstream-blockers/` are maintainer-facing RFC material. LEDs and both RESET/WPS buttons
-are physically verified. The **E0-a mirror-off experiment was negative** (native completions are
-`status=37 err=1` exception/punt-class, IP dead) and the **read-only E0-b captures** identify the
-missing stock-only classifier/punt state, so the CPU-copy mirror workaround remains required and
-the native L2/VLAN forwarding project has a retained plan plus E0-b results under
-`docs/incoming/lsw-forwarding/`. The **upstream submission package** is a documentation-only dry run
+are physically verified. The **E0-a mirror-off experiment was negative** (native completions were
+`status=37 err=1` exception/punt-class, IP dead); the **read-only E0-b captures** then identified the
+missing IFC->NAPT unicast path, and **M1a was proven** with proof image `5800c9ab`. The **W22
+kernel implementation is now release-integrated** (patches 059/060; canonical image
+**`50023446`** - native eth2 CPU delivery, no mirror tokens, 2 CPUs, ping 200/200, SSH, reboot
+determinism PASS) with the CPU-copy mirror patches 054-057 retained only as the documented
+fallback (`naptinit=0`). **W22 is release-line only - not in the L2 upstream review form** - and
+**M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending bench steps**;
+multi-port is not claimed. The **upstream submission package** is a documentation-only dry run
 - **nothing sent, no Tested-by** - and the **multi-port source-port experiment** (patch 066 /
-image `a91ebcf0`) was also **negative** - the CPU-copy path cannot identify jacks, so multi-port
+image `a91ebcf0`) was **negative** - the CPU-copy path cannot identify jacks, so multi-port
 LAN/WAN requires the native bridge. The bench **install/recovery lessons** are recorded in
 `docs/INSTALL-RECOVERY-LESSONS.md` (pair-b only, env-bootflag/selector coupling, mixed-pair
 diagnosis, physical recovery; not a general guide). The owner-only **legacy history-purge runbook**
