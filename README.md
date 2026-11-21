@@ -25,9 +25,12 @@ owner review - **nothing has been sent anywhere**. Thermal is
 > **unsupported** (temperature register reads 0, vendor DT disables it) and Wi-Fi is
 > **unsupported on 6.18** (vendor-binary driver only). **One Ethernet jack (eth2)** works via the
 > CPU-copy workaround; the other jacks need the attended source-port experiment
-> ([docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md)) or the native L2/VLAN bridge - a bench-only probe patch (066) and prepared probe image
-**`a91ebcf0`** are staged under [docs/incoming/multi-port-probe/](docs/incoming/multi-port-probe/),
-and the cable must be moved back to the eth2 jack before the run. Milestones:
+> ([docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md)) or the native L2/VLAN bridge. The source-port experiment has now been run with the bench-only
+probe image **`a91ebcf0`** and patch 066 (retained under
+[docs/incoming/multi-port-probe/](docs/incoming/multi-port-probe/)): it was **negative** - the
+CPU-copy completions carry no source-port/vport identifier and are field-for-field identical
+across jacks, so multi-port LAN/WAN over CPU-copy is not feasible and the native L2/VLAN bridge
+([docs/LSW-SPEC.md](docs/LSW-SPEC.md)) is the required path. Milestones:
 > [release status](target-skeleton/RELEASE-NOTES.md) ·
 > [release line](upstream/series-6.18/05-release-line.md) ·
 > [SMP root cause](docs/SMP-RE.md) ·
@@ -73,7 +76,7 @@ reverse-engineered code.
 | Board DTS + loader hand-off | the DTS is the **conservative comment-only cleanup** (691 lines; every active node name, unit address, property order/value, `reg` order, status, label, phandle and alias is unchanged from the hardware-verified 1,329-line pre-clean DTS). It compiles to the **known-good DTB 13,041 B sha256 `49fe5c47...`** (padded `Build/luofu-pad-dtb` to 13,048 B sha256 `402e4f71...`) and carries `/aliases/console`, `/reserved-memory/flashinfo@80600000` (`reg = <0x80600000 0x4000>`, `atag-offset = <0x1000>`) and `enable-method = "hisilicon,luofu-smp"` | the DTB is byte-identical to the known-good pre-clean one, so the loader hand-off/SMP semantics are the hardware-verified ones; the **superseded active-DTS cleanup (image `6f19c6d6`) did not boot** (MTD stall, U-Boot watchdog reset) - see the regression record below |
 | SMP (patch 018 + DTS contract) | platsmp driver compiles; vendor release sequence decoded and documented; the fix is DTS-only and the diagnostics are excluded from the release line | **2 CPUs verified** on the canonical image (CPU1 mpidr `80000001`, `Brought up 1 node, 2 CPUs`, /proc/cpuinfo 2, soak + reboot) |
 | Board features (LEDs / keys / watchdog) | stock board_id=3 overlay nodes in the board DTS (gpio-keys-polled reset GPIO22 / WPS GPIO23 active-low 20 ms; six `oem:green:*` LEDs GPIO24/25/3/2/0/1; target config `LEDS_GPIO` / `INPUT(+EVDEV/KEYBOARD)` / `KEYBOARD_GPIO_POLLED` / `WATCHDOG_SYSFS`, `INPUT_HISI_POWERKEY` off) | **verified on image `7f270b8c`**: six writable `/sys/class/leds/oem:green:*` devices, `/dev/input/event0` = gpio-keys-polled, `watchdog0` sysfs (identity HiSilicon luofu watchdog, timeout 30 s, not armed by us); physical LED light/button press still needs human confirmation |
-| Wired LAN (bench workaround) | the W3-W20 gated path (patches 054-058) is host-compiled and documented; **no native switch forwarding** | **works via the documented CPU-copy mirror workaround**: `luofu_switch.cpu_mirror=1 mirror_dst=4` + PIE port-0 copy delivery `luofu_pie.cpucopy_deliver=1 cpucopy_port=11`; host ping 20/20 0% loss, SSH. **Only the eth2 jack works through this path**: the CPU-copy completion reports port 0 with no confirmed source-port identifier, so extending the mirror mask alone is not correct; the far-right jack is a verified LAN port. Next: the attended source-port experiment in [docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md) (if there is no source-port field, multi-port is the native L2/VLAN hardware-bridge project) |
+| Wired LAN (bench workaround) | the W3-W20 gated path (patches 054-058) is host-compiled and documented; **no native switch forwarding** | **works via the documented CPU-copy mirror workaround**: `luofu_switch.cpu_mirror=1 mirror_dst=4` + PIE port-0 copy delivery `luofu_pie.cpucopy_deliver=1 cpucopy_port=11`; host ping 20/20 0% loss, SSH. **Only the eth2 jack works through this path**: the CPU-copy completion reports port 0 with no confirmed source-port identifier, so extending the mirror mask alone is not correct; the far-right jack is a verified LAN port. Measured source-port experiment (bench-only probe image `a91ebcf0`, 2026-11-21): **negative** - no source-port/vport field in the CPU-copy completions (descriptors field-for-field identical across jacks), so multi-port LAN/WAN is NOT feasible via the CPU-copy workaround and requires the native L2/VLAN hardware bridge; see [docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md) |
 | Persistent overlay | two-volume squashfs + `rootfs_data` UBI layout in the image recipe; semantic UBI-volume verifier | `/dev/ubi0_1 on /overlay type ubifs (rw)`, files survive a reboot (canonical image) |
 | Storage / FMC SPI-NAND | FMC driver + binding compile; contract documented | SPI-NAND (ESMT 128 MiB, 17 partitions) and UBI rootfs mounted on every boot |
 | Install path (automated, bench-verified) | `tools/stock-telnet-install.sh` (fail-closed: `--inspect` read-only; `--apply` needs `--attended --recovery-armed`, writes only the **inactive** pair, verifies uploaded hashes, read-back slot hash, active-pair-unchanged and the selector) plus `tools/telnet-exec.py` | **verified end-to-end 2026-11-21** (image `7421bb7a`): wrote pair b from the vendor stock telnet shell, active pair unchanged, selector `0x11` verified, rebooted into our 6.18 image with 2 CPUs. Requires the vendor stock firmware and the notebook's bench-link/recovery helpers; **not a general install or recovery guide** |
@@ -688,7 +691,7 @@ delivery table; if not, multi-port LAN/WAN is the native L2/VLAN hardware-bridge
 ([docs/LSW-SPEC.md](docs/LSW-SPEC.md)), not a CPU-copy hack. The plan includes the attended
 gates and the restore-to-known-good step; no multi-port claim is made today.
 
-**Prepared experiment (2026-11-21, not run).** Image **`a91ebcf0`** is staged for the run:
+**Prepared experiment (2026-11-21).** Image **`a91ebcf0`** was built for the run:
 the known-good `7421bb7a` userspace/kernel plus the bench-only source-mask probe patch
 [`066-net-lsw-mirror-src-mask.patch`](docs/incoming/multi-port-probe/066-net-lsw-mirror-src-mask.patch)
 (module parameter `luofu_switch.mirror_src_mask`, default `0x800`) and built-in probe
@@ -696,6 +699,17 @@ tokens `luofu_pie.rxdiag=1 luofu_switch.mirror_src_mask=0x1e00`. The patch is no
 release line or review form; the build clone was restored after producing the image. The cable
 is currently on a non-eth2 jack, so the run is blocked until it is moved back; the image and its
 sha256 are recorded in [docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md).
+
+**Measured result (2026-11-21): NEGATIVE.** The probe image was installed on the unit (active
+stock pair untouched, selector verified) and the far-right LAN jack was exercised with the
+extended mirror mask (ports 9-12). Frames were mirrored and delivered, but the CPU-copy
+completions are **field-for-field identical** to the eth2 baseline: `port=0`, `vport=0`, only
+descriptor words 0/1 populated, no source-port field. The decision gate therefore resolves to
+the **native L2/VLAN hardware bridge** ([docs/LSW-SPEC.md](docs/LSW-SPEC.md), separate project);
+do not extend mirror-mask + CPU-copy delivery as a multi-port solution and do not fake port
+identity by MAC heuristics. The board was restored to the known-good image `7421bb7a`
+afterwards. Full descriptor evidence: [docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md) section
+"Measured result of the source-port experiment". [V]
 
 ---
 
@@ -855,8 +869,10 @@ of this repository or its history.
   known-good DTB), the base-DTB `pad-dtb` build requirement, DTS-0001 (`072d0b8b...`), the
   26-patch review form, the **documentation-only upstream submission package**, the bench
   baselines `974e6ca6` / `7f270b8c` / **`7421bb7a` (known-good)**, the automated
-  stock-telnet install tooling, the measured multi-port limit and the prepared bench-only probe
-  (image `a91ebcf0`, patch 066), the DTS regression record, the retained read-only device
+  stock-telnet install tooling, the measured multi-port limit (source-port experiment
+  **negative**: CPU-copy completions carry no port identity, so the native L2/VLAN bridge is
+  required) and the bench-only probe record (image `a91ebcf0`, patch 066), the DTS regression
+  record, the retained read-only device
   feature inventory (+ update) and Wi-Fi feasibility reports, and the updated engineering docs. Publication policy: [docs/PUBLISHING.md](docs/PUBLISHING.md);
   provenance: [NOTICE.md](NOTICE.md).
 
@@ -877,5 +893,6 @@ of this repository or its history.
 > submission exists. The 26-patch review form is a set of drafts/RFCs, not merge-ready kernel
 > code. Treat the repository as a well-documented, honest starting point for an upstream port -
 > and treat the private lab evidence as the evidence of record. The upstream submission package is a
-dry-run for the owner only - **not sent, no Tested-by** - and the multi-port probe is a
-bench-only instrument that has not been run.
+dry-run for the owner only - **not sent, no Tested-by** - and the multi-port source-port
+experiment has been run and was **negative**: the CPU-copy path cannot identify jacks, so
+multi-port LAN/WAN needs the native L2/VLAN bridge.

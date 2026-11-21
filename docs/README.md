@@ -8,8 +8,10 @@ fix** plus the stock **board_id=3 LED/keys nodes**, the **conservative comment-o
 cleanup** (active content byte-identical to the hardware-verified known-good DTB), the base-DTB
 **`pad-dtb` 8-byte alignment build step**, the re-generated **DTS-0001**, the verified automated
 **stock-telnet install path**, the **multi-port Ethernet limit and experiment plan** (with the
-prepared bench-only probe patch 066 / image `a91ebcf0`), the **documentation-only upstream
-submission package**, and the known-good bench baseline **`7421bb7a`** (with the canonical
+bench-only probe patch 066 / image `a91ebcf0`, whose source-port experiment was run and was
+**negative** - CPU-copy completions carry no port identity, so the native L2/VLAN bridge is the
+required multi-port path), the **documentation-only upstream submission package**, and the
+known-good bench baseline **`7421bb7a`** (with the canonical
 `974e6ca6` and board-feature `7f270b8c` baselines). The upstream review form stays at 26 patches (001-026). The superseded
 aggressive DTS cleanup is recorded as a **hardware boot regression** (image `6f19c6d6`). The live
 status of the work is the lab notebook's `STATUS.md`; the honest summary of what is host-validated
@@ -24,8 +26,8 @@ performed and the 2026-11-18/19/21 syncs.
 | [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan - with the 2026-11-21 release and board-feature updates, the mandatory loader hand-off DTS contract and the closed/partly-closed rows | design proposal (host-validated drafts + bench-verified target images; not accepted upstream) |
 | [TARGET-SKELETON.md](TARGET-SKELETON.md) | the target-skeleton index: what the schematic target, DTS, image recipe, tools and patch stack are; status and what remains [U]/TODO | index |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; the 2026-11-21 update closes the SMP milestone without claiming upstream progress; superseded sections are marked | phase plan / history |
-| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the multi-port Ethernet limit (only eth2 works through the CPU-copy mirror; completions report port 0 / no source id), the measured far-right-jack finding, the attended source-port experiment plan and the decision gate (per-port CPU-copy delivery vs native L2/VLAN bridge), and the prepared bench-only probe image `a91ebcf0` / patch 066 | experiment plan + prepared image, not yet run |
-| [incoming/multi-port-probe/](incoming/multi-port-probe/) | retained bench-only record: patch 066 (`luofu_switch.mirror_src_mask`) and its note; not part of the release line or upstream series | bench instrument (GPL-2.0-only patch), not run |
+| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the multi-port Ethernet limit (only eth2 works through the CPU-copy mirror; completions report port 0 / no source id), the measured far-right-jack finding, the attended source-port experiment plan and the decision gate (per-port CPU-copy delivery vs native L2/VLAN bridge), and the bench-only probe image `a91ebcf0` / patch 066 | experiment plan + prepared image; **experiment run 2026-11-21: negative** (no source-port id in CPU-copy completions - native L2/VLAN bridge required) |
+| [incoming/multi-port-probe/](incoming/multi-port-probe/) | retained bench-only record: patch 066 (`luofu_switch.mirror_src_mask`) and its note; not part of the release line or upstream series | bench instrument (GPL-2.0-only patch); experiment run 2026-11-21, **negative**; retained as artifact |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
 | [SELECTOR-0x21.md](SELECTOR-0x21.md) | reconstruction of the stock A/B boot-selector contract (env `bootflag`, SYSCTRL record cell, the project's `0x21` bench marker) | RE specification, host-only |
 | [TRAILER-FORMAT.md](TRAILER-FORMAT.md) | byte-level format of the FIP trailer the stock loader requires (base DTB, 96-byte descriptor, gate magic, DTBO match rule) plus **section 11: the base-DTB totalsize must be 8-byte aligned** for the `bootfip` gate-word load (the `pad-dtb` build requirement) - curated copy; canonical copy sits next to the tool | decoded format, structurally validated + one measured unaligned-load failure |

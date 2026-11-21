@@ -23,9 +23,11 @@ on this board, Wi-Fi is unsupported on the 6.18 target, and only one Ethernet ja
 the CPU-copy workaround (multi-port is a separate project). A **documentation-only upstream
 submission package** (RFC form, artifact checklist, cover-email draft, explicit no-Tested-by
 policy, file manifest) is included for owner review; **nothing has been submitted anywhere**.
-A **bench-only multi-port source-port probe patch (066)** and a prepared probe image
-(**a91ebcf0**) are retained as an experiment record - neither is part of the release line or the
-upstream series, and the probe has not been run.
+A **bench-only multi-port source-port probe patch (066)** and probe image (**a91ebcf0**) are
+retained as an experiment record - neither is part of the release line or the upstream series.
+The experiment was run on 2026-11-21 and was **negative**: the CPU-copy completions carry no
+source-port identity (identical descriptors across jacks), so multi-port LAN/WAN requires the
+native L2/VLAN hardware bridge and the single-port workaround stands.
 
 ## What is in this repository
 
@@ -47,8 +49,9 @@ upstream series, and the probe has not been run.
   has been sent. The manifest in this repository was regenerated against the curated tree.
 - The **bench-only multi-port probe record** (`docs/incoming/multi-port-probe/`): patch 066
   (a draft kernel diff adding `luofu_switch.mirror_src_mask`) and the prepared probe image
-  `a91ebcf0`. It is not part of the release line or review form; the experiment plan and
-  decision gate are in `docs/MULTI-PORT-PLAN.md`.
+  `a91ebcf0`. It is not part of the release line or review form; the experiment plan, the
+  **negative measured result** (no source-port id in the CPU-copy completions; native L2/VLAN
+  bridge required) and the decision gate are in `docs/MULTI-PORT-PLAN.md`.
 - Our own tooling: FIP image-slicing/trailer tools, the base-DTB `pad-dtb` build guard, image
   builders and mocked host tests, plus the verified bench **stock-telnet installer**
   (`tools/stock-telnet-install.sh` + `tools/telnet-exec.py`; fail-closed, inactive-pair
@@ -163,7 +166,9 @@ HiSilicon.
   claimed. Do not present target-image bench evidence as an upstream Test-by.
 - **The multi-port probe patch is bench-only.** Image `a91ebcf0` was built for an attended
   experiment (built-in `luofu_pie.rxdiag=1` / `luofu_switch.mirror_src_mask=0x1e00` tokens);
-  it is not a release artifact, and the experiment has not been run.
+  it is not a release artifact. The experiment was run on 2026-11-21 and was **negative** (the
+  CPU-copy completions are field-for-field identical across jacks / carry no source-port id);
+  multi-port LAN/WAN therefore requires the native L2/VLAN hardware bridge.
 - **An active-DTS change must be boot-tested.** The superseded aggressive DTS cleanup (image
   `6f19c6d6`) passed every host check but did not boot (MTD partition registration stalled,
   U-Boot watchdog reset, stock fallback); it was reverted. The accepted conservative cleanup

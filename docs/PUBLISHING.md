@@ -37,6 +37,10 @@ material was sanitized, and how to verify the publication claims.
   **documentation-only upstream submission package** (`submission/`), the bench-only multi-port
   source-port probe patch 066 + prepared probe image `a91ebcf0`, and the final validation
   records - see the eighth-sync section below.
+  The **ninth sync (2026-11-21)** records the **measured result of the multi-port source-port
+  experiment: NEGATIVE** (`opensource` submodule commit `117ea55`, notebook parent
+  `75a4d8c`) - CPU-copy completions carry no source-port identity, so multi-port LAN/WAN
+  requires the native L2/VLAN hardware bridge - see the ninth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -92,7 +96,7 @@ material was sanitized, and how to verify the publication claims.
 | `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, **the stock board_id=3 LED/keys nodes and the conservative comment-only cleanup** (active content byte-identical to the known-good DTB), the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
 | `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `8ee4b8e71...`, refreshed with the board LED/keys nodes; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs, plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the retained optional deltas) |
 | `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription; the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
-| `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the prepared probe image `a91ebcf0` is documented in the multi-port plan. The experiment has not been run |
+| `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the probe image `a91ebcf0` is documented in the multi-port plan. The experiment was run on 2026-11-21 and was **negative**; native L2/VLAN bridge required |
 | `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, inactive-pair only; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
@@ -365,7 +369,7 @@ package + final validation records). It is the current pin.
 
 | Path | Change |
 | --- | --- |
-| `docs/MULTI-PORT-PLAN.md` | updated with the **prepared experiment image `a91ebcf0`** (save copy sha256 `a91ebcf04892ac9d5128c6ae5144eb9d6e09674b98938aac0aa8af289b3bc653`): the known-good `7421bb7a` userspace/kernel plus the source-mask probe patch and built-in probe tokens `luofu_pie.rxdiag=1 luofu_switch.mirror_src_mask=0x1e00`; run plan and restore step included. Bench-only, not run; the cable is on a non-eth2 jack |
+| `docs/MULTI-PORT-PLAN.md` | updated with the **prepared experiment image `a91ebcf0`** (save copy sha256 `a91ebcf04892ac9d5128c6ae5144eb9d6e09674b98938aac0aa8af289b3bc653`): the known-good `7421bb7a` userspace/kernel plus the source-mask probe patch and built-in probe tokens `luofu_pie.rxdiag=1 luofu_switch.mirror_src_mask=0x1e00`; run plan and restore step included. Bench-only. The experiment was subsequently **run and was negative** (see the ninth sync): the CPU-copy completions carry no source-port identity |
 | `docs/incoming/multi-port-probe/` | **new retained bench-only record**: `066-net-lsw-mirror-src-mask.patch` (adds the `luofu_switch.mirror_src_mask` module parameter, default `0x800`; GPL-2.0-only kernel diff) plus a curated README. Not part of the release line, review form or submission package |
 | `upstream/series-6.18/submission/` | **new documentation-only upstream submission package**: `README.md` (status, artifact checklist, reproduction commands, six merge-intent blockers, out-of-scope list), `cover-email-draft.md` (one-page v3 RFC draft, **not sent**), `TESTED-BY-POLICY.md` (no upstream Tested-by/Reviewed-by; target-image bench evidence only) and `MANIFEST.sha256` (102 entries, regenerated against this curated tree; `sha256sum -c` passes 102/102) |
 | `upstream/series-6.18/{04-validation,05-release-line,07-dts-upstream-bindings,README}.md`, `validation/git-log.txt` | final records: `04-validation.md` section 24 (submission-package validation run: release line 51/51, DTB 13,041 B `49fe5c47...`, pad 13,048 B `402e4f71...`, review form 26/26, checkpatch 0/58, hash checks 89/89), conservative-final references (`7ae18f2`), the six upstream blockers, and the README pointer to the submission package; the review-form git log was regenerated |
@@ -386,9 +390,10 @@ subscription, secret or Tested-by claim.
 - The upstream path now has a **reviewable dry-run package**, but **nothing has been submitted**
   and no third-party review/Tested-by exists; the six merge-intent blockers are recorded in the
   package and in `07-dts-upstream-bindings.md`.
-- The multi-port work has a **prepared experiment** (image `a91ebcf0` + patch 066), but the
-  probe has **not been run**; the cable is on a non-eth2 jack, so the run is blocked until it is
-  moved back. No multi-port claim is made.
+- The multi-port work has a **prepared experiment** (image `a91ebcf0` + patch 066); it was
+  subsequently **run and was negative** (no source-port identity in the CPU-copy completions) -
+  see the ninth sync. No multi-port claim is made; the native L2/VLAN bridge is the required
+  path.
 - Everything else (known-good `7421bb7a` baseline, verified install path, conservative DTS,
   thermal/Wi-Fi non-support, single-jack LAN workaround) is unchanged from the seventh sync.
 
@@ -406,6 +411,36 @@ subscription, secret or Tested-by claim.
 - bench tools: `bash -n` / `py_compile` pass and the fail-closed `--apply` gates are intact;
 - repository hygiene: no binary objects in the tree or history, no credentials/keys, no per-unit
   identifiers, no host paths; link checks clean; working tree clean.
+
+## The ninth sync (2026-11-21): the multi-port source-port experiment result (negative)
+
+Source pin: **`117ea55`** (notebook parent `75a4d8c`), the commit that records the
+multi-port source-port experiment result. The only changes are two documentation files; no code,
+DTS, series, tooling or manifest entries change.
+
+| Path | Change |
+| --- | --- |
+| `docs/MULTI-PORT-PLAN.md` | **new section "Measured result of the source-port experiment"**: probe image `a91ebcf0` was installed (active stock pair untouched, selector `0x11` verified), the far-right LAN jack was exercised with the extended mirror mask (ports 9-12), and the captured descriptors are **field-for-field identical** to the eth2 baseline - `port=0`, `vport=0`, only descriptor words 0/1 populated, no source-port field. The mirror mask does cover the other jacks, but the CPU cannot tell them apart. Conclusion: CPU-copy multi-port is **not feasible**; the native L2/VLAN hardware bridge (LSW-SPEC) is required; do not fake port identity by MAC heuristics. The board was restored to known-good `7421bb7a` |
+| `target-skeleton/RELEASE-NOTES.md` | **new section "Multi-port source-port experiment: negative"**: the single-port CPU-copy bench workaround stands; multi-port LAN/WAN requires the native L2/VLAN bridge (separate project) |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | the multi-port status is updated from prepared/not-run to the measured **negative** result and the native-bridge conclusion |
+
+### What this sync changes about the repository's honest status
+
+The multi-port question is now **closed for the CPU-copy path**: the experiment was run on the
+unit and the CPU-copy completions carry no source-port/vport identifier (identical descriptors
+across jacks), so the CPU cannot distinguish LAN jacks. The repository therefore records
+multi-port LAN/WAN as requiring the **native L2/VLAN hardware bridge** (separate project,
+`docs/LSW-SPEC.md`), not the single-port bench workaround; the verified bench topology remains
+host on the eth2 jack. No code, image or DTS change is implied by this sync.
+
+### Checks run for this sync (2026-11-21)
+
+- documentation-only sync: no code/DTS/series/tooling change, so the release-line validation,
+  `sha256sum -c validation/sha256sums.txt` (89/89) and the submission manifest (102/102) are
+  unchanged from the eighth sync and were re-verified;
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 patches, no drift);
+- link checks clean (only the documented notebook-only links unresolved); hygiene scans clean
+  (no binaries/secrets/per-unit identifiers/host paths); the pushed-remote fresh clone verified.
 
 ## What is excluded (and why)
 
@@ -575,7 +610,8 @@ design). The intermediate host-only full-series rebuilds (001-023 with the persi
 nvmem follow-ups) were never flashed or booted. No install image is published, `platform_do_upgrade`
 has never run on a device, and the bench installer in `tools/` is published for evidence, not
 as a general install/recovery guide. The **upstream submission package** is a documentation-only
-dry run - **nothing sent, no Tested-by** - and the **multi-port probe** (patch 066 / image
-`a91ebcf0`) is a bench-only instrument that has not been run; the repository remains curated
+dry run - **nothing sent, no Tested-by** - and the **multi-port source-port experiment** (patch 066 / image
+`a91ebcf0`) was run and was **negative** - the CPU-copy path cannot identify jacks, so
+multi-port LAN/WAN requires the native L2/VLAN hardware bridge; the repository remains curated
 research material, not a firmware release. See the safety and legal section of [`../README.md`](../README.md) and
 [`../NOTICE.md`](../NOTICE.md).
