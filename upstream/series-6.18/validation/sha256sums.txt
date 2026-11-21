@@ -2,7 +2,7 @@
 # Regenerated on the author host on 2026-11-21 after the release-line cleanup
 # (052/053 regeneration, 042/059/060/061 renumbering to 062-065, DTS-0001).
 # Paths are relative to the series-6.18 directory.  Verify with:
-#   cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt
+#   cd opensource/upstream/series-6.18 && sha256sum -c validation/sha256sums.txt
 
 ## series/ (upstream review form, 26 patches)
 c5eef73ce928b2e9f1bd0f397c3164d6b7a108fc930ccf7e537b184c81eee08b  series/0001-arm-mach-hisilicon-luofu.patch
@@ -32,7 +32,7 @@ d20a2e676ce148396d7d71267fce120c06e983884aca7ff84b20b1f5e3815497  series/0021-ne
 507ce72495c09d104b0ad63ebac44ecf20a94a36e25f81b7739802f8fa005a00  series/0025-net-lsw-egress-luofu.patch
 099d7253f50c50ad18bce642a2d52fca7af37c9b1c7ac356038eafe3c7aa26df  series/0026-net-gmac-bdinfo-mac-nvmem.patch
 
-## source tree patches (target-skeleton/target/linux/hisilicon/patches-6.18/)
+## source tree patches (opensource/target-skeleton/target/linux/hisilicon/patches-6.18/)
 #  001-058 plus the renumbered diagnostics 062-065 (62 files; no duplicate numbers)
 996bf896e6191d24e6b1e8e4456112e7ce985963e1d40cf37cb5ff8f10688d1d  ../../target-skeleton/target/linux/hisilicon/patches-6.18/001-arm-mach-hisilicon-luofu.patch
 278bb1a01427b31dc79d02b534e4cc4fae9e418698dad16afeea26a40af95796  ../../target-skeleton/target/linux/hisilicon/patches-6.18/002-arm-kconfig-textofs.patch
@@ -98,7 +98,7 @@ e1d9dc5f6c1e64dcd473c26b6824e7c60822e18e424781388a03b82bcfa53938  ../../target-s
 5e254fe4cea0b64d47aa0fc3c4ddf7c82f935b76d92fd8f311ba9b219b52ddd8  ../../target-skeleton/target/linux/hisilicon/patches-6.18/065-arm-hisilicon-smp-trampoline.patch
 
 ## upstream DTS series entry (DTS-0001; companion to the kernel patch 0018)
-072d0b8b63d096939d17caca5f5f24c88b58d47f0768aa593f692c1dcdd78bf9  dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch
+e9c9ed58b1a198bad16283d048a0498ee02297a8e1645f194df3f713c5d236b1  dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch
 
 ## kernel tarball used for validation (not stored in this repo)
 # sha256 3c2f44ef6acc021a7ad444d9a2e6ec1ef488ff09368793d0004a6080f69d621e  linux-6.18.60.tar.xz
