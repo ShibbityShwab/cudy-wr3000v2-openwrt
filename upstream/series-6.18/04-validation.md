@@ -1029,3 +1029,174 @@ No hardware was touched and no kernel build was run.
 
 Logs: `validation/release-line/` (release line, L0, target DTS, DTS-0001,
 pad-dtb) and `validation/` (review form).
+
+
+## 22. 2026-11-21 DTS bindings cleanup re-validation
+
+> **SUPERSEDED BY A HARDWARE REGRESSION (2026-11-21):** the active-DTS cleanup
+> recorded in this section was **not hardware-validated** and did not boot on
+> the unit (image 6f19c6d6; UART log sha256 15dc3188...; see
+> `07-dts-upstream-bindings.md` section 1).  It was reverted; the accepted
+> cleanup is the conservative comment-only one in section 23.
+
+The board DTS was cleaned for merge-readiness (submission-oriented comments,
+standard node names/unit addresses/aliases, removed experiment prose and
+unused vendor blocks).  The single source of truth is
+`target-skeleton/dts/luofu-r116.dts` (was 1,329 lines, now 712); no
+measured register/interrupt/clock/partition value changed (property-multiset
+comparison of the old and new DTBs shows only the intentional removals).  Every
+removal and rename is recorded in `07-dts-upstream-bindings.md`.
+
+**Changes covered:**
+
+- removed: SP804 timer (unused; TWD is the timer), LSW WOE node (no
+  binding/driver), thermal sensor + zones (hardware temp reads 0, vendor DT
+  disables the sensor), Wi-Fi PCIe child nodes (vendor-only), `serial1`
+  alias, redundant `status = "okay"` properties, the old file header/TODO/
+  bench prose;
+- renamed: gpio-keys container/children (`gpio-keys`, `key-reset`,
+  `key-wps`), gpio-leds children (`led-0`..`led-5`, labels
+  unchanged), fixed clocks (`clock-*`), TWD node (`timer@...`), PIE
+  node (`packet-engine@...`), switch node unit address
+  (`ethernet-switch@80000000`, matching the binding's queue-first
+  `reg-names` order), model shortened, `cudy,wr3000-v2` appended to
+  the compatible (kept last so the target's board_name/sysupgrade metadata is
+  unchanged; upstream ordering remains a documented blocker);
+- normalised: IRQ specifiers to GIC macros, GPIO flags/keys to standard macros;
+  the measured TWD PPI encoding is preserved;
+- binding review: required properties/reg-names/clock/reset/interrupt names
+  were checked manually against the YAMLs added by the series and the standard
+  6.18 bindings.  No dtschema/dt-validate/yamllint tooling is available in this
+  checkout, so `make dtbs_check` / `dt_binding_check` could not be
+  run; dtc with the `unit_address_vs_reg`, `simple_bus_reg`,
+  `avoid_unnecessary_addr_size` and
+  `unique_unit_address_if_enabled` warning sets produced **0 warnings**.
+
+**Results (2026-11-21, pristine 6.18.60 sha256 `3c2f44ef...`):**
+
+- **L1 release line (51 patches):** patch(1) 51/51 RC=0, 146 file events,
+  3 offset hunks, **0 fuzz, 0 rejects**; strict `git apply`: **all 51
+  patches apply without fuzz**;
+- **cleaned target DTS:** cpp+dtc RC=0, 0 stderr, DTB **11,702 B** sha256
+  `160fad93e0d0556b8959a87efa8b5f05623e7488b632341f871d4e7a520c21b8`;
+  totalsize unaligned, pad-dtb exercised on a copy -> **11,704 B** sha256
+  `de2ccd5f678a69e1b925567cbd5c44900c567b679bef965f53faa3e00c2aa84f`,
+  loader hand-off contract preserved; `fdtget` confirms
+  `/aliases/console = /serial@1010f000`,
+  `compatible = "hsan,flashinfo_reserved"`,
+  `reg = <0x80600000 0x4000>`, `atag-offset = <0x1000>` and
+  `/cpus/enable-method = "hisilicon,luofu-smp"`;
+- **DTS-0001:** regenerated from the cleaned single source, sha256
+  `d8afee63447d6205566e935fd8ec1beeb103e1eada43a67f9f5a129558df59f6`;
+  applies to the L1 tree RC=0; added board DTS byte-identical to the target
+  DTS; same 11,702 B DTB/hash, contract and pad-step result;
+- **upstream review form (26 patches):** patch(1) 26/26 RC=0 (3 offset hunks,
+  0 fuzz), `git am` 26/26 RC=0, identical trees; checkpatch default and
+  `--strict`: **0 errors, 58 warnings**;
+- release-line manifest/checksums unchanged for the source patches
+  (51 include / 11 exclude; manifest sha256 `4da8b960...`); the
+  DTS-series entry in `validation/sha256sums.txt` was refreshed to the new
+  DTS-0001 hash (89 entries, `sha256sum -c` passes).
+
+The remaining submission blockers (flashinfo compatible binding, v6.19 nvmem
+cells on a 6.18 baseline, switch binding reg order, TWD IRQ flags, cudy
+compatible ordering/target metadata, draft in-series drivers) are listed in
+`07-dts-upstream-bindings.md` section 6.
+
+
+## 23. 2026-11-21 conservative DTS cleanup after the hardware regression
+
+The first active-DTS cleanup (section 22, commit 538377c) produced image
+6f19c6d6, which did **not boot** on the unit: the kernel came up with SMP and
+consumed the loader hand-off, but MTD partition registration stalled
+(17 partition prints stretched from 0.90 s to 24.55 s with growing delays),
+luofu-reboot/luofu-wdt never probed, and the unit reset at 24.55 s (U-Boot
+watchdog) and fell back to stock pair A.  Evidence:
+`build/evidence-bench-gates/2026-11-21-cleaned-dts-regression.log`,
+sha256 `15dc318865ddc908e32ba8fa6d09d6a3c0f357d86a1d801b623af3bf17f21918`.
+The known-good image 7421bb7a (pre-clean DTS) shows partition scan
+0.93-1.16 s, luofu-reboot 2.28 s, luofu-wdt 2.30 s, ubi attach 2.68 s, init
+3.01 s.  Host checks (apply, dtc, contract, pad, DTS-0001 identity) are
+therefore necessary but **not sufficient**.
+
+**Conservative cleanup (commit `7ae18f2`, current final):** starting from
+the pre-clean, hardware-verified DTS
+(1,329 lines), only comments were removed (the long file header and all
+per-node prose); every active node name, unit address, property order/value,
+reg order, status, label, phandle, child name and alias is unchanged.  New
+file: **691 lines**, sha256
+`9d2d39db8fe5d28aaf7ede5f6350cbdf496b53148d44a8f3a22603d43c9406bc`.
+**Proof:** the compiled DTB is byte-identical to the known-good DTB:
+**13,041 B** sha256
+`49fe5c471786862e1057409ab920f866312e5f93e77585179dc20cdaebfcf536`;
+totalsize unaligned, `pad-dtb.py` pads to **13,048 B** sha256
+`402e4f71d12fca46e1d940c7b60a123e3ce1a734acec17b67bbf7ae338d91e03` and
+the loader hand-off contract is preserved.  Every active change from the
+superseded cleanup is now listed as a separate optional delta that must be
+hardware-tested before use (`07-dts-upstream-bindings.md` section 3).
+
+**Results (2026-11-21, pristine 6.18.60 sha256 `3c2f44ef...`):**
+
+- **DTS-0001:** regenerated from the conservative single source, sha256
+  `072d0b8b63d096939d17caca5f5f24c88b58d47f0768aa593f692c1dcdd78bf9`
+  (704 lines); applies to the L1 tree RC=0; added board DTS byte-identical to
+  the target DTS; same 13,041 B DTB/hash, contract and pad-step result;
+- **L1 release line (51 patches):** patch(1) 51/51 RC=0, 146 file events,
+  3 offset hunks, **0 fuzz, 0 rejects**; strict `git apply`: all 51
+  patches apply without fuzz;
+- **target DTS contract:** cpp+dtc RC=0, 0 stderr; contract nodes/enable-method
+  present; DTB byte-identical to the known-good devicetree;
+- **upstream review form (26 patches):** patch(1) 26/26 RC=0 (3 offset hunks,
+  0 fuzz), `git am` 26/26 RC=0, identical trees; checkpatch default and
+  `--strict`: **0 errors, 58 warnings**;
+- `gen-series.py --check` clean; `validation/sha256sums.txt` 89
+  entries, `sha256sum -c` passes; manifest 51 include / 11 exclude,
+  sha256 `4da8b960c3ad83939e0766a86969e8de2737a5b6eb79c91e80d28905f7030fd0`.
+
+**Hardware boot-test of the rebuilt image is still required** after this
+change; the byte-identical DTB is strong evidence, not a substitute for one
+attended boot.
+
+
+## 24. 2026-11-21 submission-package validation run (final)
+
+Fresh host-only run on the current tree for the submission package
+(`submission/`).  Commands: `tools/check-release-line.sh --use-tree
+<pristine> <workdir>`, `tools/run-validation.sh --use-tree <pristine>
+<workdir>`, `python3 tools/gen-series.py --check` and
+`sha256sum -c validation/sha256sums.txt`.  No hardware and no kernel build
+was involved.
+
+**Results:**
+
+- **release line (final run):** 51/51 patch(1) RC=0, 146 file events,
+  3 offset hunks, **0 fuzz, 0 rejects**; strict `git apply`: all 51 apply
+  without fuzz; board DTS compile cpp+dtc RC=0, 0 stderr; target DTB
+  **13,041 B** sha256
+  `49fe5c471786862e1057409ab920f866312e5f93e77585179dc20cdaebfcf536`;
+  totalsize unaligned, `pad-dtb.py` pads to **13,048 B** sha256
+  `402e4f71d12fca46e1d940c7b60a123e3ce1a734acec17b67bbf7ae338d91e03` and
+  the loader hand-off contract is preserved; DTS-0001 applies, is
+  byte-identical to the single source and compiles to the same DTB; **PASS**.
+- **upstream review form (final run):** 26/26 patch(1) RC=0 (3 offset hunks,
+  0 fuzz), `git am` 26/26 RC=0, resulting trees identical; checkpatch
+  default and `--strict`: **0 errors, 58 warnings**.
+- `gen-series.py --check`: clean (26 patches up to date);
+  `validation/sha256sums.txt`: 89 entries, `sha256sum -c` passes
+  89/89.
+- **submission package:** `submission/README.md` (artifact checklist,
+  status, commands, blockers), `submission/cover-email-draft.md` (one-page
+  v3 RFC draft, not sent), `submission/TESTED-BY-POLICY.md` (no upstream
+  Tested-by; target-image evidence only) and `submission/MANIFEST.sha256`
+  (sha256 of every package artifact, paths relative to `submission/`,
+  verified with `sha256sum -c` inside the package).  The manifest sha256
+  itself is recorded in the submission commit and the hand-off report; nothing
+  was submitted to any mailing list, account or web service.
+- **current conservative devicetree final:** commit `7ae18f2` (DTS 691
+  lines sha256 `9d2d39db...`; DTS-0001 sha256 `072d0b8b...`;
+  compiled DTB byte-identical to the known-good DTB).  The superseded active
+  cleanup `538377c` is recorded as regressed in section 22 and is not
+  current.
+- Host checks are necessary but **not sufficient**: the rebuilt image must be
+  boot-tested on the unit after any active-DTS change before it is treated as
+  hardware-validated.
