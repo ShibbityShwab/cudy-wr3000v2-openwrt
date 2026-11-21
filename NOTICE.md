@@ -27,12 +27,19 @@ A **bench-only multi-port source-port probe patch (066)** and probe image (**a91
 retained as an experiment record - neither is part of the release line or the upstream series.
 The experiment was run on 2026-11-21 and was **negative**: the CPU-copy completions carry no
 source-port identity (identical descriptors across jacks), so multi-port LAN/WAN requires the
-native L2/VLAN hardware bridge and the single-port workaround stands. The devicetree final also
-adopts the **boot-tested TWD level-high delta** (upstream blocker 6 closed; boot-tested image
-`f6685b80`): DTS sha256 `13427d8e...` (700 lines), DTS-0001 `e9c9ed58...` (713 lines), DTB
-`4fde76df...` / pad `4b50de73...`; **five upstream blockers remain**. The owner-only legacy
-history-purge runbook is prepared/dry-run validated **notebook-side** (not published here) and
-`PUBLISH-READINESS.md` item 1 remains unchecked - no history rewrite or push has run.
+native L2/VLAN hardware bridge and the single-port workaround stands. The devicetree final now
+adopts all four **boot-tested deltas** - TWD level-high, MAC-nvmem removal, switch MMIO-first
+`reg`/`reg-names` and `cudy,wr3000-v2` first compatible (image **`c3ef2a50`**; DTS sha256
+`9d96ac31...`, 681 lines; DTS-0001 `c029fd44...`, 694 lines; DTB `a0af2899...` / pad
+`01b74561...`; intermediate TWD baseline `f6685b80`; original verified baseline `7421bb7a`). **Two
+upstream blockers remain** (draft drivers/YAMLs incl. the in-series binding reorder, and the
+flashinfo binding). The **E0-a native-delivery experiment was negative** (mirror off: 2 CPUs boot,
+native completions arrive on port 11 but every frame is `status=37 err=1` and IP is dead), so the
+CPU-copy mirror workaround remains required; the native-forwarding plan and
+read-only/print-only instruments are retained under `docs/incoming/lsw-forwarding/`. The
+owner-only legacy history-purge runbook is prepared/dry-run validated **notebook-side** (not
+published here) and `PUBLISH-READINESS.md` item 1 remains unchecked - no history rewrite or push
+has run.
 
 ## What is in this repository
 
@@ -53,9 +60,10 @@ history-purge runbook is prepared/dry-run validated **notebook-side** (not publi
   tooling and validation logs. No transport, account or list subscription is included; nothing
   has been sent. The manifest in this repository was regenerated against the curated tree.
 - The **retained upstream blocker-reduction drafts** (`docs/incoming/upstream-blockers/`):
-  documentation + patch drafts only (flashinfo binding, MAC-nvmem removal, switch MMIO-first
-  reorder, compatible ordering, driver/YAML review); blocker 6 (TWD) is closed; they are not the
-  release series, not applied, and each active delta needs its own hardware boot-test.
+  documentation + patch drafts only for the **two remaining blockers** (draft drivers/YAMLs incl.
+  the in-series switch-binding MMIO-first reorder, and the flashinfo binding); the four active-DTS
+  deltas are closed by boot-tests (TWD image f6685b80; MAC/switch/compatible image c3ef2a50).
+  They are not the release series and not applied; any new active delta needs its own boot-test.
 - The **bench-only multi-port probe record** (`docs/incoming/multi-port-probe/`): patch 066
   (a draft kernel diff adding `luofu_switch.mirror_src_mask`) and the prepared probe image
   `a91ebcf0`. It is not part of the release line or review form; the experiment plan, the
@@ -65,15 +73,19 @@ history-purge runbook is prepared/dry-run validated **notebook-side** (not publi
   builders and mocked host tests, plus the verified bench **stock-telnet installer**
   (`tools/stock-telnet-install.sh` + `tools/telnet-exec.py`; fail-closed, inactive-pair
   only, published for evidence - see `tools/README.md`).
-- Our own kernel code (as patches): the 62 L0 patch files of the Linux 6.18 target stack
-  (`001-058` + `062-065`), of which the **51 include patches form the release line** and the 11
+- The **retained native L2/VLAN forwarding plan** (`docs/incoming/lsw-forwarding/`): the
+  implementation plan, the minimal-experiment record (including the negative E0-a result) and
+  three instruments - device read-only capture, host read-only diff, and a host write-PLANNER
+  that defaults to print-only and executes only with explicit attended/recovery flags. Planning
+  and instrumentation only; nothing there has been run as part of this repository.
+- Our own kernel code (as patches): the 62 L0 patch files of the Linux 6.18 target stack  (`001-058` + `062-065`), of which the **51 include patches form the release line** and the 11
   bench-only SMP diagnostics are excluded (`upstream/series-6.18/release-line/`); the 26-patch
   upstream review form (`001-026`: 19 merge-intent patches plus the seven fail-closed data-path
   drafts `020`-`026`, marked do-not-merge); the board DTS with the loader hand-off contract,
-  the stock board_id=3 LED/keys nodes, the **conservative comment-only cleanup plus the
-  boot-tested TWD level-high delta** (DTS 700 lines `13427d8e...`; hardware baseline image
-  `f6685b80`) and the DTS-0001 companion entry (`e9c9ed58...`, 713 lines); and the schematic
-  OpenWrt target/base-files files. The release-line hashes for patches 054/056 were refreshed
+  the stock board_id=3 LED/keys nodes, the **conservative comment-only cleanup plus all four
+  boot-tested deltas** (DTS 681 lines `9d96ac31...`; hardware baseline image `c3ef2a50`) and the
+  DTS-0001 companion entry (`c029fd44...`, 694 lines); and the schematic OpenWrt
+  target/base-files files. The release-line hashes for patches 054/056 were refreshed
   after the `dev_dbg` quieting (manifest sha256 `4da8b960...`). The retained
   [DTS cleanup record](upstream/series-6.18/07-dts-upstream-bindings.md) documents the boot
   regression of the superseded active cleanup, the TWD adoption, and the five remaining blockers.
@@ -185,6 +197,11 @@ HiSilicon.
   **not been executed**; `PUBLISH-READINESS.md` item 1 stays unchecked until a purge runs and a
   fresh clone of the public remote verifies clean. No force-push or cache purge has been done.
   This curated repository is unaffected (fresh history, zero binary blobs).
+- **The E0-a result stands: the CPU-copy mirror is still required.** With the mirror disabled the
+  unit boots 2 CPUs and native-path completions arrive on port 11, but every frame is
+  `status=37 err=1` and IP is dead (the stock CPU-punt/IFC/tagact classification is not in our
+  init). Native forwarding is a planned separate project; the retained plan's write-planner
+  defaults to print-only and can only execute with explicit attended/recovery flags.
 - **An active-DTS change must be boot-tested.** The superseded aggressive DTS cleanup (image
   `6f19c6d6`) passed every host check but did not boot (MTD partition registration stalled,
   U-Boot watchdog reset, stock fallback); it was reverted. The accepted conservative cleanup

@@ -49,6 +49,13 @@ material was sanitized, and how to verify the publication claims.
   delta adopted in the DTS, refreshed DTS-0001/release validation/submission artifacts (five
   remaining blockers), the retained upstream blocker-reduction drafts, and the notebook-side
   owner-only history-purge runbook (not published) - see the eleventh-sync section below.
+  The **twelfth sync (2026-11-21)** moves it to the **final-delta adoption**: `opensource`
+  submodule commit `691254f` (notebook parent `bd4ab3e`) - the MAC-nvmem removal, switch
+  MMIO-first `reg`/`reg-names` and `cudy,wr3000-v2`-first compatible deltas were boot-tested
+  on image `c3ef2a50` and adopted (DTS 681 lines `9d96ac31...`; DTS-0001 `c029fd44...`;
+  DTB `a0af2899...` / pad `01b74561...`), the upstream artifacts/submission were refreshed
+  (**two remaining blockers**), and the native-forwarding plan package (incl. the negative E0-a
+  result) was retained - see the twelfth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -102,9 +109,10 @@ material was sanitized, and how to verify the publication claims.
 | `README.md` | showcase: hardware, honest status table, series summary, target/image and A/B path, safety/legal |
 | `docs/` (16 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report, the trailer-format doc including the base-DTB alignment section, the multi-port plan (incl. the prepared probe image), and the validation records through the 2026-11-21 board-feature/quiet-image, DTS/install and submission-package follow-up passes |
 | `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, **the stock board_id=3 LED/keys nodes and the conservative comment-only cleanup** (active content byte-identical to the known-good DTB), the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
-| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `8ee4b8e71...`, refreshed with the board LED/keys nodes; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs, plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the retained optional deltas) |
-| `docs/incoming/upstream-blockers/` | **retained upstream blocker-reduction drafts** for the five remaining blockers (TWD/blocker 6 closed): documentation + patch drafts only (flashinfo binding, 6.18 MAC provisioning, switch MMIO-first reorder, compatible ordering/OpenWrt metadata, driver/YAML review). Text-only; not the release series, not applied; each active delta needs its own hardware boot-test |
-| `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription. It now reflects the TWD adoption (five remaining blockers, blocker 6 closed) and the current artifact hashes; the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
+| `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `c029fd44...`, final boot-tested deltas; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs, plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the retained optional deltas) |
+| `docs/incoming/upstream-blockers/` | **retained upstream blocker-reduction drafts** for the **two remaining** blockers (all four active-DTS deltas - TWD, 6.18 MAC provisioning, switch MMIO-first reorder, cudy-first compatible - are closed by boot-tests on images f6685b80/c3ef2a50): draft drivers/YAMLs incl. the in-series binding reorder, and the flashinfo binding. Text-only; not the release series, not applied; any new active delta needs its own hardware boot-test |
+| `docs/incoming/lsw-forwarding/` | **retained native L2/VLAN forwarding plan**: implementation plan, minimal-experiment record (incl. the **negative E0-a result** - mirror-off native completions are error-flagged and IP is dead, so the CPU-copy mirror remains required) and three instruments: device read-only capture, host read-only diff, and a host write-planner that defaults to print-only and executes only with explicit attended/recovery flags. Planning/instrumentation only; nothing executed by this repository |
+| `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription. It now reflects the final-delta adoption (**two remaining blockers**; all four active-DTS deltas boot-tested) and the current artifact hashes; the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
 | `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the probe image `a91ebcf0` is documented in the multi-port plan. The experiment was run on 2026-11-21 and was **negative**; native L2/VLAN bridge required |
 | `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, inactive-pair only; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
@@ -298,7 +306,11 @@ native switch forwarding is a separate project, and nothing is upstream-reviewed
   sha256 `49fe5c47...` with the loader hand-off contract, the unaligned totalsize triggers
   `pad-dtb.py` on a copy (13,048 B, contract preserved), and DTS-0001 applies with its board
   DTS byte-identical to the target DTS;
-- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **82/82**;
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**; the `test-mac-nvmem.sh`
+  harness reports **64/82** - its 18 failures are the obsolete raw-DTS nvmem-wiring assertions
+  for the cells removed by the adopted final DTS (6.18 MAC provisioning is the userspace/vendor
+  path, boot-tested on image c3ef2a50); the notebook-side test update is a remaining follow-up,
+  not a target regression;
 - `pad-dtb.py` guard smoke test on a copy of the compiled DTB (pads, folds totalsize, refuses a
   non-FDT / size-mismatch input);
 - repository hygiene: no binary objects in the tree or history, no credentials/keys, no
@@ -523,6 +535,77 @@ in tree/history, no host paths and no real MACs.
   zero binary objects in tree/history, no credentials/keys, no per-unit identifiers, no host
   paths; fresh clone of the pushed remote verified.
 
+## The twelfth sync (2026-11-21): final devicetree-delta adoption, two remaining blockers and the E0-a result
+
+Source pin: **`691254f`**, the notebook's `opensource` submodule after the final boot-tested-delta
+adoption (notebook parent `bd4ab3e`; commits: native-forwarding plan package, final deltas
+adopted after the c3ef2a50 boot-test, upstream artifacts regenerated). It is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/dts/luofu-r116.dts` | **final boot-tested deltas adopted**: MAC-nvmem cells removed (userspace/vendor MAC provisioning), switch `reg`/`reg-names` reordered MMIO-first (15 MMIO windows then the two DDR regions), root compatible now starts `cudy,wr3000-v2`, on top of the conservative cleanup + TWD level-high; DTS **681 lines** sha256 `9d96ac31...` |
+| `target-skeleton/target/linux/hisilicon/image/luofu.mk` | OpenWrt `SUPPORTED_DEVICES += cudy,wr3000-v2` added |
+| `upstream/series-6.18/` | **DTS-0001 regenerated** (sha256 `c029fd44...`, 694 lines); DTB **12,650 B sha256 `a0af2899...`**, padded **12,656 B sha256 `01b74561...`**; release-line validator PASS; 00/04/05/06/07/README refreshed: blockers 3/4/5 closed by the **c3ef2a50** boot-test (2 CPUs, `GIC-0 29 Level twd`, `board_name=cudy,wr3000-v2`, MACs ...:73/...:74, br-lan up, ping 15/15), **two blockers remain** (draft drivers/YAMLs incl. the in-series binding reorder, flashinfo binding), baselines now **c3ef2a50 current / f6685b80 previous / 7421bb7a original**; `validation/release-line/pad-dtb.log`, `summary.txt` and `sha256sums.txt` refreshed |
+| `upstream/series-6.18/submission/` | package README / TESTED-BY-POLICY / cover-email draft updated to the final-delta adoption and **two remaining blockers**; `MANIFEST.sha256` regenerated against this curated tree and verified **102/102** |
+| `docs/incoming/upstream-blockers/` | updated to the adopted state: the three active-DTS blockers are closed by the c3ef2a50 boot-test and only the two remaining drafts stay open; text-only, not applied |
+| `docs/incoming/lsw-forwarding/` | **new retained native L2/VLAN forwarding plan**: implementation plan (38 KB), minimal-experiment record (incl. the negative **E0-a** result), unknown/read list, a device read-only capture script, a host read-only diff script and a host write-*planner* that defaults to print-only and executes only with explicit attended/recovery flags. Planning/instrumentation only; the host NIC MAC was redacted; nothing was executed as part of this repository |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | final deltas, two remaining blockers, new baselines/hashes, E0-a result and the retained forwarding plan |
+
+### E0-a native-delivery experiment (negative; mirror workaround still required)
+
+Image **990c5cab** (adopted target DTS, cmdline `luofu_switch.cpu_mirror=0 luofu_pie.rxdiag=1
+luofu_pie.accepterr=1`) was installed on pair b and booted: the unit boots 2 CPUs, LEDs and
+`event0` are present, but there is **no usable IP path**. UART shows eth2 link down then up
+(1 Gbps), and repeated `pie-trace RXDIAG ch=0 port=11 len=60 status=37 err=1` - native-path
+completions **do** arrive on port 11 without the mirror, but every frame is error-flagged and
+dropped (the stock CPU-punt/IFC/tagact classification is not in our init). **Conclusion: the
+CPU-copy mirror workaround remains required**; the next step is the E0-b read-only stock-vs-ours
+classifier capture in the retained forwarding plan, then a W21 design. [V]
+
+### Curation rules applied to this sync
+
+Host paths sanitized to `~`; no vendor binaries, firmware blobs, credentials, keys or per-unit
+identifiers in the published tree. The retained forwarding plan/source scripts are text-only
+(non-executable in this repository) and contain no host paths; its one full host NIC MAC was
+redacted to the documentation prefix `02:00:00:xx:xx:xx`, and only truncated last octets (`...:73`/`...:74`)
+appear in the upstream validation prose. The submission `MANIFEST.sha256` was regenerated against
+this curated tree (7 entries differ due to curation) and verifies 102/102. The notebook-side
+hygiene fix (host paths -> `~`, per-unit MAC redaction) was re-verified against this repository:
+266 tracked files, zero binary blobs in tree/history, no host paths and no full MACs.
+
+### What this sync changes about the repository's honest status
+
+- **Upstream blockers 3, 4 and 5 are closed** by the c3ef2a50 hardware boot-test (MAC-nvmem
+  removal, switch MMIO-first order, cudy-first compatible + OpenWrt metadata), on top of the
+  earlier TWD closure: **two blockers remain** (draft drivers/YAMLs including the in-series
+  binding reorder, and the flashinfo binding). The current DTS-purpose hardware baseline is
+  **c3ef2a50** (previous f6685b80; original verified 7421bb7a).
+- The **native CPU-delivery path (E0-a) is not usable yet**: the mirror-off image boots but its
+  native completions are `status=37 err=1` and IP is dead, so the CPU-copy mirror workaround
+  remains the only working data path; native forwarding is a planned separate project with its
+  plan and read-only/print-only instruments retained.
+- The multi-port source-port result (negative), the install path, thermal/Wi-Fi non-support and
+  all earlier caveats are unchanged. **History-purge item remains OPEN**: the owner-only runbook
+  is prepared/dry-run validated notebook-side but not executed; `PUBLISH-READINESS.md` item 1
+  stays unchecked and the curated repositories are unaffected (fresh histories, no binaries).
+
+### Checks run for this sync (2026-11-21, /home workdirs)
+
+- `tools/check-release-line.sh <linux-6.18.60.tar.xz> /home/.../tmp-release-line-check` -
+  **PASS**: 51/51 include patches with `patch(1)` RC=0 (146 file events, 3 offset hunks, 0 fuzz,
+  0 rejects), strict `git apply` clean, target DTS cpp+dtc RC=0 producing DTB **12,650 B sha256
+  `a0af2899...`**, unaligned totalsize detected and `pad-dtb.py` pads to **12,656 B sha256
+  `01b74561...` with the loader hand-off contract preserved; **DTS-0001 `c029fd44...` applies
+  and its board DTS is byte-identical** to the target DTS;
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 patches, no drift);
+- `(cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt)` - **89/89 OK**;
+- `(cd upstream/series-6.18/submission && sha256sum -c MANIFEST.sha256)` - **102/102 OK**;
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **82/82**;
+- link checks clean (only the documented notebook-only links unresolved); repository hygiene:
+  zero binary objects in tree/history, no credentials/keys, no full MACs, no host paths;
+- fresh clone of the pushed remote verified (266 files, checksums/series/manifest and artifact
+  hashes match).
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -613,11 +696,14 @@ tree.
   layout, and the host tools carry MIT SPDX headers). The submission README carries a curated
   note describing this; `sha256sum -c MANIFEST.sha256` passes 102/102 from inside the package.
   The package is documentation-only - no account, list subscription or email transport is
-  included, and nothing has been sent. The eleventh sync's TWD refresh regenerated the manifest
-  again (7 entries changed because of curation, including the TWD-updated hashes and the
-  curated notes); `sha256sum -c MANIFEST.sha256` passes 102/102. The retained blocker-reduction
-  drafts are text-only (patch drafts + READMEs), contain no vendor binaries, credentials,
-  per-unit identifiers or host paths, and are not applied to any tree.
+  included, and nothing has been sent. The twelfth sync's final-delta refresh regenerated the
+  manifest again (7 entries changed because of curation, including the final hashes and curated
+  notes); `sha256sum -c MANIFEST.sha256` passes 102/102. The retained blocker-reduction drafts and
+  the native-forwarding plan package are text-only (prose + patch/script drafts), contain no
+  vendor binaries, credentials, per-unit identifiers or host paths (the forwarding plan's host
+  NIC MAC was redacted to a documentation prefix), and are not applied to any tree. The
+  retained forwarding instruments are read-only/print-only by design and nothing in them was
+  executed by this repository.
 - **The multi-port probe patch 066** is kept verbatim from the notebook (a GPL-2.0-only kernel
   diff, our own code) with a curated README; it is not part of the release line, the review form
   or the submission package, and the prepared image `a91ebcf0` is a bench instrument only.
@@ -695,14 +781,19 @@ design). The intermediate host-only full-series rebuilds (001-023 with the persi
 `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and bdinfo-MAC
 nvmem follow-ups) were never flashed or booted. No install image is published, `platform_do_upgrade`
 has never run on a device, and the bench installer in `tools/` is published for evidence, not
-as a general install/recovery guide. The devicetree final also adopts the **boot-tested TWD level-high delta** (upstream blocker 6
-closed; boot-tested image `f6685b80`: DTB `4fde76df...` / pad `4b50de73...`, 2 CPUs,
-`GIC-0 29 Level twd`, ping 20/20); LEDs and both RESET/WPS buttons are now physically verified;
-**five upstream blockers remain** with retained drafts under `docs/incoming/upstream-blockers/`. The
-**upstream submission package** is a documentation-only dry run - **nothing sent, no Tested-by** -
-and the **multi-port source-port experiment** (patch 066 / image `a91ebcf0`) was run and was
-**negative** - the CPU-copy path cannot identify jacks, so multi-port LAN/WAN requires the native
-L2/VLAN hardware bridge. The owner-only **legacy history-purge runbook** is prepared/dry-run
-validated notebook-side but **not executed**; `PUBLISH-READINESS.md` item 1 remains unchecked. The
-repository remains curated research material, not a firmware release. See the safety and legal section of [`../README.md`](../README.md) and
+as a general install/recovery guide. The devicetree final now adopts **all four boot-tested deltas** (TWD level-high + the
+final MAC-nvmem removal, switch MMIO-first order and `cudy,wr3000-v2`-first compatible;
+boot-tested together on image **c3ef2a50** - DTS `9d96ac31...`, DTS-0001 `c029fd44...`, DTB
+`a0af2899...` / pad `01b74561...`, 2 CPUs, `GIC-0 29 Level twd`, board_name cudy,wr3000-v2,
+ping 15/15; previous TWD baseline f6685b80; original verified 7421bb7a). LEDs and both RESET/WPS
+buttons are physically verified; **two upstream blockers remain** with retained drafts under
+`docs/incoming/upstream-blockers/`. The **E0-a mirror-off native-delivery experiment was negative**
+(native completions arrive on port 11 but are `status=37 err=1` and IP is dead), so the CPU-copy
+mirror workaround remains required and the native L2/VLAN forwarding project has a retained plan
+under `docs/incoming/lsw-forwarding/`. The **upstream submission package** is a documentation-only dry
+run - **nothing sent, no Tested-by** - and the **multi-port source-port experiment** (patch 066 /
+image `a91ebcf0`) was also **negative** - the CPU-copy path cannot identify jacks, so multi-port
+LAN/WAN requires the native bridge. The owner-only **legacy history-purge runbook** is
+prepared/dry-run validated notebook-side but **not executed**; `PUBLISH-READINESS.md` item 1 remains
+unchecked. The repository remains curated research material, not a firmware release. See the safety and legal section of [`../README.md`](../README.md) and
 [`../NOTICE.md`](../NOTICE.md).
