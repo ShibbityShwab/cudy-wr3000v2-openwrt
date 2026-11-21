@@ -44,6 +44,11 @@ material was sanitized, and how to verify the publication claims.
   A following documentation-only commit (**`baa9aa3`**, notebook parent `c8106dd`) adds the
   physical feature-check record (all six LEDs visually confirmed; RESET press captured;
   WPS pending) - see the tenth-sync note below.
+  The **eleventh sync (2026-11-21)** moves it to the **TWD-adoption follow-up**: `opensource`
+  submodule commit `95c4502` (notebook parent `371c1b1`) - the boot-tested TWD level-high
+  delta adopted in the DTS, refreshed DTS-0001/release validation/submission artifacts (five
+  remaining blockers), the retained upstream blocker-reduction drafts, and the notebook-side
+  owner-only history-purge runbook (not published) - see the eleventh-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -98,7 +103,8 @@ material was sanitized, and how to verify the publication claims.
 | `docs/` (16 engineering documents plus the index and this policy) | the design, RE specifications, the measured read-only silicon inventory and its procedure, GPL request provenance, the consolidated reversal report, the trailer-format doc including the base-DTB alignment section, the multi-port plan (incl. the prepared probe image), and the validation records through the 2026-11-21 board-feature/quiet-image, DTS/install and submission-package follow-up passes |
 | `target-skeleton/` | the OpenWrt target, board DTS with the loader hand-off contract, **the stock board_id=3 LED/keys nodes and the conservative comment-only cleanup** (active content byte-identical to the known-good DTB), the 62 L0 patch files (001-058 + 062-065; the release line is the 51 include patches), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
 | `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: 51 include / 11 exclude; 054/056 hashes refreshed after the `dev_dbg` quieting, manifest sha256 `4da8b960...`; `05-release-line.md`), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `8ee4b8e71...`, refreshed with the board LED/keys nodes; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs, plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the retained optional deltas) |
-| `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription; the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
+| `docs/incoming/upstream-blockers/` | **retained upstream blocker-reduction drafts** for the five remaining blockers (TWD/blocker 6 closed): documentation + patch drafts only (flashinfo binding, 6.18 MAC provisioning, switch MMIO-first reorder, compatible ordering/OpenWrt metadata, driver/YAML review). Text-only; not the release series, not applied; each active delta needs its own hardware boot-test |
+| `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription. It now reflects the TWD adoption (five remaining blockers, blocker 6 closed) and the current artifact hashes; the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
 | `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the probe image `a91ebcf0` is documented in the multi-port plan. The experiment was run on 2026-11-21 and was **negative**; native L2/VLAN bridge required |
 | `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, inactive-pair only; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
@@ -457,6 +463,66 @@ change; the release-line validation (51/51), 89/89 validation hashes and 102/102
 manifest are unchanged and were re-verified. The README board-feature rows were updated to
 record the physical result.
 
+## The eleventh sync (2026-11-21): TWD adoption, refreshed upstream artifacts and the blocker drafts
+
+Source pin: **`95c4502`**, the notebook's `opensource/` submodule after the TWD-adoption follow-up
+(notebook parent `371c1b1`; commits: TWD level-high adoption, upstream artifact refresh, retained
+blocker-reduction drafts, publish runbook + hygiene re-check). It is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/dts/luofu-r116.dts` | **boot-tested TWD level-high delta**: local-timer interrupts now `<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>` (0x304, up from the measured vendor `<1 13 0x301>`), with `arm-gic.h`/`irq.h` includes and a comment recording the measured read-only GICD_ICFGR1 `0b11` value; DTS now **700 lines** sha256 `13427d8e...` |
+| `target-skeleton/RELEASE-NOTES.md` | buttons fully verified (RESET and WPS both captured on `event0`; LEDs visually confirmed) and the TWD-timer measured/boot-tested record (blocker 6 closed; image `f6685b80`) |
+| `upstream/series-6.18/` | **DTS-0001 regenerated** (sha256 `e9c9ed58...`, 713 lines); current DTB **`4fde76df...`**, padded **`4b50de73...`** (13,041 -> 13,048 B); release-line validator PASS; `00/04/05/06/07/README` refreshed (blocker list now **five**, TWD closed with the boot-test evidence; `04-validation` adds the TWD-acceptance/pad records, `07` records the adoption and hardware evidence); `validation/release-line/summary.txt` and `validation/sha256sums.txt` refreshed |
+| `upstream/series-6.18/submission/` | package README / TESTED-BY-POLICY / cover-email draft updated to the TWD adoption, **five remaining blockers** and current artifact hashes; `MANIFEST.sha256` regenerated against this curated tree and verified **102/102** |
+| `docs/incoming/upstream-blockers/` | **new retained blocker-reduction drafts** (16 text/diff files): one package per remaining blocker (flashinfo binding, 6.18 MAC provisioning, switch MMIO-first reorder, compatible ordering/OpenWrt metadata, driver/YAML review) plus the closed TWD record. Documentation + patch drafts only, not applied, not the release series; each active delta needs its own boot-test |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | TWD adoption, five blockers, TWD-purpose baseline `f6685b80`, buttons fully verified, retained blocker drafts and the notebook-side purge-runbook pointer/status |
+| **not copied (publication decision)** | the **owner-only legacy history-purge runbook** (`PUBLISH-PURGE-RUNBOOK.md`, 821 lines) and the `PUBLISH-PREP.md`/`PUBLISH-READINESS.md` updates stay **notebook-side**: they describe destructive operations on the legacy repository (795-commit rewrite, eleven blob paths incl. an accidental `fip-slice` pyc, force-with-lease push, branch rewrite/delete, cache purge) that are owner-only and not executed. This repository publishes only the pointer/status; `PUBLISH-READINESS.md` item 1 remains unchecked |
+
+Curation rules applied to this sync: host paths sanitized to `~` (none were new); no vendor binaries,
+firmware blobs, credentials, keys or per-unit identifiers; the retained blocker drafts are
+text-only and contain no secrets/MACs/host paths; the submission `MANIFEST.sha256` was
+regenerated against this curated tree (7 entries changed due to curation) and verifies
+`sha256sum -c` 102/102. The notebook-side hygiene fix (host paths -> `~`, per-unit MACs redacted
+in tracked text) was re-verified against this repository: 250 tracked files, zero binary blobs
+in tree/history, no host paths and no real MACs.
+
+### What this sync changes about the repository's honest status
+
+- **Upstream blocker 6 (TWD timer interrupt flags) is closed** by measurement + boot-test: the
+  GIC-400 PPI configuration is read-only/SoC-fixed (measured GICD_ICFGR1 PPI13 field `0b11`), so
+  the standard `GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)` encoding was adopted and
+  boot-tested PASS on image `f6685b80` (`/proc/interrupts` `GIC-0 29 Level twd`, both CPUs
+  ~100 Hz, ping 20/20, no errors). **Five upstream blockers remain**, each with a retained
+  draft and a documented hardware-dependency (three active DTS deltas need boot-tests).
+- **Physical input/status is now fully verified**: all six `oem:green:*` LEDs were seen lit and both
+  RESET (`KEY_RESTART` 0x198) and WPS (`KEY_WPS_BUTTON` 0x211) presses were captured on `event0`.
+- The current **DTS-purpose hardware baseline is `f6685b80`** (TWD level-high); `7421bb7a` remains
+  the previous verified baseline. The install path, multi-port negative result, thermal/Wi-Fi
+  non-support and all earlier caveats are unchanged.
+- **History-purge item remains OPEN**: the runbook is prepared and dry-run validated (795
+  commits preserved; all eleven old blob ids unreachable/absent after reflog+gc in throwaway
+  clones; both branch options, force-with-lease and a fresh-clone gate simulated) but **not
+  executed** - no push, branch operation or cache purge. The legacy repo is still public and
+  unarchived; `PUBLISH-READINESS.md` item 1 stays unchecked. The curated repositories are
+  unaffected (fresh histories, zero binary blobs).
+
+### Checks run for this sync (2026-11-21, /home workdirs)
+
+- `tools/check-release-line.sh <linux-6.18.60.tar.xz> /home/.../tmp-release-line-check` -
+  **PASS**: 51/51 include patches with `patch(1)` RC=0 (146 file events, 3 offset hunks, 0 fuzz,
+  0 rejects), strict `git apply` clean, DTB **13,041 B sha256 `4fde76df...`**, unaligned totalsize
+  detected and `pad-dtb.py` pads to **13,048 B sha256 `4b50de73...`** with the loader hand-off
+  contract preserved; DTS-0001 (**`e9c9ed58...`**) applies and its board DTS is byte-identical to
+  the target DTS;
+- `python3 upstream/series-6.18/tools/gen-series.py --check` - **PASS** (26 review-form patches, no drift);
+- `(cd upstream/series-6.18 && sha256sum -c validation/sha256sums.txt)` - **89/89 OK**;
+- `(cd upstream/series-6.18/submission && sha256sum -c MANIFEST.sha256)` - **102/102 OK**;
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **82/82**;
+- link checks clean (only the documented notebook-only links unresolved); repository hygiene:
+  zero binary objects in tree/history, no credentials/keys, no per-unit identifiers, no host
+  paths; fresh clone of the pushed remote verified.
+
 ## What is excluded (and why)
 
 | Excluded | Reason |
@@ -471,6 +537,7 @@ record the physical result.
 | per-unit identifiers (MAC/serial/PIN/efuse/`secret`/UUID values) | privacy and responsible disclosure; the docs name the offset instead of printing the value |
 | credentials, keys, tokens, Lab/bench secrets | never published (and never committed to the source tree either) |
 | the notebook bench helpers the installer calls (`tools/bench-link.sh`, `tools/recovery-card.sh`), the image build and the physical recovery procedure | they are live-lab instruments, not publication content; the published installer refuses without their preflight and `tools/README.md` states the dependency. No recovery procedure is published |
+| the owner-only legacy history-purge runbook and the publication-policy pages (`PUBLISH-PURGE-RUNBOOK.md`, `PUBLISH-PREP.md`, `PUBLISH-READINESS.md`) | they describe destructive operations on the **legacy** repository and remain notebook-side; this repository publishes only the pointer/status. `PUBLISH-READINESS.md` item 1 (vendor-object history purge) is **still unchecked**; no rewrite, force-push or cache purge has run. The curated repos are unaffected (fresh history, zero binary blobs) |
 | the `lab/` programs and vendor-module analysis fixtures | out of scope for the OpenWrt port repo; the relevant specifications are in `docs/` |
 | incoming/lane staging packages, **except** the retained read-only reports and the bench-only probe record | a deliberate exception: `target-skeleton/docs/incoming/feature-inventory/` and `target-skeleton/docs/incoming/wifi-recon/` are text-only, read-only device/Wi-Fi reports needed to explain the current status (curated notes; no vendor binaries, secrets or per-unit identifiers; the one MAC placeholder uses the documentation prefix `02:00:00:xx:xx:xx`), and `docs/incoming/multi-port-probe/` retains the bench-only probe patch 066 + note because the multi-port experiment plan references it. None is part of the release line or upstream series |
 
@@ -546,7 +613,11 @@ tree.
   layout, and the host tools carry MIT SPDX headers). The submission README carries a curated
   note describing this; `sha256sum -c MANIFEST.sha256` passes 102/102 from inside the package.
   The package is documentation-only - no account, list subscription or email transport is
-  included, and nothing has been sent.
+  included, and nothing has been sent. The eleventh sync's TWD refresh regenerated the manifest
+  again (7 entries changed because of curation, including the TWD-updated hashes and the
+  curated notes); `sha256sum -c MANIFEST.sha256` passes 102/102. The retained blocker-reduction
+  drafts are text-only (patch drafts + READMEs), contain no vendor binaries, credentials,
+  per-unit identifiers or host paths, and are not applied to any tree.
 - **The multi-port probe patch 066** is kept verbatim from the notebook (a GPL-2.0-only kernel
   diff, our own code) with a curated README; it is not part of the release line, the review form
   or the submission package, and the prepared image `a91ebcf0` is a bench instrument only.
@@ -624,9 +695,14 @@ design). The intermediate host-only full-series rebuilds (001-023 with the persi
 `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and bdinfo-MAC
 nvmem follow-ups) were never flashed or booted. No install image is published, `platform_do_upgrade`
 has never run on a device, and the bench installer in `tools/` is published for evidence, not
-as a general install/recovery guide. The **upstream submission package** is a documentation-only
-dry run - **nothing sent, no Tested-by** - and the **multi-port source-port experiment** (patch 066 / image
-`a91ebcf0`) was run and was **negative** - the CPU-copy path cannot identify jacks, so
-multi-port LAN/WAN requires the native L2/VLAN hardware bridge; the repository remains curated
-research material, not a firmware release. See the safety and legal section of [`../README.md`](../README.md) and
+as a general install/recovery guide. The devicetree final also adopts the **boot-tested TWD level-high delta** (upstream blocker 6
+closed; boot-tested image `f6685b80`: DTB `4fde76df...` / pad `4b50de73...`, 2 CPUs,
+`GIC-0 29 Level twd`, ping 20/20); LEDs and both RESET/WPS buttons are now physically verified;
+**five upstream blockers remain** with retained drafts under `docs/incoming/upstream-blockers/`. The
+**upstream submission package** is a documentation-only dry run - **nothing sent, no Tested-by** -
+and the **multi-port source-port experiment** (patch 066 / image `a91ebcf0`) was run and was
+**negative** - the CPU-copy path cannot identify jacks, so multi-port LAN/WAN requires the native
+L2/VLAN hardware bridge. The owner-only **legacy history-purge runbook** is prepared/dry-run
+validated notebook-side but **not executed**; `PUBLISH-READINESS.md` item 1 remains unchecked. The
+repository remains curated research material, not a firmware release. See the safety and legal section of [`../README.md`](../README.md) and
 [`../NOTICE.md`](../NOTICE.md).

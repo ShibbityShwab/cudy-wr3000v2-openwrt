@@ -1,12 +1,13 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at the
-**2026-11-21 submission-package follow-up** - source `opensource` submodule commit
-`c931c74` (notebook parent `fa76c97`): the **51-patch release line** (62 patch files: 001-058 +
+**2026-11-21 TWD-adoption follow-up** - source `opensource` submodule commit `95c4502`
+(notebook parent `371c1b1`): the **51-patch release line** (62 patch files: 001-058 +
 062-065; the 11 bench-only SMP diagnostics are excluded), the **DTS-only loader hand-off SMP
 fix** plus the stock **board_id=3 LED/keys nodes**, the **conservative comment-only board-DTS
-cleanup** (active content byte-identical to the hardware-verified known-good DTB), the base-DTB
-**`pad-dtb` 8-byte alignment build step**, the re-generated **DTS-0001**, the verified automated
+cleanup plus the boot-tested TWD level-high delta** (DTS `13427d8e...`; DTB `4fde76df...` / pad
+`4b50de73...`; hardware baseline image `f6685b80`), the base-DTB **`pad-dtb` 8-byte alignment
+build step**, the re-generated **DTS-0001** (`e9c9ed58...`, 713 lines), the verified automated
 **stock-telnet install path**, the **multi-port Ethernet limit and experiment plan** (with the
 bench-only probe patch 066 / image `a91ebcf0`, whose source-port experiment was run and was
 **negative** - CPU-copy completions carry no port identity, so the native L2/VLAN bridge is the
@@ -26,6 +27,7 @@ performed and the 2026-11-18/19/21 syncs.
 | [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan - with the 2026-11-21 release and board-feature updates, the mandatory loader hand-off DTS contract and the closed/partly-closed rows | design proposal (host-validated drafts + bench-verified target images; not accepted upstream) |
 | [TARGET-SKELETON.md](TARGET-SKELETON.md) | the target-skeleton index: what the schematic target, DTS, image recipe, tools and patch stack are; status and what remains [U]/TODO | index |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; the 2026-11-21 update closes the SMP milestone without claiming upstream progress; superseded sections are marked | phase plan / history |
+| [incoming/upstream-blockers/](incoming/upstream-blockers/) | retained blocker-reduction drafts for the **five remaining** upstream blockers (TWD/blocker 6 closed by the boot-tested level-high delta): flashinfo binding, 6.18 MAC provisioning, switch MMIO-first reorder, compatible ordering/OpenWrt metadata, driver/YAML review | drafts only, not applied; boot-test required per active delta |
 | [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the multi-port Ethernet limit (only eth2 works through the CPU-copy mirror; completions report port 0 / no source id), the measured far-right-jack finding, the attended source-port experiment plan and the decision gate (per-port CPU-copy delivery vs native L2/VLAN bridge), and the bench-only probe image `a91ebcf0` / patch 066 | experiment plan + prepared image; **experiment run 2026-11-21: negative** (no source-port id in CPU-copy completions - native L2/VLAN bridge required) |
 | [incoming/multi-port-probe/](incoming/multi-port-probe/) | retained bench-only record: patch 066 (`luofu_switch.mirror_src_mask`) and its note; not part of the release line or upstream series | bench instrument (GPL-2.0-only patch); experiment run 2026-11-21, **negative**; retained as artifact |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
@@ -72,8 +74,12 @@ Additional status pages and retained reports:
   upstream blockers.
 - [`../upstream/series-6.18/submission/README.md`](../upstream/series-6.18/submission/README.md) -
   the **documentation-only upstream submission package** (RFC form): status/artifact checklist,
-  one-page cover-email draft, explicit no-Tested-by policy and a file manifest. Nothing has been
-  sent anywhere; the manifest was regenerated for this curated tree.
+  one-page cover-email draft, explicit no-Tested-by policy and a file manifest. It now reflects
+  the TWD adoption (**five remaining blockers**, blocker 6 closed) and the current artifact
+  hashes. Nothing has been sent anywhere; the manifest was regenerated for this curated tree.
+- [`../docs/incoming/upstream-blockers/00-INDEX.md`](../docs/incoming/upstream-blockers/00-INDEX.md) -
+  the retained blocker-reduction drafts index (documentation + patch drafts only; not the
+  release series, not applied).
 - [`../NOTICE.md`](../NOTICE.md) - provenance and the no-vendor-code policy.
 
 ## Reading order
@@ -114,6 +120,10 @@ Additional status pages and retained reports:
   text-only device reports that document the feature matrix, the install-path findings, the
   multi-port limit and the Wi-Fi feasibility decision. Their `SUMMARY.md` files carry curated
   status notes; no other incoming/staging package is published.
+- The owner-only legacy history-purge runbook (`PUBLISH-PURGE-RUNBOOK.md`) and
+  `PUBLISH-PREP.md`/`PUBLISH-READINESS.md` are **notebook-side** and not published here;
+  `PUBLISH-READINESS.md` item 1 (vendor-object history purge) remains **unchecked** - no rewrite,
+  force-push or cache purge has run.
 - The bench install tooling lives at [`../tools/`](../tools/): `stock-telnet-install.sh` and
   `telnet-exec.py` are published for evidence, not as a general install/recovery guide (see
   [`../tools/README.md`](../tools/README.md)).

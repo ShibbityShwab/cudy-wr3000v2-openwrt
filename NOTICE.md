@@ -27,7 +27,12 @@ A **bench-only multi-port source-port probe patch (066)** and probe image (**a91
 retained as an experiment record - neither is part of the release line or the upstream series.
 The experiment was run on 2026-11-21 and was **negative**: the CPU-copy completions carry no
 source-port identity (identical descriptors across jacks), so multi-port LAN/WAN requires the
-native L2/VLAN hardware bridge and the single-port workaround stands.
+native L2/VLAN hardware bridge and the single-port workaround stands. The devicetree final also
+adopts the **boot-tested TWD level-high delta** (upstream blocker 6 closed; boot-tested image
+`f6685b80`): DTS sha256 `13427d8e...` (700 lines), DTS-0001 `e9c9ed58...` (713 lines), DTB
+`4fde76df...` / pad `4b50de73...`; **five upstream blockers remain**. The owner-only legacy
+history-purge runbook is prepared/dry-run validated **notebook-side** (not published here) and
+`PUBLISH-READINESS.md` item 1 remains unchecked - no history rewrite or push has run.
 
 ## What is in this repository
 
@@ -47,6 +52,10 @@ native L2/VLAN hardware bridge and the single-port workaround stands.
   `MANIFEST.sha256` covering the review-form documents, DTS-0001, release-line classification,
   tooling and validation logs. No transport, account or list subscription is included; nothing
   has been sent. The manifest in this repository was regenerated against the curated tree.
+- The **retained upstream blocker-reduction drafts** (`docs/incoming/upstream-blockers/`):
+  documentation + patch drafts only (flashinfo binding, MAC-nvmem removal, switch MMIO-first
+  reorder, compatible ordering, driver/YAML review); blocker 6 (TWD) is closed; they are not the
+  release series, not applied, and each active delta needs its own hardware boot-test.
 - The **bench-only multi-port probe record** (`docs/incoming/multi-port-probe/`): patch 066
   (a draft kernel diff adding `luofu_switch.mirror_src_mask`) and the prepared probe image
   `a91ebcf0`. It is not part of the release line or review form; the experiment plan, the
@@ -61,12 +70,13 @@ native L2/VLAN hardware bridge and the single-port workaround stands.
   bench-only SMP diagnostics are excluded (`upstream/series-6.18/release-line/`); the 26-patch
   upstream review form (`001-026`: 19 merge-intent patches plus the seven fail-closed data-path
   drafts `020`-`026`, marked do-not-merge); the board DTS with the loader hand-off contract,
-  the stock board_id=3 LED/keys nodes, the **conservative comment-only cleanup** (active content
-  byte-identical to the hardware-verified known-good DTB) and the DTS-0001 companion entry
-  (`072d0b8b...`); and the schematic OpenWrt target/base-files files. The release-line hashes for
-  patches 054/056 were refreshed after the `dev_dbg` quieting (manifest sha256
-  `4da8b960...`). The retained [DTS cleanup record](upstream/series-6.18/07-dts-upstream-bindings.md)
-  documents the boot regression of the superseded active cleanup and the optional deltas.
+  the stock board_id=3 LED/keys nodes, the **conservative comment-only cleanup plus the
+  boot-tested TWD level-high delta** (DTS 700 lines `13427d8e...`; hardware baseline image
+  `f6685b80`) and the DTS-0001 companion entry (`e9c9ed58...`, 713 lines); and the schematic
+  OpenWrt target/base-files files. The release-line hashes for patches 054/056 were refreshed
+  after the `dev_dbg` quieting (manifest sha256 `4da8b960...`). The retained
+  [DTS cleanup record](upstream/series-6.18/07-dts-upstream-bindings.md) documents the boot
+  regression of the superseded active cleanup, the TWD adoption, and the five remaining blockers.
 - The image recipe's standard OpenWrt **squashfs + `rootfs_data` UBI layout**: the static
   read-only rootfs volume plus an empty dynamic overlay volume (`vol_size=1MiB`,
   `vol_flags=autoresize`) that the kernel's first read-write UBIFS mount formats.
@@ -169,6 +179,12 @@ HiSilicon.
   it is not a release artifact. The experiment was run on 2026-11-21 and was **negative** (the
   CPU-copy completions are field-for-field identical across jacks / carry no source-port id);
   multi-port LAN/WAN therefore requires the native L2/VLAN hardware bridge.
+- **The legacy history-purge runbook is notebook-side and owner-only.** The prepared,
+  dry-run-validated `PUBLISH-PURGE-RUNBOOK.md` (legacy repo: 795 commits, eleven binary blob
+  paths including an accidental bytecode file) is **not published in this repository** and has
+  **not been executed**; `PUBLISH-READINESS.md` item 1 stays unchecked until a purge runs and a
+  fresh clone of the public remote verifies clean. No force-push or cache purge has been done.
+  This curated repository is unaffected (fresh history, zero binary blobs).
 - **An active-DTS change must be boot-tested.** The superseded aggressive DTS cleanup (image
   `6f19c6d6`) passed every host check but did not boot (MTD partition registration stalled,
   U-Boot watchdog reset, stock fallback); it was reverted. The accepted conservative cleanup
