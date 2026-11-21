@@ -19,8 +19,10 @@ flashing/recovery guide: no install image is published, `platform_do_upgrade` ha
 on a device, the intermediate host-only rebuilds (`001`-`023` and `001`-`026`) were never flashed
 or booted, and the image container keeps the
 `BOOT-VERIFIED RECIPE / NOT FLASHABLE-UNTIL-INSTALLED` marker. Thermal telemetry is unsupported
-on this board, Wi-Fi is unsupported on the 6.18 target, and only one Ethernet jack works through
-the CPU-copy workaround (multi-port is a separate project). A **documentation-only upstream
+on this board and Wi-Fi is unsupported on the 6.18 target. W22/ M1b-1 bench close-out: all four
+switch ports deliver natively to the CPU (no mirror), and LAN-to-LAN forwarding is proven in both
+directions on both tested LAN pairs (eth2<->eth0 and eth2<->eth1; software bridge, no hardware L2
+offload required). A **documentation-only upstream
 submission package** (RFC form, artifact checklist, cover-email draft, explicit no-Tested-by
 policy, file manifest) is included for owner review; **nothing has been submitted anywhere**.
 A **bench-only multi-port source-port probe patch (066)** and probe image (**a91ebcf0**) are
@@ -47,9 +49,12 @@ mirror patches 054-057 remain in the line only as the documented fallback. **W22
 only - it is not in the L2 upstream review form (unchanged, 26 patches)**. Bench: canonical image
 **`50023446`** boots with native eth2 CPU delivery (dmesg "W22: NAPT/flow engine initialized and
 verified", 2 CPUs, ping 200/200 0% loss, SSH, reboot determinism PASS); M1a was first proven with
-image `5800c9ab`. **M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending
-bench steps**; multi-port is not claimed. The E0-a/E0-b experiments, M1a proof, W22 drafts and the
-M1b plan are retained under `docs/incoming/lsw-forwarding/`, and the bench-verified
+image `5800c9ab`. The **15-minute W22 soak PASSed 900/900 0% loss** and **M1b-1 PASSed**
+(native per-port CPU delivery on all four jacks) and **M1b-3 LAN-to-LAN PASSed on both tested LAN
+pairs** (eth2<->eth0, eth2<->eth1; software bridge, no hardware L2 offload). The
+fallback-image test was **retired as untested-by-design** (build cmdline-cache mistake; the source
+option `naptinit=0` + mirror tokens remains as a documented known limitation). The E0-a/E0-b
+experiments, M1a proof, W22 drafts, M1b plan/results are retained under `docs/incoming/lsw-forwarding/`, and the bench-verified
 **install/recovery lessons** are in `docs/INSTALL-RECOVERY-LESSONS.md`. The owner-only legacy
 history-purge runbook is prepared/dry-run validated **notebook-side** (not published here) and
 `PUBLISH-READINESS.md` item 1 remains unchecked - no history rewrite or push has run.
@@ -91,13 +96,16 @@ history-purge runbook is prepared/dry-run validated **notebook-side** (not publi
   implementation plan, E0-a/E0-b analyses and results (negative mirror-off run, then read-only
   stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and the
   M1a proof** (`m1a/napt-init/proof-image/RESULT.md`; proof image `5800c9ab`), the **W22
-  release-integration drafts** (`w22/`; now release-line patches 059/060) and the **M1b plan**
-  (`m1b/M1B-PLAN.md`; per-port/LAN-to-LAN, pending bench step), plus read-only capture/diff tools
+  release-integration drafts** (`w22/`; now release-line patches 059/060), the **M1b plan and
+  M1b-1 PASS results** (`m1b/M1B-PLAN.md`, `m1b/M1B-RESULTS.md`: native per-port delivery on all
+  four jacks; LAN-to-LAN PASS on both tested pairs), plus read-only capture/diff tools
   and a print-only write planner. The on-box probe scripts are gated (attended + recovery-armed);
   nothing there was run by this repository. The plan's host NIC MAC was redacted.
 
 - The **bench-verified install/recovery lessons** (`docs/INSTALL-RECOVERY-LESSONS.md`): the
-  telnet-installer end-to-end procedure (pair-b only, env-`bootflag`/`selector` agreement, read-backs +
+  telnet-installer end-to-end procedure (pair-b only, **active-pair flashes refused** - guard
+  `f188360`; env-`bootflag`/`selector` agreement; the **two-stage post-recovery pair rule**;
+  read-backs +
   semantic UBI verify + selector last) and the lessons from the mixed-pair diagnosis (set the env
   `bootflag` together with the selector cell; our image is pair-b-only; the broker channel only works
   on a consistent vendor pair; recovery is physical RESET-hold + TFTP). Bench record only - not a
@@ -230,8 +238,12 @@ HiSilicon.
   the PFE NAPT/flow engine (patch 059) and delivers the native exception class (patch 060), so
   eth2 works with no CPU-copy mirror (image `50023446`; M1a first proven with `5800c9ab`). The
   CPU-copy mirror patches 054-057 remain only as the documented fallback (`naptinit=0` + mirror
-  tokens). **Multi-port (per-port delivery, LAN-to-LAN) is the pending M1b bench step; the
-  fallback-image rebuild and the soak are also pending** - no multi-port claim is made.
+  tokens). Bench close-out: the **15-minute soak PASSed 900/900 0% loss** and **M1b-1 PASSed**
+  (native per-port CPU delivery on all four jacks) and **LAN-to-LAN is proven on both tested pairs**
+  (eth2<->eth0 and eth2<->eth1, software bridge, no hardware L2 offload required); the optional
+  **WAN L3 is verified as well** (host DHCP server on eth3/WAN: lease 192.168.50.115/24, default
+  route via 192.168.50.1, ICMP both directions; host ufw UDP 67/68 gotcha recorded) - **no bench
+  items remain**. The fallback-image test is retired as untested-by-design (known limitation).
 - **The install/recovery record is bench evidence, not an instruction manual.** The published
   installer is fail-closed (pair-b only, env-`bootflag`/`selector` agreement enforced, read-backs,
   selector last) and is not a general install or recovery guide; recovery is physical RESET-hold

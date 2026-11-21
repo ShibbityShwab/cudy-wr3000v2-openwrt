@@ -1,8 +1,8 @@
 # Documentation index
 
 These documents are a curated snapshot of the lab notebook's engineering record at the
-**2026-11-21 W22 release-integration state** - source `opensource` submodule `5a6d29d`
-(notebook parent `8558465`; W22 release integration and M1a/W22/M1b docs): the **53-patch
+**2026-11-22 multi-port LAN close-out** - source `opensource` submodule `fa36d9b`
+(notebook parent `210548b`; W22 release integration plus the M1b bench results): the **53-patch
 release line** (64 patch files: 001-060 + 062-065; the 11 bench-only SMP diagnostics are excluded)
 including the **W22 native-forwarding patches 059** (PFE NAPT/flow-engine init) and **060** (PIE
 native exception-class delivery; canonical cmdline `naptinit=1` with no mirror tokens; the
@@ -15,13 +15,20 @@ current DTS-purpose baseline image `6e9c54d0` and the **canonical W22 data-path 
 re-generated **DTS-0001** (`886f3ad0...`, 694 lines), the verified automated
 **stock-telnet install path**, the **multi-port Ethernet limit and experiment plan** (with the
 bench-only probe patch 066 / image `a91ebcf0`, whose source-port experiment was run and was
-**negative** - CPU-copy completions carry no port identity, so the native L2/VLAN bridge is the
-required multi-port path), the **documentation-only upstream submission package** (zero remaining blockers),
+**negative** - CPU-copy completions carry no port identity; the W22 native path plus the software
+bridge now provide multi-port LAN forwarding without a hardware L2/VLAN offload (M1b-1/M1b-3 PASS),
+and the WAN L3 path is verified as well (host DHCP lease 192.168.50.115/24, default route, ICMP
+both ways; host ufw UDP 67/68 gotcha recorded), so **no bench items remain**), the
+**documentation-only upstream submission package** (zero remaining blockers),
 and the current baselines: **`50023446`** (canonical W22, native CPU delivery), `6e9c54d0` (current
 DTS-purpose; previous `c3ef2a50`; earlier f6685b80), and `974e6ca6`/`7f270b8c`/`7421bb7a` for the
 pre-W22 bring-up. The upstream review form stays at 26 patches (001-026) - **W22 is release-line only,
-not in the L2 form**; **M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are
-pending bench steps**. The superseded
+not in the L2 form**. Bench close-out: **M1b-1 PASS** (native per-port CPU delivery on all four
+jacks), **M1b-3 LAN-to-LAN PASS on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1; broadcast
++ learned unicast both directions through the software bridge; **no hardware L2 offload
+required**) and a **15-minute soak PASS 900/900 0% loss**. The WAN L3 path is verified as well (host DHCP lease 192.168.50.115/24, default route, ICMP both
+ways), so **no bench items remain**; the fallback-image test is retired as untested-by-design (known
+limitation). The superseded
 aggressive DTS cleanup is recorded as a **hardware boot regression** (image `6f19c6d6`). The live
 status of the work is the lab notebook's `STATUS.md`; the honest summary of what is host-validated
 and what the bench phases did - and did **not** - prove is in [`../README.md`](../README.md). Read
@@ -35,10 +42,14 @@ performed and the 2026-11-18/19/21 syncs.
 | [TARGET-DESIGN.md](TARGET-DESIGN.md) | the concrete target/DTS/image design: target layout, board DTS conversion, FIP/trailer/dual-slot/sysupgrade recipe, driver inventory and upstream distance, acceptance criteria, staged plan - with the 2026-11-21 release and board-feature updates, the mandatory loader hand-off DTS contract and the closed/partly-closed rows | design proposal (host-validated drafts + bench-verified target images; not accepted upstream) |
 | [TARGET-SKELETON.md](TARGET-SKELETON.md) | the target-skeleton index: what the schematic target, DTS, image recipe, tools and patch stack are; status and what remains [U]/TODO | index |
 | [ROADMAP-OPENWRT.md](ROADMAP-OPENWRT.md) | the phase plan and milestone history; the 2026-11-21 update closes the SMP milestone without claiming upstream progress; superseded sections are marked | phase plan / history |
-| [incoming/lsw-forwarding/](incoming/lsw-forwarding/) | retained native L2/VLAN forwarding lane: implementation plan, E0-a/E0-b analyses and results (negative mirror-off run; read-only stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and proof** (`m1a/napt-init/proof-image/RESULT.md`; proof image `5800c9ab` - native port=11 deliveries, ping 200/200, SSH), the **W22 release-integration drafts** (`w22/`; now release-line patches 059/060, canonical image `50023446`) and the **M1b plan** (`m1b/M1B-PLAN.md`; per-port/LAN-to-LAN, pending), plus read-only capture/diff tools and a print-only write planner | bench records + gated instruments only; nothing executed by this repository; M1b/fallback-image/soak pending |
+| [incoming/lsw-forwarding/](incoming/lsw-forwarding/) | retained native L2/VLAN forwarding lane: implementation plan, E0-a/E0-b analyses and results (negative mirror-off run; read-only stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and proof** (`m1a/napt-init/proof-image/RESULT.md`; proof image `5800c9ab` - native port=11 deliveries, ping 200/200, SSH), the **W22 release-integration drafts** (`w22/`; now release-line patches 059/060, canonical image `50023446`) and the **M1b plan + results** (`m1b/M1B-PLAN.md`, `m1b/M1B-RESULTS.md`: native per-port delivery
+on all four jacks; **LAN-to-LAN PASS on eth2<->eth0 and eth2<->eth1** through the software bridge,
+no hardware L2 offload), plus read-only capture/diff tools and a print-only write planner | bench
+records + gated instruments only; nothing executed by this repository; LAN forwarding complete on
+the tested ports and WAN L3 verified; no bench items remain |
 | [incoming/upstream-blockers/](incoming/upstream-blockers/) | **ZERO remaining upstream blockers** - the last (flashinfo loader hand-off binding) was closed by boot-tested image `6e9c54d0` with `compatible = "hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"`; for the record: the pre-clean active deltas (TWD, 6.18 MAC provisioning, switch MMIO-first, cudy-first) were closed on f6685b80/c3ef2a50. The retained files are maintainer-facing documentation/drafts for normal RFC review | not blocker tasks; text-only, not applied; any new active delta still needs its own boot-test |
-| [INSTALL-RECOVERY-LESSONS.md](INSTALL-RECOVERY-LESSONS.md) | bench-verified install/recovery lessons (telnet installer end-to-end PASS, pair-b-only rule, env-bootflag/cell coupling, mixed-pair diagnosis, physical recovery) **⚠ note** | bench-only record, not a general install or recovery guide |
-| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the pre-W22 multi-port Ethernet limit and the source-port experiment (negative), the decision gate and the bench-only probe image `a91ebcf0` / patch 066; a curated note records that **W22 makes eth2 native** (no mirror tokens) and that **M1b is the pending multi-port step** | experiment plan + prepared image; experiment run 2026-11-21: negative; W22 supersedes the mirror for eth2, multi-port not claimed |
+| [INSTALL-RECOVERY-LESSONS.md](INSTALL-RECOVERY-LESSONS.md) | bench-verified install/recovery lessons (telnet installer end-to-end PASS, pair-b-only rule, **active-pair flashes refused** - installer guard `f188360`, **two-stage post-recovery pair rule**, env-bootflag/cell coupling, mixed-pair diagnosis, physical recovery) **⚠ note** | bench-only record, not a general install or recovery guide |
+| [MULTI-PORT-PLAN.md](MULTI-PORT-PLAN.md) | the pre-W22 multi-port Ethernet limit and the source-port experiment (negative), the decision gate and the bench-only probe image `a91ebcf0` / patch 066; a curated note records that **W22 makes eth2 native** (no mirror tokens) and that **M1b-1/M1b-3 proved native per-port delivery on all four jacks and LAN-to-LAN on both tested LAN pairs** (software bridge, no hardware L2 offload) | experiment plan + prepared image; source-port experiment 2026-11-21: negative; W22 supersedes the mirror; LAN multi-port proven on the tested ports and WAN L3 verified; no bench items remain |
 | [incoming/multi-port-probe/](incoming/multi-port-probe/) | retained bench-only record: patch 066 (`luofu_switch.mirror_src_mask`) and its note; not part of the release line or upstream series | bench instrument (GPL-2.0-only patch); experiment run 2026-11-21, **negative**; retained as artifact |
 | [GPL-REQUEST.md](GPL-REQUEST.md) | GPLv2 §3 source-request record: status, artifact checklist, tracking table, follow-up letter | provenance (unanswered) |
 | [SELECTOR-0x21.md](SELECTOR-0x21.md) | reconstruction of the stock A/B boot-selector contract (env `bootflag`, SYSCTRL record cell, the project's `0x21` bench marker) | RE specification, host-only |

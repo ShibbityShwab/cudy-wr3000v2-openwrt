@@ -75,10 +75,24 @@ material was sanitized, and how to verify the publication claims.
   cpucopy tokens (mirror patches 054-057 retained only as the documented fallback); the W22
   canonical image is **`50023446`** and M1a was proven with `5800c9ab`. **W22 is release-line
   only - the L2 upstream review form/submission is unchanged (26 patches)**; **M1b
-  (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending bench steps**. The
+  (per-port/LAN-to-LAN), the fallback-image rebuild and the soak were pending bench steps at that
+  point (closed in the fifteenth sync)**. The
   m1a/napt-init, w22, m1b, E0B docs were retained and the release-line validation logs refreshed;
   host paths in the validation logs were sanitized to `~` for this curated copy - see the
   fourteenth-sync section below.
+  The **fifteenth sync (2026-11-22)** moves it to the **M1b bench close-out**: `opensource`
+  submodule `fa36d9b` (notebook parent `210548b`) - **native per-port CPU delivery on all
+  four jacks** (M1b-1) and **LAN-to-LAN forwarding proven in both directions on both tested LAN
+  pairs** (M1b-3: eth2<->eth0 and eth2<->eth1, broadcast + learned unicast through the software
+  bridge - **no hardware L2 offload required**), with a **15-minute soak PASS 900/900 0% loss**;
+  the **fallback-image test is retired as untested-by-design** (source option `naptinit=0`
+  remains, known limitation); the **WAN L3 path was then also verified** (host dnsmasq DHCP server
+  on eth3/WAN: lease 192.168.50.115/24, default route via 192.168.50.1, ICMP both directions; host
+  ufw UDP 67/68 gotcha recorded) - **no bench items remain**. The
+  hardened installer (refuses active-pair flashes; `f188360`) and the two-stage post-recovery
+  pair rule were synced into `tools/` and `docs/INSTALL-RECOVERY-LESSONS.md`. The release line/submission
+  are unchanged (53 patches/L0 64, manifest `619eb15a...`; curated submission MANIFEST still
+  102/102) - see the fifteenth-sync section below.
 - This repository was created fresh: `git init`, curated copy, new initial commit(s). **No git
   history was copied from the source repositories**, so no object that ever existed there
   (including the ten vendor `.o` files that were removed from the old repository's HEAD on
@@ -135,11 +149,11 @@ material was sanitized, and how to verify the publication claims.
 W22 patches 059 NAPT/flow-engine init and 060 PIE native exception-class delivery), image recipe (squashfs + empty dynamic `rootfs_data` overlay volume) **including the `Build/luofu-pad-dtb` base-DTB alignment step**, base-files (MAC provisioning, guarded LAN/WAN map, boot-pair recorder, heartbeat), tools (incl. `pad-dtb.py`) and mocked host tests — the actual deliverable. It also carries the **retained read-only device reports** under `docs/incoming/` (feature inventory + its 2026-11-21 update, Wi-Fi recon; curated notes explain superseded findings and the install/multi-port follow-ups) |
 | `upstream/series-6.18/` | the 26-patch review-form submission series (cover letter, per-patch commit messages, MAINTAINERS proposal, tree/order rationale, validation logs); patches `020`-`026` are carried as do-not-merge drafts. It now also carries the **release line** (`release-line/manifest.tsv`: **53 include** / 11 exclude, L0 64 files, manifest sha256 `619eb15a...`; W22 record in `05-release-line.md` section 7 and `04-validation.md` section 29), the **DTS-0001** DTS-series entry (`dts-series/`, sha256 `886f3ad0...`, unchanged by W22; `06-dts-series-dependency.md`) and the `tools/check-release-line.sh` validator (which also exercises the pad-dtb step) with `validation/release-line/` raw logs (host paths sanitized to `~` in this curated copy), plus `07-dts-upstream-bindings.md` (the DTS cleanup/hardware-regression record and the closed blocker list) |
 | `docs/incoming/upstream-blockers/` | **retained upstream review documents** - **ZERO remaining blockers**: the last (flashinfo loader hand-off binding) was boot-tested on image `6e9c54d0` and adopted; the retained files are maintainer-facing RFC/review material (driver/YAML items incl. the adopted in-series binding reorder, and the drafted reserved-memory binding). Text-only; not the release series, not applied; any new active delta needs its own hardware boot-test |
-| `docs/incoming/lsw-forwarding/` | **retained native L2/VLAN forwarding lane**: implementation plan, E0-a/E0-b analyses + results (negative mirror-off run; read-only stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and proof** (`m1a/napt-init/proof-image/RESULT.md`; image `5800c9ab`), the **W22 release-integration drafts** (`w22/`; now release-line patches 059/060, canonical image `50023446`) and the **M1b plan** (`m1b/M1B-PLAN.md`; per-port/LAN-to-LAN, pending), plus read-only capture/diff tools and a print-only write planner. The on-box probe scripts are gated (attended + recovery-armed); planning and bench records only - nothing was run by this repository; the plan's host NIC MAC was redacted |
+| `docs/incoming/lsw-forwarding/` | **retained native L2/VLAN forwarding lane**: implementation plan, E0-a/E0-b analyses + results (negative mirror-off run; read-only stock-vs-ours captures that found the IFC->NAPT unicast path), the reviewed **M1a probes and proof** (`m1a/napt-init/proof-image/RESULT.md`; image `5800c9ab`), the **W22 release-integration drafts** (`w22/`; now release-line patches 059/060, canonical image `50023446`) and the **M1b plan + results** (`m1b/M1B-PLAN.md`, `m1b/M1B-RESULTS.md`: native per-port delivery on all four jacks; **LAN-to-LAN PASS both directions on eth2<->eth0 and eth2<->eth1** through the software bridge, no hardware L2 offload; **WAN L3 PASS** - host DHCP lease 192.168.50.115/24, default route, ICMP both ways), plus read-only capture/diff tools and a print-only write planner. The on-box probe scripts are gated (attended + recovery-armed); planning and bench records only - nothing was run by this repository; the host NIC MACs in the results were redacted to the documentation prefix |
 | `upstream/series-6.18/submission/` | the **documentation-only upstream submission package** (RFC form, dry run): package README/status/artifact checklist, one-page cover-email draft, explicit no-Tested-by policy and `MANIFEST.sha256`. Nothing has been sent; no transport/account/list subscription. It now reflects the final-delta adoption (**ZERO remaining blockers**; all five devicetree deltas and the flashinfo loader hand-off boot-tested) and the current artifact hashes (DTS `381b2e8c...`; DTS-0001 `886f3ad0...`; release-line manifest `1e00b568...`); the manifest is regenerated against this curated tree and verifies `sha256sum -c` (102/102) |
 | `docs/incoming/multi-port-probe/` | retained **bench-only** multi-port source-port probe record: patch 066 (GPL-2.0-only kernel diff, not part of the release line) plus its README; the probe image `a91ebcf0` is documented in the multi-port plan. The experiment was run on 2026-11-21 and was **negative**; native L2/VLAN bridge required |
-| `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, inactive-pair only; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository |
-| `docs/INSTALL-RECOVERY-LESSONS.md` | the **bench-verified install/recovery lessons** (telnet installer end-to-end PASS, pair-b-only rule, env-`bootflag`/`selector` coupling, the mixed-pair diagnosis, physical recovery) - derived from the notebook's 2026-11-21 bench update. Bench-only record; explicitly **not** a general install or recovery guide |
+| `tools/` | the verified bench **stock-telnet installer** (`stock-telnet-install.sh` + `telnet-exec.py`) and its `README.md`. Fail-closed, **pair-b only**, **refuses active-pair flashes** (stock running from rootfsb / env `bootflag=b`; guard `f188360`) and env/cell disagreement; published for evidence/reproducibility, not as a general install/recovery guide. Read-only inspect default; `--apply` needs `--attended --recovery-armed`. MIT SPDX headers in this repository (the source GPL header was re-applied as MIT per the license split) |
+| `docs/INSTALL-RECOVERY-LESSONS.md` | the **bench-verified install/recovery lessons** (telnet installer end-to-end PASS, pair-b-only rule, **active-pair flashes refused** - guard `f188360`, the **two-stage post-recovery pair rule**, env-`bootflag`/`selector` coupling, the mixed-pair diagnosis, physical recovery) - derived from the notebook's 2026-11-21/22 bench updates and its RUNBOOK. Bench-only record; explicitly **not** a general install or recovery guide |
 | `LICENSE-MIT`, `LICENSE-GPL-2.0`, `NOTICE.md` | licenses and provenance |
 | `upstream/series-6.18/validation/` | raw host-only validation evidence (apply logs, checkpatch, hashes) |
 
@@ -719,9 +733,9 @@ state (notebook parent `8558465`). It is the current pin.
   200/200 0% loss + SSH work; reboot determinism PASS. M1a was first proven with image
   **`5800c9ab`** (userspace NAPT-init replay; native port=11 deliveries in the status-77 class).
 - **Scope limit:** W22 is **release-line only - it is not in the L2 upstream review form** (still
-  26 patches; the submission package is unchanged). **M1b (per-port native delivery,
-  LAN-to-LAN), the fallback-image rebuild and the soak are pending bench steps**; multi-port is
-  not claimed. The clock constraint is respected as before (the known-good 7421bb7a baseline is
+  26 patches; the submission package is unchanged). At the time of this sync, M1b (per-port native
+  delivery, LAN-to-LAN), the fallback-image rebuild and the soak were pending bench steps; they were
+  closed in the fifteenth sync (LAN-to-LAN and WAN L3 PASS; fallback retired). The clock constraint is respected as before (the known-good 7421bb7a baseline is
   the pre-W22 one; no claim is made about exceeding the earlier verified boot).
 - The CPU-copy mirror patches **054-057 remain in the line only as the documented fallback**
   (`naptinit=0` + mirror tokens); the mirror workaround is no longer the canonical path for eth2.
@@ -746,6 +760,57 @@ state (notebook parent `8558465`). It is the current pin.
 - link checks clean (only the documented notebook-only links unresolved); repository hygiene:
   zero binary objects in tree/history, no credentials/keys, no full MACs, no host paths (the
   refreshed validation logs were sanitized to `~`);
+- fresh clone of the pushed remote verified (hashes/series/manifest/artifacts match).
+
+## The fifteenth sync (2026-11-22): M1b bench close-out - native per-port delivery, LAN-to-LAN on both tested pairs, soak PASS
+
+Source pin: **`5cf46b5`**, the notebook's `opensource` submodule at the multi-port networking close-out
+(notebook parent `c38863f`), on top of the W22 release integration. It is the current pin.
+
+| Path | Change |
+| --- | --- |
+| `target-skeleton/RELEASE-NOTES.md` | wired-LAN row updated by the notebook: native LAN on **all four jacks** via W22, **LAN-to-LAN forwarding proven in both directions on eth2<->eth0 AND eth2<->eth1**, no CPU-copy mirror and **no hardware L2 offload required**; **WAN L3 path verified too** (DHCP lease from a host server, default route, ICMP both ways). A curated addendum records the parent-side bench details (M1b-1/M1b-3, WAN L3, soak 900/900, two-stage install/recovery, fallback retired) |
+| `docs/incoming/lsw-forwarding/m1b/M1B-RESULTS.md` | final M1b results: jack map for all four ports; **LAN-to-LAN PASS on both tested LAN pairs** (broadcast + learned unicast both directions; bridge FDB on the correct ports; second host USB-Ethernet adapter); **WAN L3 PASS** (host dnsmasq DHCP server gave lease 192.168.50.115/24, eth3 default route via 192.168.50.1, ICMP both ways; host ufw UDP 67/68 gotcha recorded); evidence names recorded. The two full host MACs were redacted to the documentation prefix for publication |
+| `tools/stock-telnet-install.sh` + `tools/README.md` | synced the **hardened installer**: pair-b only, **refuses active-pair flashes** (stock running from rootfsb / env `bootflag=b`; guard `f188360`) and env/cell disagreement, with the two-stage instructions in the error path. The source GPL SPDX header was re-applied as **MIT** and the staging path re-adapted to `$HOME/staging-fi` for this curated copy; the README safety/verification row was updated |
+| `docs/INSTALL-RECOVERY-LESSONS.md` | added the **two-stage post-recovery pair rule** (switch recovered stock to pair a first, then write inactive pair b atomically - avoids the mixed our-kernel/stock-rootfs state), the active-pair refusal, and the updated verification record (W22 image `50023446` after recovery #5; 15-min soak PASS); sources now also cite the notebook RUNBOOK section |
+| `docs/incoming/lsw-forwarding/README.md`, `docs/MULTI-PORT-PLAN.md`, `target-skeleton/README.md` | M1b close-out notes: all four jacks deliver natively; LAN-to-LAN PASS on both tested pairs; **WAN L3 PASS** (DHCP lease/default route/ICMP both ways); no hardware L2/VLAN offload required; **no bench items remain**; fallback-image test retired as untested-by-design |
+| `README.md`, `NOTICE.md`, `docs/README.md`, this page | final multi-port state: W22 image `50023446`, native per-port delivery on all four jacks, LAN-to-LAN on eth2<->eth0 and eth2<->eth1 through the software bridge (no L2 offload), **WAN L3 verified** (DHCP lease/route/ICMP), 15-min soak PASS 900/900, two-stage install rule; W22 still release-line only (L2 form unchanged); fallback-image test retired; **no bench items remain** |
+| **unchanged** | release line 53 patches / L0 64, manifest `619eb15a...`; DTS/DTS-0001/DTB hashes; review form 26 patches; submission package (notebook manifest unchanged; curated MANIFEST still 102/102) |
+
+### What this sync changes about the repository's honest status
+
+- **The LAN is feature-complete on the tested ports.** Native per-port CPU delivery works on all
+  four switch ports (eth0/port9, eth1/port10, eth2/port11, eth3/port12 WAN) with the W22 image and
+  no CPU-copy mirror, and the software bridge forwards **LAN-to-LAN in both directions on both
+  tested LAN pairs** (eth2<->eth0 and eth2<->eth1; broadcast + learned unicast; bridge FDB shows
+  the host MACs on the correct ports). **No hardware L2/VLAN offload is required** for multi-port
+  LAN forwarding through the tested ports.
+- **Stability and install:** the W22 image passed a **15-minute soak (900/900 pings, 0% loss)** and
+  was re-installed after recovery #5 with the corrected **two-stage pair procedure** (stock pair a
+  first, then inactive pair b atomically; installer guard `f188360` refuses active-pair flashes).
+- **Not claimed / remaining:** the WAN port (eth3) is verified end-to-end at L3 too - a host DHCP
+  server gave the box WAN lease 192.168.50.115/24, eth3 came up with a default route and ICMP passed
+  both ways (host ufw UDP 67/68 gotcha recorded) - **no bench items remain**. The hardware L2/VLAN
+  offload (M2) is not needed for the tested LAN forwarding and is not implemented. Wi-Fi/thermal remain unsupported; the submission package
+  is still a dry run (**nothing sent, no Tested-by**); the history-purge item remains owner-only and
+  open (`PUBLISH-READINESS.md` item 1 unchecked; curated repo unaffected).
+- **Fallback-image test retired as untested-by-design:** a build cmdline-cache mistake invalidated
+  it; the mirror fallback remains a **source option** (`naptinit=0` + mirror tokens) and is documented
+  as a known limitation - no further fallback cycles.
+
+### Checks run for this sync (2026-11-22, /home workdirs)
+
+- `tools/check-release-line.sh` - **PASS**: 53/53 include patches `patch(1)` RC=0 (149 file events,
+  3 offset hunks, 0 fuzz, 0 rejects), strict `git apply` clean; DTS contract unchanged (DTB
+  12,678 B `62574b11...` / pad 12,680 B `8d79794e...`); DTS-0001 `886f3ad0...` byte-identical;
+- `gen-series.py --check` - **PASS** (26 review-form patches, no drift - the L2 form is unchanged);
+- `sha256sum -c validation/sha256sums.txt` - **89/89 OK**; release-line manifest `619eb15a...`
+  (53 include / 11 exclude);
+- `sha256sum -c submission/MANIFEST.sha256` - **102/102 OK** (unchanged curated tree/package);
+- mocked host tests: first-install **94/94**, factory-MAC **103/103**, MAC-nvmem **77/77**;
+- link checks clean (only the documented notebook-only links unresolved); repository hygiene:
+  zero binary objects in tree/history, no credentials/keys, no full MACs (the two host MACs in the
+  retained M1b results were redacted), no host paths (the release-line logs remain `~`-sanitized);
 - fresh clone of the pushed remote verified (hashes/series/manifest/artifacts match).
 
 ## What is excluded (and why)
@@ -850,7 +915,13 @@ tree.
   adopted 6.18 userspace MAC path. The **fourteenth sync** sanitized host paths in the refreshed
   release-line validation logs to `~` (they were generated in the notebook's private lab tree) and
   regenerated the curated submission manifest (12 entries differ from the notebook's because of
-  curation).
+  curation). The **fifteenth sync** re-based `target-skeleton/RELEASE-NOTES.md` onto the notebook's
+  updated wired-LAN row and re-added the curated addendum, synced the hardened installer
+  (`tools/stock-telnet-install.sh`: source GPL header re-applied as MIT, staging path re-adapted to
+  `$HOME/staging-fi`), added the two-stage rule to `docs/INSTALL-RECOVERY-LESSONS.md`, and redacted
+  the two full host MACs in the retained `m1b/M1B-RESULTS.md` to `02:00:00:xx:xx:xx`. Nothing in the release
+  line or submission package changed, so the curated submission MANIFEST remains valid at
+  102/102 with the same curated hash.
 - **The multi-port probe patch 066** is kept verbatim from the notebook (a GPL-2.0-only kernel
   diff, our own code) with a curated README; it is not part of the release line, the review form
   or the submission package, and the prepared image `a91ebcf0` is a bench instrument only.
@@ -922,8 +993,9 @@ cleanup (image `6f19c6d6`) was documented as a **hardware boot regression** and 
 accepted conservative cleanup is comment-only and compiles to the known-good DTB. Thermal
 telemetry is unsupported on this board (temperature register reads 0, vendor DT disables the
 sensor), Wi-Fi is unsupported on the 6.18 target, the eth2 jack now works **natively** (W22
-driver NAPT init, no CPU-copy mirror), and multi-port (per-port/LAN-to-LAN) remains the open
-M1b/native-bridge project, and the earlier
+driver NAPT init, no CPU-copy mirror) and multi-port LAN is **complete on the tested ports** (all
+four jacks deliver natively; LAN-to-LAN works on both tested LAN pairs through the software bridge,
+no hardware L2 offload needed), and the earlier
 MAC-duplication concern is withdrawn (LAN ports share the vendor base MAC, WAN = base+1 by
 design). The intermediate host-only full-series rebuilds (001-023 with the persistent
 `rootfs_data` volume, and the 001-026 image with the PIE completion, LSW egress and bdinfo-MAC
@@ -943,9 +1015,14 @@ missing IFC->NAPT unicast path, and **M1a was proven** with proof image `5800c9a
 kernel implementation is now release-integrated** (patches 059/060; canonical image
 **`50023446`** - native eth2 CPU delivery, no mirror tokens, 2 CPUs, ping 200/200, SSH, reboot
 determinism PASS) with the CPU-copy mirror patches 054-057 retained only as the documented
-fallback (`naptinit=0`). **W22 is release-line only - not in the L2 upstream review form** - and
-**M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending bench steps**;
-multi-port is not claimed. The **upstream submission package** is a documentation-only dry run
+fallback (`naptinit=0`). **W22 is release-line only - not in the L2 upstream review form**. **M1b is closed on the tested
+ports**: native per-port CPU delivery on all four jacks and **LAN-to-LAN forwarding proven in both
+directions on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1) through the box's software
+bridge - **no hardware L2/VLAN offload is required**; the W22 image passed a **15-minute soak PASS
+900/900 0% loss**, the two-stage post-recovery install rule is documented, and the **WAN L3 path is
+verified too** (host DHCP lease 192.168.50.115/24, default route via 192.168.50.1, ICMP both
+directions; host ufw UDP 67/68 gotcha recorded) - **no bench items remain**. The fallback-image
+test is retired as untested-by-design (known limitation). The **upstream submission package** is a documentation-only dry run
 - **nothing sent, no Tested-by** - and the **multi-port source-port experiment** (patch 066 /
 image `a91ebcf0`) was **negative** - the CPU-copy path cannot identify jacks, so multi-port
 LAN/WAN requires the native bridge. The bench **install/recovery lessons** are recorded in

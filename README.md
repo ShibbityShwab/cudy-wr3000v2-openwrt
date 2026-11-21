@@ -25,8 +25,12 @@ quiet image **`7421bb7a`**, the known-good hardware
 > fallback. The W22 canonical image **`50023446`** boots with native CPU delivery on the bench
 > (NAPT init verified in dmesg, 2 CPUs, ping/SSH, reboot determinism); M1a was first proven with
 > image `5800c9ab`. **W22 is release-line only - the L2 upstream review form stays unchanged at
-> 26 patches**; M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the soak are pending
-> bench steps. DTS-0001 is the current board-DTS entry (`886f3ad0...`, 694 lines), which now
+> 26 patches**. The W22 path is bench-verified: a **15-minute soak PASSed 900/900 0% loss** and
+> **M1b-1 PASSed** (native per-port CPU delivery on all four jacks) and **M1b-3 LAN-to-LAN is
+> proven on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1; broadcast + learned unicast both
+> directions through the software bridge; no hardware L2 offload required). The fallback-image test was **retired as untested-by-design** (build
+> cmdline-cache mistake; the fallback remains a source option `naptinit=0` and is documented as a
+> known limitation). DTS-0001 is the current board-DTS entry (`886f3ad0...`, 694 lines), which now
 adopts all **five boot-tested devicetree deltas** - TWD level-high, MAC-nvmem removal, switch
 MMIO-first `reg`/`reg-names`, `cudy,wr3000-v2` first compatible and the final flashinfo
 compatible pair (`"hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"`) - on top of the
@@ -109,10 +113,10 @@ reverse-engineered code.
 | TWD timer (Cortex-A9 local timer; upstream blocker 6) | DTS uses the standard encoding `<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>` (0x304) with the `arm-gic.h`/`irq.h` includes; the measured read-only GICD_ICFGR1 PPI13 field is 0b11 and the GIC-400 PPI config is SoC-fixed, so the DT flag does not reprogram hardware | **boot-tested PASS on image `f6685b80`**: `/proc/interrupts` reports `GIC-0 29 Level twd`, both CPUs tick ~100 Hz, ping 20/20, no Oops/RCU stalls; blocker 6 is closed and the DTS/DTB/DTS-0001 were refreshed |
 | Final devicetree deltas adopted (**zero blockers remain**; 2026-11-21) | MAC nvmem cells removed (userspace/vendor MAC provisioning), switch `reg`/`reg-names` MMIO-first order, `cudy,wr3000-v2`-first compatible + OpenWrt `SUPPORTED_DEVICES`, and the final flashinfo compatible pair `"hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"` (submodule commits `6c2cc2f`, `71b2167`; in-series binding patch 0021 reordered MMIO-first, review form rerun 26/26) | **boot-tested PASS**: MAC/switch/compatible deltas on image `c3ef2a50` (2 CPUs, `GIC-0 29 Level twd`, board_name `cudy,wr3000-v2`, ping 15/15); **flashinfo pair on image `6e9c54d0`** (stock loader `bootfip` staging PASS, `/proc/device-tree/reserved-memory/flashinfo@80600000/compatible` = new pair, 2 CPUs, cmdline `ubi.mtd=rootfsb`); **all documented upstream blockers are closed** - remaining review items are normal RFC content |
 | Board features (LEDs / keys / watchdog) | stock board_id=3 overlay nodes in the board DTS (gpio-keys-polled reset GPIO22 / WPS GPIO23 active-low 20 ms; six `oem:green:*` LEDs GPIO24/25/3/2/0/1; target config `LEDS_GPIO` / `INPUT(+EVDEV/KEYBOARD)` / `KEYBOARD_GPIO_POLLED` / `WATCHDOG_SYSFS`, `INPUT_HISI_POWERKEY` off) | **verified on image `7f270b8c`**: six writable `/sys/class/leds/oem:green:*` devices, `/dev/input/event0` = gpio-keys-polled, `watchdog0` sysfs (identity HiSilicon luofu watchdog, timeout 30 s, not armed by us). **Physical checks (2026-11-21):** the user visually confirmed all six `oem:green:*` LEDs lit when driven to brightness 1 (set back to off); a RESET press was captured on `/dev/input/event0` as EV_KEY `KEY_RESTART` (0x198) press+release; both the RESET (`KEY_RESTART` 0x198) and WPS (`KEY_WPS_BUTTON` 0x211) presses were captured as EV_KEY press+release pairs |
-| Wired LAN (native W22; mirror fallback) | the W22 path is release-integrated (patches 059/060; canonical cmdline `luofu_switch.naptinit=1`, no mirror/accepterr/cpucopy tokens) and host-validated (53/53) | **native eth2 delivery works without the mirror**: image `50023446` boots with the driver NAPT/flow-engine init (dmesg "W22: NAPT/flow engine initialized and verified"), 2 CPUs, ping 200/200 0% loss, SSH, reboot determinism PASS. M1a was first proven with image `5800c9ab` (userspace NAPT-init replay, native port=11 completions, status-77 class). The **CPU-copy mirror patches 054-057 remain in the line only as the documented fallback** (`naptinit=0` + mirror tokens), and the probe image `a91ebcf0` records the earlier negative source-port experiment. **Multi-port (per-port native delivery, LAN-to-LAN) is the next bench step (M1b) and is not claimed**; the fallback-image rebuild and the soak are pending too. Historical/planning docs: [docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md), [docs/incoming/lsw-forwarding/](docs/incoming/lsw-forwarding/) |
+| Wired LAN (native W22; mirror fallback) | the W22 path is release-integrated (patches 059/060; canonical cmdline `luofu_switch.naptinit=1`, no mirror/accepterr/cpucopy tokens) and host-validated (53/53) | **native eth2 delivery works without the mirror**: image `50023446` boots with the driver NAPT/flow-engine init (dmesg "W22: NAPT/flow engine initialized and verified"), 2 CPUs, ping 200/200 0% loss, SSH, reboot determinism PASS. M1a was first proven with image `5800c9ab` (userspace NAPT-init replay, native port=11 completions, status-77 class). The **CPU-copy mirror patches 054-057 remain in the line only as the documented fallback** (`naptinit=0` + mirror tokens), and the probe image `a91ebcf0` records the earlier negative source-port experiment. **M1b-1 PASS (2026-11-22): native per-port CPU delivery verified on all four jacks with the W22 image and no mirror** - far-right `eth0`/port 9 (ping 200/200 0% + SSH), second-from-right `eth1`/port 10 (200/200 + SSH), `eth2`/port 11 (bench baseline), leftmost `eth3`/port 12 WAN (link up 1000 Mbps, rx=77 tx=44 DHCP frames; ping N/A because it is the WAN zone, not br-lan); back on eth2 20/20 0%. A **15-minute soak PASSed 900/900 0% loss**. **M1b-3 LAN-to-LAN PASS on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1; broadcast + learned unicast in both directions through the box's software bridge; bridge FDB on the correct ports; **no hardware L2 offload required**); **WAN L3 is also verified** (host DHCP server on the leftmost jack: lease **192.168.50.115/24**, default route via 192.168.50.1, ICMP both directions; host `ufw INPUT DROP` silently dropped DHCP until UDP 67/68 was allowed - gotcha recorded). **No bench items remain.** The fallback-image test was retired as untested-by-design (known limitation). Historical/planning docs: [docs/MULTI-PORT-PLAN.md](docs/MULTI-PORT-PLAN.md), [docs/incoming/lsw-forwarding/](docs/incoming/lsw-forwarding/) |
 | Persistent overlay | two-volume squashfs + `rootfs_data` UBI layout in the image recipe; semantic UBI-volume verifier | `/dev/ubi0_1 on /overlay type ubifs (rw)`, files survive a reboot (canonical image) |
 | Storage / FMC SPI-NAND | FMC driver + binding compile; contract documented | SPI-NAND (ESMT 128 MiB, 17 partitions) and UBI rootfs mounted on every boot |
-| Install path (automated, bench-verified) | `tools/stock-telnet-install.sh` (fail-closed: `--inspect` read-only; `--apply` needs `--attended --recovery-armed`, writes only the **inactive** pair, verifies uploaded hashes, read-back slot hash, active-pair-unchanged and the selector) plus `tools/telnet-exec.py` | **verified end-to-end 2026-11-21** (last run: flashinfo-test image `6e9c54d0`): pair-b only, env-`bootflag`/`selector` agreement enforced, read-backs + semantic UBI verify + selector last, active pair unchanged, rebooted into our 6.18 image with 2 CPUs and the expected cmdline. Requires the vendor stock firmware and the notebook's bench-link/recovery helpers; **not a general install or recovery guide**; bench lessons: [docs/INSTALL-RECOVERY-LESSONS.md](docs/INSTALL-RECOVERY-LESSONS.md) |
+| Install path (automated, bench-verified) | `tools/stock-telnet-install.sh` (fail-closed: `--inspect` read-only; `--apply` needs `--attended --recovery-armed`, writes only the **inactive** pair, verifies uploaded hashes, read-back slot hash, active-pair-unchanged and the selector) plus `tools/telnet-exec.py` | **verified end-to-end again 2026-11-22** (W22 image `50023446`, re-installed after recovery #5 via the **two-stage pair procedure**): pair-b only, **active-pair flashes refused** (stock running from rootfsb or env `bootflag=b` - guard `f188360`), env-`bootflag`/`selector` agreement enforced, read-backs + semantic UBI verify + selector last, active pair unchanged, 15-min soak PASS. Requires the vendor stock firmware and the notebook's bench-link/recovery helpers; **not a general install or recovery guide**; bench lessons: [docs/INSTALL-RECOVERY-LESSONS.md](docs/INSTALL-RECOVERY-LESSONS.md) |
 | Upstream submission package (documentation only) | `upstream/series-6.18/submission/`: status/artifact checklist, one-page RFC cover-email draft, explicit no-Tested-by policy and a file manifest (`MANIFEST.sha256`, regenerated for this curated tree and verified `sha256sum -c`) | **nothing has been sent anywhere**; no account/list subscription/email transport; the package records **ZERO remaining blockers** (all five devicetree deltas and the flashinfo loader hand-off are boot-tested) plus the out-of-scope list |
 | A/B install path | `platform_do_upgrade` runs against mocked MTD/sysfs/ubiformat: first-install **144/144**, A/B **100/100** (with the real built container); factory-MAC **103/103**; MAC-nvmem **77/77** (rewritten for the adopted 6.18 userspace MAC path after the nvmem-cell removal) | the fail-closed sequence was executed **manually** on 2026-11-19 and repeatedly with the automated stock-telnet installer on 2026-11-21 (pair-b only, env-bootflag/selector agreement enforced, read-backs, semantic UBI verify, selector last, active pair verified unchanged; handover fix `6e69aa3` after the mixed-pair diagnosis). `platform_do_upgrade` itself has never run on a device and the loader env re-stamp remains open; bench lessons: [docs/INSTALL-RECOVERY-LESSONS.md](docs/INSTALL-RECOVERY-LESSONS.md) |
 | FIP trailer generator | reproduces both recorded vendor containers byte-for-byte; fail-closed on every decoded loader check; a novel generated trailer has never been booted | a FIP kernel slice assembled with this tooling booted from the inactive slot (2026-11-19); per-slot A/B trailer handling still [U] |
@@ -121,7 +125,7 @@ reverse-engineered code.
 | MDIO + PHY (007, 008) | complete driver ports, compile clean | bus/PHY never enumerated |
 | Factory-MAC provisioning | userspace bdinfo derivation + validation (103/103 mocked); kernel-side read-only nvmem path (patch 026, host-only) | no MAC read from a real unit through the netdev path; the guarded LAN/WAN map is host-only. **MAC plan corrected:** eth0/eth1/eth2 sharing the LAN base MAC and eth3 = base+1 is the vendor rule (`board.d`/`99_fixwan`), not a defect - the earlier "duplicate MAC" blocker is withdrawn |
 | Wi-Fi (Hi5622V100) | reverse-engineering/feasibility record only - the vendor stack is a closed cfg80211 full-MAC driver (not mac80211), no source and no mainline/OpenWrt 6.18 driver exists ([recon](target-skeleton/docs/incoming/wifi-recon/SUMMARY.md)) | vendor binary stack; **Wi-Fi is declared unsupported on the 6.18 target (option C)**; the vendor 5.10 kernel + modules remains the only Wi-Fi-capable system; GPL section 3 source request sent 2026-10-01, **no reply held** |
-| **On-device validation** | - | **three bench phases**: 2026-11-19 first userspace boot (patches 001-017, console only); 2026-11-21 canonical `974e6ca6` (2 CPUs, bench LAN, SSH, ubifs overlay, 15-min soak 0 failures, reboot persistent); 2026-11-21 board-feature image `7f270b8c` (2 CPUs, six LEDs, `event0`, `watchdog0`, ping 0% loss) and quiet image **`7421bb7a`** (sha256 `7421bb7a...`; known-good baseline, periodic dmesg spam removed, byte-identical rebuild after the conservative DTS cleanup); automated stock-telnet install verified (2 CPUs after install); the superseded active-DTS image `6f19c6d6` did not boot (regression record); TWD level-high delta boot-tested on image `f6685b80` (2 CPUs, `GIC-0 29 Level twd`, ping 20/20); final MAC/switch/compatible deltas boot-tested on image `c3ef2a50` (2 CPUs, board_name `cudy,wr3000-v2`, ping 15/15); **flashinfo compatible-first boot-tested on image `6e9c54d0`** (stock loader staging PASS, new compatible pair in the DT, cmdline/rootfsb, 2 CPUs); E0-a mirror-off experiment negative (native completions error-flagged, IP dead - mirror workaround required); **E0-b read-only stock-vs-ours captures** (9,488 words each, 0 read failures; 30 candidates / 72 counter rows) led to the IFC->NAPT decode and the M1a proof; **W22 native forwarding landed** - canonical image `50023446` (2 CPUs, dmesg NAPT/flow engine initialized and verified, no mirror tokens, ping 200/200, SSH, reboot determinism PASS); M1a proof image `5800c9ab`; **M1b/fallback-image/soak pending** |
+| **On-device validation** | - | **three bench phases**: 2026-11-19 first userspace boot (patches 001-017, console only); 2026-11-21 canonical `974e6ca6` (2 CPUs, bench LAN, SSH, ubifs overlay, 15-min soak 0 failures, reboot persistent); 2026-11-21 board-feature image `7f270b8c` (2 CPUs, six LEDs, `event0`, `watchdog0`, ping 0% loss) and quiet image **`7421bb7a`** (sha256 `7421bb7a...`; known-good baseline, periodic dmesg spam removed, byte-identical rebuild after the conservative DTS cleanup); automated stock-telnet install verified (2 CPUs after install); the superseded active-DTS image `6f19c6d6` did not boot (regression record); TWD level-high delta boot-tested on image `f6685b80` (2 CPUs, `GIC-0 29 Level twd`, ping 20/20); final MAC/switch/compatible deltas boot-tested on image `c3ef2a50` (2 CPUs, board_name `cudy,wr3000-v2`, ping 15/15); **flashinfo compatible-first boot-tested on image `6e9c54d0`** (stock loader staging PASS, new compatible pair in the DT, cmdline/rootfsb, 2 CPUs); E0-a mirror-off experiment negative (native completions error-flagged, IP dead - mirror workaround required); **E0-b read-only stock-vs-ours captures** (9,488 words each, 0 read failures; 30 candidates / 72 counter rows) led to the IFC->NAPT decode and the M1a proof; **W22 native forwarding landed** - canonical image `50023446` (2 CPUs, dmesg NAPT/flow engine initialized and verified, no mirror tokens, ping 200/200, SSH, reboot determinism PASS); M1a proof image `5800c9ab`; **M1b-1 PASS on all four jacks** (native per-port delivery, no mirror); **15-min soak PASS 900/900 0% loss**; fallback-image test retired as untested-by-design (known limitation); **M1b-3 LAN-to-LAN PASS on eth2<->eth0 AND eth2<->eth1** (software bridge, no hardware L2 offload); **WAN L3 PASS** (DHCP lease 192.168.50.115/24, default route, ICMP both ways); **no bench items remain** |
 
 The one-line summary: the **release line is real, host-validated and bench-verified on one
 unit**, but this is research engineering, not a firmware release: no install path has run on a
@@ -353,10 +357,25 @@ The native data path is now in the release line itself (host-validated + bench-v
   first proven with proof image **`5800c9ab`** (userspace NAPT-init replay, mirror off: native
   port=11 deliveries in the status-77 class, ping 200/200, SSH). [V]
 
-**Scope and pending steps.** W22 is **release-line only - it is not in the L2 upstream review form**
-(the review form is unchanged at 26 patches). Multi-port (per-port native delivery, LAN-to-LAN) is
-the next bench experiment (**M1b**, plan in the retained forwarding docs); the fallback-image
-rebuild and the soak are pending as well. Nothing multi-port is claimed. [I]
+**Bench close-out and remaining steps.** The image was re-installed after recovery #5 with the
+corrected **two-stage pair procedure** (switch the recovered stock to pair a first, then write the
+inactive pair b atomically; installer guard commit `f188360`, documented in
+[docs/INSTALL-RECOVERY-LESSONS.md](docs/INSTALL-RECOVERY-LESSONS.md)) and a **15-minute soak PASSed
+900/900 0% loss**. **M1b-1 PASS (2026-11-22): native per-port CPU delivery on all four jacks** -
+far-right `eth0`/port 9 (ping 200/200 + SSH), second-from-right `eth1`/port 10 (200/200 + SSH),
+`eth2`/port 11 (baseline), leftmost `eth3`/port 12 WAN (link up 1000 Mbps, rx=77 tx=44 DHCP
+frames; ping N/A because it is the WAN zone, not br-lan); back on eth2 20/20 0%. **W22 is
+release-line only - it is not in the L2 upstream review form** (unchanged at 26 patches). **LAN-to-LAN forwarding (M1b-3) is now proven** in both directions on both tested LAN pairs -
+eth2<->eth0 and eth2<->eth1 - with a second host USB-Ethernet adapter: broadcast + learned
+unicast PASS both ways, bridge FDB on the correct ports, through the box's **software bridge
+(no hardware L2 offload required)**. The **WAN L3 path is verified as well**: with the second
+adapter on the leftmost jack (eth3/WAN) a host dnsmasq DHCP server on 192.168.50.1/24 gave the box
+WAN lease **192.168.50.115/24** (udhcpc select/lease logged), eth3 came up with a default route via
+192.168.50.1, and ICMP passed both ways (box->gateway 5/5, host->box 4/4). The host firewall
+(`ufw INPUT DROP`) had to allow UDP 67/68 on the test interface - gotcha recorded. **No bench
+items remain** (the fallback-image test was retired as untested-by-design). The **fallback-image test is retired as untested-by-design** - a
+build cmdline-cache mistake invalidated it; the fallback remains a source option (`naptinit=0` +
+mirror tokens) and is documented as a known limitation, with no further cycles. [I]
 
 ### Canonical boot configuration
 
@@ -481,7 +500,7 @@ The console/soak/reboot logs are private lab evidence under the notebook's gitig
 | **`7f270b8c`** (board features) | L0 + DTS fix + stock board_id=3 LED/keys nodes + pad-dtb + board config | - | bench-verified: 2 CPUs, six LEDs, `event0`, `watchdog0`, ping 0% loss (2026-11-21) |
 | **`7421bb7a`** (known-good, current) | `7f270b8c` line with W17/W19 `dev_dbg` and heartbeat 5 s -> 60 s | sha256 `7421bb7a...` | **bench-verified known-good baseline** (2026-11-21): same features, periodic dmesg spam removed; reproduced byte-for-byte by the conservative comment-only DTS rebuild |
 | **`6e9c54d0`** (DTS-purpose, current hardware baseline) | `7421bb7a` userspace/kernel + all five boot-tested DTS deltas (TWD level-high, MAC-nvmem removal, switch MMIO-first, cudy-first, flashinfo compatible pair; DTB `62574b11...` / pad `8d79794e...`) | - | **boot-tested** (2026-11-21): stock loader `bootfip` staging PASS with the new first compatible; 2 CPUs, `GIC-0 29 Level twd`, cmdline `ubi.mtd=rootfsb` + project marker, zero blockers remain; current DTS-purpose baseline |
-| **`50023446`** (canonical W22) | release line 53 patches incl. W22 059/060 + canonical `naptinit=1` cmdline (no mirror tokens) | sha256 `50023446...` | **bench-verified canonical W22 image** (2026-11-21): 2 CPUs, dmesg `W22: NAPT/flow engine initialized and verified`, native eth2 CPU delivery, ping 200/200 0% loss, SSH, reboot determinism PASS; mirror fallback image documented |
+| **`50023446`** (canonical W22) | release line 53 patches incl. W22 059/060 + canonical `naptinit=1` cmdline (no mirror tokens) | sha256 `50023446...` | **bench-verified canonical W22 image** (2026-11-21): 2 CPUs, dmesg `W22: NAPT/flow engine initialized and verified`, native eth2 CPU delivery, ping 200/200 0% loss, SSH, reboot determinism PASS, **15-min soak PASS 900/900 0% loss**, **M1b-1 per-port delivery PASS on all four jacks**; fallback-image test retired as untested-by-design (the mirror line remains a source option, not a tested image) |
 | **`5800c9ab`** (M1a proof) | adopted release tree + cmdline `cpu_mirror=0 luofu_napt_init=1` + probe-only NAPT-init replay | sha256 `5800c9ab...` | **M1a PROVEN** (2026-11-21): native port=11 deliveries in the status-77 class, ping 200/200, SSH; the userspace proof that led to the W22 kernel patches |
 | **`c3ef2a50`** (DTS-purpose, previous baseline) | `7421bb7a` userspace/kernel + final boot-tested DTS deltas (TWD level-high, MAC-nvmem removal, switch MMIO-first, cudy-first; DTB `a0af2899...` / pad `01b74561...`) | sha256 `c3ef2a50...` | **boot-tested** (2026-11-21): 2 CPUs, `GIC-0 29 Level twd`, `board_name=cudy,wr3000-v2`, MACs ...:73/...:74, br-lan up + ping 15/15 0% loss, no errors; superseded for DTS purposes by `6e9c54d0` |
 | **`f6685b80`** (DTS-purpose, earlier TWD baseline) | `7421bb7a` userspace/kernel + boot-tested TWD level-high DTS delta (DTB `4fde76df...` / pad `4b50de73...`) | - | **boot-tested** (2026-11-21): 2 CPUs, `/proc/interrupts` `GIC-0 29 Level twd`, ~100 Hz counts on both CPUs, ping 20/20, no errors; superseded for DTS purposes by `c3ef2a50` (7421bb7a remains the earlier verified baseline) |
@@ -886,9 +905,11 @@ read-only/print-only instruments are retained under
 initializes the PFE NAPT/flow engine (release-line patch 059) and the native exception class
 delivers unicast to the CPU (patch 060), so the canonical image `50023446` needs **no mirror
 tokens**; M1a was first proven with image `5800c9ab`. The CPU-copy mirror patches 054-057 stay in
-the release line only as the documented fallback (`naptinit=0` + mirror tokens). **Multi-port
-(per-port delivery, LAN-to-LAN) is the pending M1b bench step and is not claimed**; the fallback
-image rebuild and soak are pending too.
+the release line only as the documented fallback (`naptinit=0` + mirror tokens). **M1b-1 PASS (2026-11-22): native per-port delivery was verified on all four jacks** (see the
+wired-LAN row); **M1b-3 LAN-to-LAN PASS on both tested LAN pairs** (eth2<->eth0, eth2<->eth1; broadcast +
+learned unicast both directions; software bridge, no hardware L2 offload); **WAN L3 also verified**
+(host DHCP lease 192.168.50.115/24, default route, ICMP both ways) - no bench items remain. The fallback-image test was retired as untested-by-design (known
+limitation).
 
 ---
 
@@ -1059,8 +1080,8 @@ of this repository or its history.
 - Lab notebook / live research record: **[cudy-wr3000v2](https://github.com/ShibbityShwab/cudy-wr3000v2)**
 - Security research (CVE write-ups, affected versions, disclosure status): **[cudy-wr3000v2-cve](https://github.com/ShibbityShwab/cudy-wr3000v2-cve)**
 - This repository is a curated, fresh-history snapshot of the lab notebook's `opensource/`
-  subtree at the **2026-11-21 W22 release sync** (source `opensource` submodule `5a6d29d` on notebook
-  parent `8558465`): the **53-patch release line** (L0 64 files: 001-060 + 062-065; manifest
+  subtree at the **2026-11-22 M1b bench close-out** (source `opensource` submodule `5803ab0` on notebook
+  parent `0c3ef48`; W22 release integration plus the M1b-1/soak bench results): the **53-patch release line** (L0 64 files: 001-060 + 062-065; manifest
   sha256 `619eb15a...`) including the **W22 native-forwarding patches 059** (PFE NAPT/flow-engine
   init) and **060** (PIE native exception-class delivery), the DTS-only loader hand-off SMP fix
   plus the stock board_id=3 LED/keys nodes, the **conservative comment-only board-DTS cleanup
@@ -1081,8 +1102,14 @@ of this repository or its history.
   release integration**, the retained **native L2/VLAN forwarding docs/instruments** (`m1a/`,
   `w22/`, `m1b/` and analysis under `docs/incoming/lsw-forwarding/`), the DTS regression record,
   the retained read-only device feature inventory (+ update) and Wi-Fi feasibility reports, and the
-  updated engineering docs. The owner-only history-purge runbook stays notebook-side (not
-  published); `PUBLISH-READINESS.md` item 1 remains unchecked. Publication policy: [docs/PUBLISHING.md](docs/PUBLISHING.md);
+  updated engineering docs. W22 bench close-out: **M1b-1 PASS** (native per-port CPU delivery on
+  all four jacks; M1B-RESULTS retained), **15-minute soak PASS 900/900 0% loss**, the corrected
+  **two-stage post-recovery install rule** (installer guard `f188360`), LAN-to-LAN PASS on
+  both tested pairs (eth2<->eth0, eth2<->eth1; software bridge, no hardware L2 offload), optional
+  WAN L3 verified (host DHCP lease 192.168.50.115/24, default route, ICMP both ways; no bench items
+  remain), and the fallback-image
+  test retired as untested-by-design. The owner-only history-purge runbook stays notebook-side
+  (not published); `PUBLISH-READINESS.md` item 1 remains unchecked. Publication policy: [docs/PUBLISHING.md](docs/PUBLISHING.md);
   provenance: [NOTICE.md](NOTICE.md).
 
 > **The honest bottom line:** this is real, host-validated and bench-verified engineering on
@@ -1098,8 +1125,12 @@ of this repository or its history.
 > was first proven with image `5800c9ab`. **All documented upstream blockers are closed**, and
 > **W22 is release-line only - not in the L2 review form**. LEDs and both RESET/WPS buttons are
 > physically verified. The mirror patches 054-057 remain only as the documented fallback
-> (`naptinit=0` + mirror tokens). **M1b (per-port/LAN-to-LAN), the fallback-image rebuild and the
-> soak are pending bench steps**, and multi-port is not claimed. The E0/M1a history and retained
+> (`naptinit=0` + mirror tokens). Bench close-out: the **15-minute soak PASSed 900/900 0% loss** and
+> **M1b-1 PASSed** (native per-port delivery on all four jacks) and **M1b-3 LAN-to-LAN is proven
+> on both tested LAN pairs** (eth2<->eth0 and eth2<->eth1; software bridge, no hardware L2
+> offload); the WAN L3 path is verified too (host DHCP lease 192.168.50.115/24, default route, ICMP
+> both ways), and the fallback-image test is
+> retired as untested-by-design (known limitation). The E0/M1a history and retained
 > native-forwarding docs/instruments are under `docs/incoming/lsw-forwarding/`; the **install/recovery
 > lessons** are recorded in `docs/INSTALL-RECOVERY-LESSONS.md`. The owner-only legacy history-purge
 > runbook is prepared/dry-run validated notebook-side **but not executed** (`PUBLISH-READINESS.md`
@@ -1107,9 +1138,10 @@ of this repository or its history.
 > build step; the aggressive DTS cleanup is a recorded boot regression and was reverted. These
 > results supersede the earlier "host-only, never booted" state - but they do **not** make this
 > a release: `platform_do_upgrade` has never run on a device, per-slot A/B trailer handling
-> and the loader env re-stamp remain open, only one Ethernet jack works through the CPU-copy
-> workaround (multi-port currently needs the native bridge), native switch forwarding is a
-> separate unresolved project, Wi-Fi is vendor-only and unsupported on 6.18, thermal is
+> and the loader env re-stamp remain open; native per-port CPU delivery now works on all four
+> jacks (M1b-1), LAN-to-LAN forwarding is proven on both tested LAN pairs through the software
+> bridge (no hardware L2 offload), and native switch L2/VLAN offload is a separate optional
+> project, Wi-Fi is vendor-only and unsupported on 6.18, thermal is
 > unsupported on this board, per-driver silicon validation is partial, and no upstream
 > submission exists. The 26-patch review form is a set of drafts/RFCs, not merge-ready kernel
 > code. Treat the repository as a well-documented, honest starting point for an upstream port -
