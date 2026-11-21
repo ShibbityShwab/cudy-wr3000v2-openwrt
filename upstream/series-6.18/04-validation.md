@@ -1310,3 +1310,108 @@ submodule commit **6c2cc2f** (target DTS + OpenWrt `SUPPORTED_DEVICES`).
 earlier (f6685b80); **two blockers remain** (07 section 6): draft
 drivers/YAMLs (including the in-series binding reorder) and the flashinfo
 binding.  Logs: `validation/release-line/` refreshed.
+
+
+## 27. 2026-11-21 switch binding MMIO-first adoption into the series (review-form rerun)
+
+The boot-tested DTS already used MMIO-first switch `reg`/`reg-names`;
+the in-series binding YAML (source patch
+`021-net-lsw-init-luofu.patch`, and the generated review-form file
+`series/0021-net-lsw-init-luofu.patch`) was reordered to match, so the DTS
+and the binding now agree.  The driver needs no change: it looks the switch
+resources up by name (`platform_get_resource_byname` /
+`devm_platform_ioremap_resource_byname`); the enum order is internal.
+
+The patch commit message was updated to state the new order and that the window
+order is binding/DTS data only.
+
+**Rerun results (2026-11-21, host-only):**
+
+- **source patch** `021-net-lsw-init-luofu.patch`: sha256
+  `86f6f020eb0ee6bb6fe665a11e87542dfe3df4e34864c23d855d28c14269c2e3`;
+  generated review-form file
+  `series/0021-net-lsw-init-luofu.patch`: sha256
+  `d249a83a6da6c945cc7f8f588af1f2f2805467b84be7648aba469ed8f68f233e`;
+- **upstream review form:** patch(1) 26/26 RC=0 (3 offset hunks, 0 fuzz, 0
+  rejects), `git am` 26/26 RC=0, resulting trees identical; checkpatch
+  default and `--strict`: **0 errors, 58 warnings**;
+  `gen-series.py --check` clean;
+- **release-line validator PASS:** 51/51 patch(1) RC=0, 146 file events,
+  3 offset hunks, **0 fuzz, 0 rejects**, strict `git apply` 51/51; target
+  DTS contract and DTS-0001 identity PASS (DTS unchanged: 681 lines sha256
+  `9d96ac31...`; DTB 12,650 B sha256 `a0af2899...`, pad 12,656 B
+  sha256 `01b74561...`);
+- release-line manifest refreshed: 51 include / 11 exclude / 62 patches;
+  manifest sha256
+  `1e00b568819af505ba258682bbec314e590d4488de1acff2f35f98a1ea7ef63a`;
+  `validation/sha256sums.txt` 89 entries, `sha256sum -c` passes 89/89;
+- **flashinfo binding** is the only remaining blocker.  The final host-side
+  option (documented `hisilicon,luofu-flashinfo` compatible first with the
+  vendor string as fallback, plus the drafted reserved-memory binding) and the
+  exact one-variable loader boot-test are specified in
+  `../../docs/incoming/upstream-blockers/01-flashinfo-reserved-memory/README.md`;
+  it has **not** been run and no hardware claim is made.
+
+
+## 28. 2026-11-21 LAST blocker closed: flashinfo compatible-first boot-test (image 6e9c54d0)
+
+The last remaining blocker - the `hsan,flashinfo_reserved` stock-loader
+hand-off binding - was closed by hardware.  The target DTS now uses
+`compatible = "hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"`; the
+documented upstream string is first and the vendor string stays as fallback.
+The drafted reserved-memory binding remains the maintainer-facing documentation
+(`docs/incoming/upstream-blockers/01-flashinfo-reserved-memory/`).
+
+**Boot-test PASS (image 6e9c54d0):** a clean consistent stock pair was restored
+by RESET-hold recovery, then the flashinfo-test image (current adopted DTS with
+only the compatible list changed) was flashed over the broker channel to pair b
+(mtd write kernelb, ubiformat mtd14, `fw_setenv bootflag=b` verified,
+selector boot_reg 0x11 verified, FIRE_OK) and rebooted.  U-Boot logged
+`bootflag b bootreg 11` and `Image Name: Linux-6.18.60`; `bootfip`
+staging lines appear for the new first compatible (`alias console=/serial@1010f000`,
+`serialnr->high=0x8250`, `serialnr->low=0x1010f000`,
+`atag_addr=0x80601000`).  Boot: 6.18.60, 2 CPUs, `GIC-0 29 Level twd`;
+`/proc/cmdline` contains `ubi.mtd=rootfsb` and the full
+`luofu_switch` marker;
+`/proc/device-tree/reserved-memory/flashinfo@80600000/compatible` =
+`hisilicon,luofu-flashinfo hsan,flashinfo_reserved`; selector 0x11; no
+Oops/BUG/panic/RCU stall.  Evidence:
+`build/evidence-bench-gates/flashinfo-loader/`.  Adopted in submodule commit
+**71b2167**.
+
+**Artifacts after adoption:**
+
+- DTS: **681 lines**, sha256
+  `381b2e8ca54d88f91b23370717bc3f635b979ecb1f8e841a2b5af05f960809b2`;
+- DTS-0001: sha256
+  `886f3ad095fc075cdf746cb0372eaf28c912fef91592f2885a739a7211bdf74c`
+  (694 lines), regenerated from the single source, byte-identical;
+- DTB: **12,678 B** sha256
+  `62574b118afd0aaf445b03d7ed49c9e021be78d39049dcb0626b9130f94ca899`;
+  totalsize unaligned, `pad-dtb.py` pads to **12,680 B** sha256
+  `8d79794effef4d29523908618ebbdb1b0a47469dffcfdbea78a239191860b055`, loader
+  hand-off contract preserved (compatible pair).
+- New DTS-purpose hardware baseline: image **6e9c54d0** (supersedes c3ef2a50;
+  f6685b80 the previous DTS-purpose baseline and 7421bb7a the earlier verified
+  baseline).
+
+**Validation (host-only, pristine 6.18.60):**
+
+- release-line validator **PASS** after updating its contract check to the new
+  compatible pair: 51/51 patch(1) RC=0, 146 file events, 3 offset hunks,
+  **0 fuzz, 0 rejects**, strict `git apply` 51/51; target DTS contract
+  (`hisilicon,luofu-flashinfo hsan,flashinfo_reserved`) and DTS-0001
+  identity PASS; pad step exercised (new DTB/hashes above);
+- upstream review form: not rerun - no series file changed by the DTS-only
+  compatible update; the last recorded run remains 26/26 patch(1)+`git am`,
+  identical trees, 0 errors / 58 checkpatch warnings;
+- `gen-series.py --check` clean; release-line manifest unchanged
+  (51 include / 11 exclude, sha256 `1e00b568...`);
+  `validation/sha256sums.txt` refreshed (89 entries) and
+  `sha256sum -c` passes 89/89.
+
+**Blocker status: ZERO remain.**  Install/recovery lessons from the boot-test
+(env bootflag + selector together after recovery, pair-b-only images, broker
+requires a consistent vendor pair, mixed-pair state) are documented in the
+install/recovery docs and the installer tool.  Logs:
+`validation/release-line/` refreshed.

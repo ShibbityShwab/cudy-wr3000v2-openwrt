@@ -1,49 +1,39 @@
-# Upstream blocker-reduction drafts - luofu 6.18 series (2026-11-21, final deltas adopted)
+# Upstream blocker-reduction drafts - luofu 6.18 series (2026-11-21, ZERO blockers)
 
-> **Curated copy (synced 2026-11-21).** The three active-DTS blockers (6.18 MAC provisioning,
-> switch MMIO-first order, cudy compatible ordering) were boot-tested on image **c3ef2a50** and
-> adopted, together with the earlier TWD level-high delta (image `f6685b80`); **two blockers
-> remain** (draft drivers/YAMLs, flashinfo binding). These are retained **documentation + patch
-> drafts only** - not the release series, not applied. Text-only: no vendor binaries, firmware
-> blobs, credentials, per-unit identifiers or host paths. Any new active delta needs its own
-> hardware boot-test. See
-> [../../../upstream/series-6.18/07-dts-upstream-bindings.md](../../../upstream/series-6.18/07-dts-upstream-bindings.md) section 6.
+> **Curated copy (synced 2026-11-21).** All documented upstream blockers are now **CLOSED** (last:
+> flashinfo loader hand-off binding, boot-tested on image `6e9c54d0`). The remaining files are
+> maintainer-facing documentation and drafts for normal RFC review (driver/YAML items, the
+> reserved-memory binding), **not open blocker tasks**. Text-only; nothing applied; any future
+> active-DTS change still needs its own boot-test. See
+> [../../../upstream/series-6.18/07-dts-upstream-bindings.md](../../../upstream/series-6.18/07-dts-upstream-bindings.md)
+> section 6 and [../../../docs/PUBLISHING.md](../../../docs/PUBLISHING.md).
 
-**STATUS: documentation + patch drafts only for the remaining work.**  The three
-active-DTS blockers (6.18 MAC provisioning, switch MMIO-first order, cudy
-compatible ordering) were **boot-tested PASS on image c3ef2a50** and adopted
-(commit `6c2cc2f`); TWD was adopted earlier (image f6685b80).  **Two
-blockers remain**: draft drivers/YAMLs and the flashinfo binding.  Current final
-DTS 681 lines sha256 `9d96ac31...`; DTB 12,650 B sha256 `a0af2899...`
-(pad 12,656 B sha256 `01b74561...`); DTS-0001 sha256 `c029fd44...`
-(694 lines).  Current DTS-purpose baseline image **c3ef2a50** supersedes
-f6685b80; 7421bb7a is the earlier verified baseline.
+**STATUS: ZERO upstream blockers remain.**  The last blocker - the
+`hsan,flashinfo_reserved` loader hand-off binding - was closed by hardware
+boot-test image **6e9c54d0**: the target DTS now uses
+`compatible = "hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"` and
+the stock loader accepted the documented first compatible (bootfip staging
+lines, 2 CPUs, cmdline/rootfsb, compatible property all verified).  Adopted in
+commit `71b2167`; evidence in `build/evidence-bench-gates/flashinfo-loader/`.
 
-## Remaining blockers
+Current final artefacts: DTS 681 lines sha256 `381b2e8c...`; DTB 12,678 B
+sha256 `62574b11...` (pad 12,680 B sha256 `8d79794e...`); DTS-0001
+sha256 `886f3ad0...` (694 lines); current DTS-purpose baseline image
+**6e9c54d0** (supersedes c3ef2a50; f6685b80 and 7421bb7a earlier).
 
-| # | blocker | after this package | artifact |
-| --- | --- | --- | --- |
-| 1 | Drivers + YAMLs are still drafts | **open** - prioritized top-issue review; the in-series switch binding YAML still needs the MMIO-first reorder (DTS side boot-tested, binding-side change pending) | `05-driver-yaml-review.md`, `03-switch-binding-mmio-first/binding.diff` |
-| 2 | `hsan,flashinfo_reserved` has no upstream binding | **drafted** - reserved-memory child binding + compatible/loader options; needs maintainer direction; one loader boot-test only if the vendor string is not first | `01-flashinfo-reserved-memory/` |
+## Closed blockers
 
-**Closed by hardware boot-tests:**
+- TWD level-high - boot-tested f6685b80.
+- 6.18 MAC provisioning, switch MMIO-first order (DTS + in-series binding),
+  cudy-compatible ordering + OpenWrt metadata - boot-tested c3ef2a50.
+- flashinfo loader hand-off binding - boot-tested 6e9c54d0 (this file's
+  `01-flashinfo-reserved-memory/README.md` has the full PASS record).
 
-- TWD level-high (image f6685b80) - 2 CPUs, `GIC-0 29 Level twd`, counts ~100 Hz, ping 20/20.
-- 6.18 MAC provisioning (image c3ef2a50) - nvmem cells removed, userspace MACs ...:73/...:74.
-- Switch MMIO-first (image c3ef2a50) - switch data path works, br-lan up, ping 15/15.
-- cudy compatible ordering + OpenWrt metadata (image c3ef2a50) - `board_name=cudy,wr3000-v2`, compatible order verified.
-
-## What is hardware-dependent (remaining)
-
-- Flashinfo binding: one loader boot-test only if the vendor compatible is moved
-  from first position; otherwise documentation-only.
-- Driver/YAML cleanups: code review, not hardware.
+The in-series driver/YAML review items in `05-driver-yaml-review.md` are
+normal RFC submission content, not blocker tasks.
 
 ## Rules
 
-- These files are proposals for the remaining work; adopted deltas are in the
-  target DTS / target image recipe.  Any new active delta needs its own unit
-  boot-test.
-- Patch drafts are unified diffs against the tree state at their creation; they
-  may need rebasing after maintainer review.
+- No remaining hardware test is required for a documented blocker; any future
+  active-DTS change still needs its own boot-test.
 - No curated repos were touched; no submission/email/web action was taken.

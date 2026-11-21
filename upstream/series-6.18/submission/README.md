@@ -2,15 +2,13 @@
 
 > **Curated copy (synced 2026-11-21).** This is the lab notebook's documentation-only upstream
 > submission package; **nothing has been submitted anywhere** (no account, list subscription or
-> email transport is included). It is reproduced here as part of the release record and now
-> reflects the final boot-tested devicetree adoption: **two remaining blockers** (draft
-> drivers/YAMLs incl. the in-series binding reorder, and the flashinfo binding), DTS-0001
-> `c029fd44...`, DTB `a0af2899...` / pad `01b74561...`, hardware baseline `c3ef2a50`.
-> `MANIFEST.sha256` was **regenerated against this curated tree** (the notebook manifest covers the
-> notebook layout/originals; this repository's review-form README carries a curated note,
-> `01-commit-messages.md` uses this repository's path layout, and host tools carry MIT SPDX
-> headers). Verify with `sha256sum -c MANIFEST.sha256` from inside this directory. No
-> Tested-by/Reviewed-by is claimed (see `TESTED-BY-POLICY.md`).
+> email transport included). It now reflects the **ZERO-blocker** final state: flashinfo
+> compatible-first adopted (boot-tested image `6e9c54d0`, stock loader PASS), current hashes
+> (DTS `381b2e8c...`, DTS-0001 `886f3ad0...`, DTB `62574b11...` / pad `8d79794e...`, release-line
+> manifest `1e00b568...`), and the rerun review form (patch 0021 MMIO-first; 26/26, checkpatch 0
+> errors / 58 warnings). No Tested-by/Reviewed-by is claimed (see `TESTED-BY-POLICY.md`).
+> `MANIFEST.sha256` was **regenerated against this curated tree**; verify with
+> `sha256sum -c MANIFEST.sha256` from inside this directory.
 
 **Status: DOCUMENTATION-ONLY PACKAGE / RFC.  Nothing has been submitted
 anywhere.**  This directory is a dry-run hand-off bundle for the owner to review
@@ -23,13 +21,14 @@ regenerated 2026-11-21 from the current tree (see git log for the exact commit).
 | item | value |
 | --- | --- |
 | kernel review form | 26 patches in `../series/` (RFC / do-not-merge split; see `../00-cover-letter.md`) |
-| DTS-series entry | **DTS-0001** `../dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch`, sha256 `c029fd44e686e4366d238056582d4bd6c7dcc1a280cadda3792b76991c4ff5b8` (694 lines) |
-| single-source board DTS | pre-clean 1,329 lines -> conservative cleanup **691 lines** (7ae18f2) -> TWD delta **700 lines** (5b401c1) -> final deltas **681 lines** (6c2cc2f); sha256 `9d96ac31b49cecebd8e99fec7b53ba0ef5ee52132383bd46cf1c0eda0b17f342` |
-| compiled board DTB | **12,650 B** sha256 `a0af289969ff7a458448a8171eaf56b8332e18c771c362880af88a1998721b94`; unaligned totalsize, `pad-dtb.py` pads to **12,656 B** sha256 `01b74561869cf3d959c1a64defff6fcc70da81ef21f1370adb492eb8fe6a7df4` |
-| current DTS-purpose hardware image | **c3ef2a50** (boot-tested final deltas: 2 CPUs, `GIC-0 29 Level twd`, board_name=cudy,wr3000-v2, MACs ...:73/...:74, ping 15/15).  Previous DTS-purpose baseline: f6685b80; earlier verified baseline: 7421bb7a |
+| DTS-series entry | **DTS-0001** `../dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch`, sha256 `886f3ad095fc075cdf746cb0372eaf28c912fef91592f2885a739a7211bdf74c` (694 lines) |
+| single-source board DTS | pre-clean 1,329 lines -> conservative cleanup **691 lines** (7ae18f2) -> TWD delta **700 lines** (5b401c1) -> MAC/switch/compatible deltas **681 lines** (6c2cc2f) -> flashinfo compatible-first **681 lines** (71b2167); sha256 `381b2e8ca54d88f91b23370717bc3f635b979ecb1f8e841a2b5af05f960809b2` |
+| compiled board DTB | **12,678 B** sha256 `62574b118afd0aaf445b03d7ed49c9e021be78d39049dcb0626b9130f94ca899`; unaligned totalsize, `pad-dtb.py` pads to **12,680 B** sha256 `8d79794effef4d29523908618ebbdb1b0a47469dffcfdbea78a239191860b055` |
+| current DTS-purpose hardware image | **6e9c54d0** (boot-tested flashinfo compatible-first: stock loader staging PASS, 2 CPUs, `GIC-0 29 Level twd`, cmdline ubi.mtd=rootfsb + project marker).  Previous DTS-purpose baseline: c3ef2a50; earlier: f6685b80/7421bb7a |
 | release-line validator | PASS: 51 include / 11 exclude, 51/51 patch(1) RC=0, 3 offset hunks, **0 fuzz**, strict git apply 51/51; DTS contract and DTS-0001 byte-identity OK |
 | review form checks | 26/26 patch(1) and `git am`, identical trees, 3 offset hunks, 0 fuzz; checkpatch **0 errors / 58 warnings** |
-| current devicetree final | submodule commit **6c2cc2f** (conservative cleanup 7ae18f2 + boot-tested TWD level-high + final MAC/switch/compatible deltas); the superseded active cleanup **538377c** is regressed and NOT current (`../04-validation.md` sections 22-26, `../07-dts-upstream-bindings.md` section 6) |
+| current devicetree final | submodule commit **71b2167** (conservative cleanup 7ae18f2 + boot-tested TWD level-high + MAC/switch/compatible deltas + boot-tested flashinfo compatible-first); the superseded active cleanup **538377c** is regressed and NOT current (`../04-validation.md` sections 22-28, `../07-dts-upstream-bindings.md` section 6) |
+| remaining upstream blockers | **ZERO** - all active-DTS/code blockers closed; the drafted flashinfo binding remains maintainer-facing documentation only |
 
 ## What is in this package
 
@@ -44,16 +43,16 @@ regenerated 2026-11-21 from the current tree (see git log for the exact commit).
 
 | artifact | sha256 | role |
 | --- | --- | --- |
-| `../../../target-skeleton/dts/luofu-r116.dts` | `9d96ac31b49cecebd8e99fec7b53ba0ef5ee52132383bd46cf1c0eda0b17f342` | single-source board DTS (outside the package tree) |
-| `../00-cover-letter.md` | `4ea2a3e1337abd47991eb16203e4aed5b84ca51f16afab4f3467135b3bfb086c` | submission document |
-| `../01-commit-messages.md` | `d9fbfa51823d771ec1150358c716a53ea98a03d615529d60f5e0a2e3e4069ecd` | submission document |
+| `../../../target-skeleton/dts/luofu-r116.dts` | `381b2e8ca54d88f91b23370717bc3f635b979ecb1f8e841a2b5af05f960809b2` | single-source board DTS (outside the package tree) |
+| `../00-cover-letter.md` | `eabcdf08697e6545faad7562d9335c721d23f32f507d60b67266ae2912ddde71` | submission document |
+| `../01-commit-messages.md` | `46eb1afc4584b078bdfc85fe1df67daf7b96a7c2c44b8d7eab9339d46eb70d47` | submission document |
 | `../02-maintainers-proposal.md` | `30ae8a95b2786b3d60153f26fc4b8bf7b0c4b38b78e06e82e60b4a7f26d05c31` | submission document |
 | `../03-rationale-tree-placement.md` | `7fdf3c34343a6004d69fc8cd55a055db02b0e471f363c91270e54889179350fa` | submission document |
-| `../04-validation.md` | `208e7ae622d081f309a04501e6f0a9f46bae93460a3a3d7710375149b7ab35c7` | submission document |
-| `../05-release-line.md` | `e5f989e0299e6e4d772dd532257e9e765d0cab63423be2a293d3b39af47bf82e` | submission document |
-| `../06-dts-series-dependency.md` | `f985972feebb9b25cd3a4348a778c20eb0ecb4a9ae8a2740e6313e061f8fa76e` | submission document |
-| `../07-dts-upstream-bindings.md` | `1c58884abaf1cb7b06d704d6fd153e6996de1e708e6fe813891f903179a04360` | submission document |
-| `../README.md` | `ea0bebdc51b50c400794a1bd3544bf5c10a4ba9bbf3f0872942bec486c00e8c8` | submission document |
+| `../04-validation.md` | `d7fb71fbe86ca37439a70c5c42e7aa01e400010e795751e4eb3954679e9ae627` | submission document |
+| `../05-release-line.md` | `b2b17ac7b8813b2395aaf9cb9179ca3dbbed2f22d9b645116df97af60ff24494` | submission document |
+| `../06-dts-series-dependency.md` | `5e5486bd71663e829b48b42909e5a94c55f6a7d3d01224b4b56db0df582e0f6c` | submission document |
+| `../07-dts-upstream-bindings.md` | `2ccee41d0a0ee77bf2b2796a625f0bae0addd39712d0f3c482f720046a17162a` | submission document |
+| `../README.md` | `fbdbf6337f7f3abef2f69e58a53102693156f60a7b6d7c3b1ede181db4f2587b` | submission document |
 | `../commit-messages/0001-arm-mach-hisilicon-luofu.txt` | `766990284609fe095e6d971fc1414972899aa2d5f8d0ff6048a9e1a4415b2ad5` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0002-arm-kconfig-textofs.txt` | `5f188ce552a4d5bd54cd98f031396c0f910d40f8ac9e566712711300a098ca5a` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0003-arm-textofs-nonimmediate.txt` | `76d40be5e780a9a2510fbbf50b0ed16294883881105dc22cea42e389e66e7dbe` | per-patch commit-message draft (provenance) |
@@ -74,16 +73,16 @@ regenerated 2026-11-21 from the current tree (see git log for the exact commit).
 | `../commit-messages/0018-arm-mach-hisilicon-smp.txt` | `3c6d80645d45417b3a1c817b97dc5c6b481585d82dc94aa7d4dba9fa0dbcdcba` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0019-arm-clk-luofu-clock-tree.txt` | `957ebc55793bd4ee4b04343fbb408cf0330f67441af5177b3eab7c8dbcbd7372` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0020-net-pie-datapath-luofu.txt` | `5b5491cc011a0507991e0adb17b3ba4e109da11f028ee3cfb8091a549a5d821b` | per-patch commit-message draft (provenance) |
-| `../commit-messages/0021-net-lsw-init-luofu.txt` | `f783373b43c94012737f3632cae784a92acf6a6207f83af1c43847be5e1ebf05` | per-patch commit-message draft (provenance) |
+| `../commit-messages/0021-net-lsw-init-luofu.txt` | `e5c7050afb38d4bb9f95f3f4489324e1b000d33cf4ff1efbaf979691fc820079` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0022-net-lsw-qidmap-write-luofu.txt` | `f0e486a5064482686dc9df1fb8ce1d7661436d77f2c3912cf800b9521ab31d2a` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0023-net-gmac-netdev-connect-luofu.txt` | `a4f982aff5e990243344996ff1b923912caa0a72f0bd739a8fac2075cbfec8be` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0024-net-pie-completion-decode-luofu.txt` | `4f0ed10cb5849f9ecc27eb523714f4a04c833f668a6773fd8b91fd88e5938814` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0025-net-lsw-egress-luofu.txt` | `18f99bae18c640b3b7c2e6248469f9e16c4de2eba8f20f2b75354c0249c74204` | per-patch commit-message draft (provenance) |
 | `../commit-messages/0026-net-gmac-bdinfo-mac-nvmem.txt` | `bc31ff38703abd5e0c9e1d835943dfd41f5a3209448d4232beb07c1d915a6db8` | per-patch commit-message draft (provenance) |
-| `../dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch` | `c029fd44e686e4366d238056582d4bd6c7dcc1a280cadda3792b76991c4ff5b8` | DTS-series entry DTS-0001 (companion of 0018) |
+| `../dts-series/0001-arm-dts-hisilicon-luofu-r116-loader-handoff.patch` | `886f3ad095fc075cdf746cb0372eaf28c912fef91592f2885a739a7211bdf74c` | DTS-series entry DTS-0001 (companion of 0018) |
 | `../release-line/EXCLUDED.txt` | `35501a8366bb3404faaf6a3c3b0bb5bce684ebd6e36a2cee03a95a31b1b6895e` | release-line manifest/classification |
 | `../release-line/INCLUDED.txt` | `af5f32e40fd6bb7995205f90e4f5e2c796398c3fd8f15ba86d5f62c1305e9120` | release-line manifest/classification |
-| `../release-line/manifest.tsv` | `4da8b960c3ad83939e0766a86969e8de2737a5b6eb79c91e80d28905f7030fd0` | release-line manifest/classification |
+| `../release-line/manifest.tsv` | `1e00b568819af505ba258682bbec314e590d4488de1acff2f35f98a1ea7ef63a` | release-line manifest/classification |
 | `../series/0001-arm-mach-hisilicon-luofu.patch` | `c5eef73ce928b2e9f1bd0f397c3164d6b7a108fc930ccf7e537b184c81eee08b` | kernel review-form patch |
 | `../series/0002-arm-kconfig-textofs.patch` | `bbb0266e2230d1c7e11ea616cd2f5591e1e3e043f042a62bc0c871f802597ad5` | kernel review-form patch |
 | `../series/0003-arm-textofs-nonimmediate.patch` | `3bdcf2bcee6c8a6ceece7ca1ec357702230b979eae79578d0d67cc479c05befe` | kernel review-form patch |
@@ -104,26 +103,26 @@ regenerated 2026-11-21 from the current tree (see git log for the exact commit).
 | `../series/0018-arm-mach-hisilicon-smp.patch` | `b83933ee6b1aff92910ce5472ff428f261140f2a98fa8eed1f42cf2e6264479c` | kernel review-form patch |
 | `../series/0019-arm-clk-luofu-clock-tree.patch` | `d97fd9aa2c2bc6a1110b4e88aaa851094647ce4b5084e2612e771d91e27f99e9` | kernel review-form patch |
 | `../series/0020-net-pie-datapath-luofu.patch` | `624fa7cc19fcaa79d4d668c758d0216814863e99c561d775edba145ee3059212` | kernel review-form patch |
-| `../series/0021-net-lsw-init-luofu.patch` | `d20a2e676ce148396d7d71267fce120c06e983884aca7ff84b20b1f5e3815497` | kernel review-form patch |
+| `../series/0021-net-lsw-init-luofu.patch` | `d249a83a6da6c945cc7f8f588af1f2f2805467b84be7648aba469ed8f68f233e` | kernel review-form patch |
 | `../series/0022-net-lsw-qidmap-write-luofu.patch` | `8c2b139a4f0b2bff8732363ba5962328bd09fad5e88ff4edeadb48696d157b53` | kernel review-form patch |
 | `../series/0023-net-gmac-netdev-connect-luofu.patch` | `9119bb372977cc1d37e1328f8f110719959841148e8803c67882beb2262343f8` | kernel review-form patch |
 | `../series/0024-net-pie-completion-decode-luofu.patch` | `5e93d7200543407841c201a4f6bc8decc664dce5680041f384b31ad44d6271b8` | kernel review-form patch |
 | `../series/0025-net-lsw-egress-luofu.patch` | `507ce72495c09d104b0ad63ebac44ecf20a94a36e25f81b7739802f8fa005a00` | kernel review-form patch |
 | `../series/0026-net-gmac-bdinfo-mac-nvmem.patch` | `099d7253f50c50ad18bce642a2d52fca7af37c9b1c7ac356038eafe3c7aa26df` | kernel review-form patch |
-| `../tools/check-release-line.sh` | `f0f7025cd18d6b6f7500d9bfc7e24dae39d1afd93051cc250aadc561ca5876dc` | validation/regeneration tool |
+| `../tools/check-release-line.sh` | `75b99f065fa972aa476731e8ced4f2be8e8461eb0e5ba001cf04e74513333922` | validation/regeneration tool |
 | `../tools/gen-dts-series-patch.py` | `17f971dc1ac2bd2f9837d8baeddf996ecc7cf4e1b45423170025ae838d2c5a71` | validation/regeneration tool |
 | `../tools/gen-series.py` | `833efd29a9c8a6700cbbb4ba483a2195a5c19d5be1fca74d0aecda4c76e24f6f` | validation/regeneration tool |
 | `../tools/run-validation.sh` | `460de5bc233b965140c4145de590074c0d2014b9a0dbb6747543bb1ca6046a25` | validation/regeneration tool |
 | `../validation/checkpatch-default-summary.txt` | `30809589945efcc293a2d59130aeb3fc3a2d3b924ea91251557d04ea30d7d44e` | validation log |
-| `../validation/checkpatch-default.log` | `c297d476734d9d90ffc406db19567d4fd54535b95fb8384526576b4c9218dd83` | validation log |
+| `../validation/checkpatch-default.log` | `69748a2e6379b4a9fe3e7928c700b21258fa8f47c49158a9df0c873430e8e448` | validation log |
 | `../validation/checkpatch-strict-summary.txt` | `a2732ceb427e9d7103524f1c7439e77103d7f4b290f06df03bac77e1c1e07f6d` | validation log |
-| `../validation/checkpatch-strict.log` | `a44116402b26951171652687b2a0d23e7c05eebff7fcddf2f8cf7c51490bb085` | validation log |
+| `../validation/checkpatch-strict.log` | `745a97eee0ebe82fbcfa6b5b8762a717557725f7fc48ea5c7066e8549a292899` | validation log |
 | `../validation/checkpatch-summary.txt` | `f54741bf38811a5ab3a18d6c2a2d4af2ff88144a382469ffa8a5d7c56b2ed4b3` | validation log |
 | `../validation/checkpatch-version.txt` | `92e929bf6fdae4a35e44eef54cf2dbcf4d465b241139574b3f57de488fd5818c` | validation log |
 | `../validation/git-am-summary.txt` | `19da267e633c7ebe507b101ca05a4ba1ba55272f9b47a92002989046d23683fc` | validation log |
 | `../validation/git-am.log` | `2672c0d1eabda0987b677df383c49674745345abb06b73bac1183cd603056de9` | validation log |
 | `../validation/git-diffstat.txt` | `28e2c642cd3ff30b131350dd6a3bb2fb0ea331a1921c5bd7804ea4d56ba7df92` | validation log |
-| `../validation/git-log.txt` | `221ad19073995773d101e1b3dec8aee0b915f5f4ba63af32dc8a49c57ec904ce` | validation log |
+| `../validation/git-log.txt` | `3cf37a50a4e88023836637553602d07f0ef5296c16350fd58da3bd62173dad1f` | validation log |
 | `../validation/git-status.txt` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | validation log |
 | `../validation/offsets.txt` | `8140eb24235ed434a8db162121fd90e72c5fa9d5bc97c5b220c9704f26647423` | validation log |
 | `../validation/patch-apply.log` | `48db9433a6cb504760c24af893c2d56b93cc3d34ab798dc953520c0b0ba31d09` | validation log |
@@ -136,10 +135,10 @@ regenerated 2026-11-21 from the current tree (see git log for the exact commit).
 | `../validation/release-line/git-apply-strict.log` | `a2986a59946d7e6fca451ef1cdd2e5e2ee0c7a55ebd9c5e7d72e62446a80297e` | validation log |
 | `../validation/release-line/included.txt` | `af5f32e40fd6bb7995205f90e4f5e2c796398c3fd8f15ba86d5f62c1305e9120` | validation log |
 | `../validation/release-line/offsets.txt` | `75528687d76d4c88332abdb72d57e16488051387eab5c7992e37c4a3afb7b97c` | validation log |
-| `../validation/release-line/pad-dtb.log` | `15d73e87fd98ed5514188700f0558d15ab8dab8548456be9367dd89252cb63bf` | validation log |
+| `../validation/release-line/pad-dtb.log` | `98fa85fefcb9e5b10a2cee671767ea923224c40270d7d659acd86fff908b8efe` | validation log |
 | `../validation/release-line/patch-apply.log` | `29c2b56b31433342b568973e8bd73c8c65bcb611b5aacdf8dab58820ceec06a1` | validation log |
-| `../validation/release-line/summary.txt` | `fdfb774cc73dadc824b8ed26acb0c8791e8f5120bbabe3ecc726592fb5d92b9b` | validation log |
-| `../validation/sha256sums.txt` | `e6fafb83322f3084b78ec1f3cdd8480301af4ae77266487163e8ff5743cdd34c` | validation log |
+| `../validation/release-line/summary.txt` | `386178317ef273686c4374b507d5bf951a1f8f8ad22a8c994401273f463ff544` | validation log |
+| `../validation/sha256sums.txt` | `4debf7ac9c23ca9016460bf96ac66441eccb9d2c0f112d02c8712d2f2cadc6fb` | validation log |
 | `../validation/tree-diff.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | validation log |
 | `../validation/tree-equivalence.txt` | `7a399c88d8c6aad4e39f3553c6c4b56986823f6c666bc87c35be41d74845b2a2` | validation log |
 | `../validation/version.txt` | `fca6872c788884dd9df279d37e972d76924f2426be56259c9c451a47ae93f95e` | validation log |
@@ -173,24 +172,29 @@ checks (patch apply, dtc, contract, pad, checkpatch) are necessary but not
 sufficient - the rebuilt image must be boot-tested on the unit after any
 active-DTS change.
 
-## Two remaining blockers before this could be merge-intent (status 2026-11-21); all active-DTS deltas boot-tested
+## ZERO remaining blockers (status 2026-11-21)
 
-Blocker-reduction drafts (documentation + patch drafts only for the remaining
-work) live under `../../../docs/incoming/upstream-blockers/`.
+**All documented upstream blockers are closed.**  The last one - the
+`hsan,flashinfo_reserved` loader hand-off binding - was closed by hardware
+boot-test image **6e9c54d0**: the target DTS now uses
+`compatible = "hisilicon,luofu-flashinfo", "hsan,flashinfo_reserved"` and the
+stock loader accepted the documented first compatible (bootfip staging lines,
+`atag_addr=0x80601000`, 2 CPUs, cmdline ubi.mtd=rootfsb + project marker, no
+Oops/BUG/panic/RCU stall).  Evidence:
+`build/evidence-bench-gates/flashinfo-loader/`; adopted in commit
+`71b2167`.  The drafted reserved-memory binding stays as maintainer-facing
+documentation (`../../../docs/incoming/upstream-blockers/01-flashinfo-reserved-memory/`).
 
-| # | blocker | status | draft |
-| --- | --- | --- | --- |
-| 1 | drivers + YAMLs are still drafts | open - prioritized top-issue review; the in-series switch binding YAML still needs the MMIO-first reorder (DTS side boot-tested) | `05-driver-yaml-review.md`, `03-switch-binding-mmio-first/binding.diff` |
-| 2 | `hsan,flashinfo_reserved` has no upstream binding | drafted reserved-memory child binding; maintainer direction needed; boot-test only if the vendor string is not first | `01-flashinfo-reserved-memory/` |
+**Closed by hardware boot-tests:** TWD level-high (f6685b80); MAC-nvmem removal,
+switch MMIO-first order (DTS + in-series binding) and cudy-compatible ordering
+(c3ef2a50); flashinfo compatible-first (6e9c54d0).  The remaining
+draft-driver/YAML review items are normal RFC submission content, not blocker
+tasks.  No hardware test remains for a documented blocker.
 
-**Closed by hardware boot-tests:** TWD level-high (image f6685b80, 2 CPUs,
-`GIC-0 29 Level twd`, counts ~100 Hz, ping 20/20); MAC-nvmem removal,
-switch MMIO-first order and cudy-compatible ordering (image c3ef2a50:
-board_name=cudy,wr3000-v2, userspace MACs ...:73/...:74, br-lan up, ping 15/15).
-
-**What remains hardware-dependent:** only a possible one-loader boot-test for
-the flashinfo binding if the vendor compatible moves; the driver/YAML cleanups
-are code review.  Full record: `../07-dts-upstream-bindings.md` section 6.
+**Not claimed / out of scope:** pinctrl consumer states, consumer clocks, the
+A/B boot-selector protocol beyond the measured cell, LED description, Wi-Fi and
+thermal support, and unused vendor blocks (wired-first target).  Full record:
+`../07-dts-upstream-bindings.md` section 6.
 
 **Not claimed / out of scope (not counted as blockers above):** pinctrl consumer
 states, consumer clocks, the A/B boot-selector protocol beyond the measured
